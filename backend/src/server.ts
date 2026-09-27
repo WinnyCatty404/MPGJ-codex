@@ -90,6 +90,8 @@ async function buildProjectDocx(projectId: string) {
     '系统等级': levelChinese ? `第${levelChinese}级` : `第${project.system_level}级`,
     '测评年度': String(project.assessment_year),
     '密评机构名称': institution.name || '',
+    '密评机构通信地址': institution.address || '',
+    '密评机构邮政编码': institution.postalCode || '',
     '密评机构联系人姓名': institution.contact || '',
     '密评机构联系人职务/职称': institution.title || '',
     '密评机构联系人所属部门': institution.department || '',

@@ -6302,41 +6302,6 @@
         log = applyWordImport(blocks, file.name);
         normalizeParagraphTextareas(document.getElementById('page-implement'));
         syncTopologyCaption();
-        // 仅提取2.2章节中的内嵌拓扑图，现场证据截图仍不自动导入。
-        try {
-          const section = blocks.findIndex(function (b) { return b.type === 'p' && b.text.trim() === '网络拓扑图及描述' && _impHLevel(b.style) > 0; });
-          const ids = [];
-          if (section >= 0) {
-            const level = _impHLevel(blocks[section].style);
-            for (let i = section + 1; i < blocks.length; i++) {
-              const b = blocks[i];
-              if (b.type === 'p' && _impHLevel(b.style) > 0 && _impHLevel(b.style) <= level) break;
-              (b.imageIds || []).forEach(function (id) { if (!ids.includes(id)) ids.push(id); });
-            }
-          }
-          const rels = new DOMParser().parseFromString(dec8.decode(_impZipRead(buf8, 'word/_rels/document.xml.rels')), 'application/xml');
-          const candidates = Array.from(rels.getElementsByTagName('Relationship')).filter(function (rel) {
-            return ids.includes(rel.getAttribute('Id')) && /\/image$/.test(rel.getAttribute('Type') || '') && rel.getAttribute('TargetMode') !== 'External';
-          });
-          if (candidates.length === 1) {
-            const target = candidates[0].getAttribute('Target');
-            const ext = target.split('.').pop().toLowerCase();
-            const mime = { png: 'image/png', jpg: 'image/jpeg', jpeg: 'image/jpeg', gif: 'image/gif' }[ext];
-            if (!mime) throw new Error('拓扑图格式暂不支持，请手动上传');
-            const bytes = _impZipRead(buf8, target.startsWith('/') ? target.slice(1) : 'word/' + target.replace(/^\.\//, ''));
-            let binary = '';
-            for (let i = 0; i < bytes.length; i += 8192) binary += String.fromCharCode.apply(null, bytes.subarray(i, i + 8192));
-            const img = document.getElementById('topology-image');
-            img.src = 'data:' + mime + ';base64,' + btoa(binary);
-            img.style.display = 'block';
-            document.getElementById('topology-placeholder').style.display = 'none';
-            document.getElementById('topology-upload-area').classList.add('has-image');
-            document.getElementById('topology-filename').textContent = '图2-1 ' + (document.getElementById('mi-sys-name').value || '{被测系统}') + '网络拓扑图';
-          }
-          log.sections.push({ title: '网络拓扑图', lines: [{ msg: candidates.length === 1 ? '已导入2.2章节拓扑图' : '未找到唯一的内嵌拓扑图，请手动选择上传（不影响描述正文导入）', warn: candidates.length !== 1 }] });
-        } catch (imageError) {
-          log.sections.push({ title: '网络拓扑图', lines: [{ msg: imageError.message || '拓扑图导入失败，请手动上传', warn: true }] });
-        }
       } catch (e) {
         showToast('导入失败：' + (e && e.message ? e.message : e), true);
         return;
@@ -6551,7 +6516,7 @@
         add(s1, '基本信息表数值字段（等保级别/S-A-G、备案编号、测评情况、用户数量、密码产品数量等）已定向回填');
       }
     }
-    add(s1, '说明：报告封面、声明、密评机构信息及现场证据截图不导入；2.2拓扑图单独识别');
+    add(s1, '说明：报告封面、声明、密评机构信息、网络拓扑图片及现场证据截图不导入；网络拓扑描述正文正常导入');
 
     // ============ 2. 系统资产 / 测评对象 / 测评指标 ============
     const s2 = sec('步骤2 · 测评准备与方案编制');
