@@ -14,7 +14,7 @@ import { fileURLToPath } from 'node:url';
 import { randomUUID } from 'node:crypto';
 import { writeReportContent } from './report-content.js';
 import { writeAppendixBImages, writePlanningImages, writeReportEvidence } from './report-evidence.js';
-import { allowLatinWordWrap, formatAppendixBHeadings, formatFigureOneOne, formatLatinFonts, formatReportTables, normalizeBasicInfoTemplateValues, normalizeCheckboxLabelSpacing, replaceReportSlots, specializeReportTemplate, unresolvedReportSlots } from './report-template.js';
+import { allowLatinWordWrap, formatAppendixBHeadings, formatFigureOneOne, formatLatinFonts, formatReportTables, normalizeBasicInfoTemplateValues, normalizeCheckboxLabelSpacing, prepareLevelTwoTemplate, replaceReportSlots, specializeReportTemplate, unresolvedReportSlots } from './report-template.js';
 import { generatePreviousAssessment } from './previous-assessment.js';
 
 dotenv.config({ path: fileURLToPath(new URL('../../.env', import.meta.url)) });
@@ -25,6 +25,8 @@ const jwtSecret = process.env.JWT_SECRET || 'development-only-change-me';
 const execFileAsync = promisify(execFile);
 const storageRoot = fileURLToPath(new URL('../../storage/', import.meta.url));
 const defaultReportTemplate = path.join(storageRoot, 'templates', 'report', 'default-report-template.docx');
+const levelTwoReportTemplate = path.join(storageRoot, 'templates', 'report', 'level-2', 'default-report-template.docx');
+const reportTemplateForLevel = (level: number) => level === 2 ? levelTwoReportTemplate : defaultReportTemplate;
 const rawTemplateRoot = path.join(storageRoot, 'templates', 'records');
 const pool = new Pool({
   connectionString:
@@ -68,9 +70,9 @@ async function buildProjectDocx(projectId: string) {
   ]);
   const project = projectResult.rows[0];
   if (!project) return null;
-  if (Number(project.system_level) !== 3) throw new Error('当前仅已核对三级报告模板；二级项目需配置并核对二级模板后才能导出');
+  if (![2, 3].includes(Number(project.system_level))) throw new Error('仅支持二级和三级系统');
   // 使用“模板设置 → 报告模板”上传的当前文件；项目导入的 Word 只作为数据来源。
-  const template = await fs.readFile(defaultReportTemplate).catch(() => {
+  const template = await fs.readFile(reportTemplateForLevel(Number(project.system_level))).catch(() => {
     throw new Error('尚未配置报告模板，请先在“模板设置”中上传 DOCX 文件');
   });
   const zip = await JSZip.loadAsync(template);
@@ -78,6 +80,7 @@ async function buildProjectDocx(projectId: string) {
   const previousAssessment = generatePreviousAssessment(stageData.planning || {});
   const content = stageData.reporting?.exportContent;
   const savedValues = stageData.reporting?.templateValues as Record<string, string> | undefined;
+  if (stageData.reporting?.assessmentLevel && Number(stageData.reporting.assessmentLevel) !== Number(project.system_level)) throw new Error('项目等级已变更，请重新打开实施页面并保存后导出');
   if (!content || !savedValues) throw new Error('请刷新项目实施页面并重新导出，以保存最新报告字段');
   const institution = institutionResult.rows[0]?.setting_value || defaultInstitution;
   const levelNumber = Number(project.system_level);
@@ -117,8 +120,9 @@ async function buildProjectDocx(projectId: string) {
     if (!file) continue;
     let xml = await file.async('string');
     if (name === 'word/document.xml') {
+      if (levelNumber === 2) xml = prepareLevelTwoTemplate(xml, await zip.file('word/styles.xml')!.async('string'));
       xml = specializeReportTemplate(xml, values);
-      xml = writeReportContent(xml, await zip.file('word/styles.xml')!.async('string'), { ...content, sections: [] });
+      xml = writeReportContent(xml, await zip.file('word/styles.xml')!.async('string'), { ...content, sections: levelNumber === 2 ? content.sections : [] });
       xml = await writePlanningImages(xml, zip, planningImages);
       xml = await writeReportEvidence(xml, zip, stageData.onsite?.onsiteRecords || {});
       xml = await writeAppendixBImages(xml, zip, stageData.reporting?.appendixBImages || {});
@@ -609,16 +613,23 @@ app.get('/api/templates', auth, asyncRoute(async (_req, res) => {
     try { name = JSON.parse(await fs.readFile(path.join(path.dirname(defaultReportTemplate), 'metadata.json'), 'utf8')).originalName || name; } catch { /* use physical file name */ }
     report = { name, size: stat.size, updatedAt: stat.mtime.toISOString() };
   } catch { /* no default template yet */ }
-  res.json({ report, rawRecords: await listRawTemplates() });
+  let report2: typeof report = null;
+  try {
+    const stat = await fs.stat(levelTwoReportTemplate);
+    const meta = JSON.parse(await fs.readFile(path.join(path.dirname(levelTwoReportTemplate), 'metadata.json'), 'utf8'));
+    report2 = { name: meta.originalName || '二级报告模板.docx', size: stat.size, updatedAt: stat.mtime.toISOString() };
+  } catch { /* Level two has an independent template. */ }
+  res.json({ report, report2, rawRecords: await listRawTemplates() });
 }));
 
 app.post('/api/templates/report', auth, asyncRoute(async (req, res) => {
   if (req.user!.role !== 'admin') return res.status(403).json({ message: '仅管理员可配置模板' });
-  const input = z.object({ name: z.string().min(1).max(255), dataBase64: z.string().min(1) }).parse(req.body);
+  const input = z.object({ systemLevel: z.union([z.literal(2), z.literal(3)]).default(3), name: z.string().min(1).max(255), dataBase64: z.string().min(1) }).parse(req.body);
   if (!input.name.toLowerCase().endsWith('.docx')) return res.status(400).json({ message: '报告模板必须为 DOCX 文件' });
-  await fs.mkdir(path.dirname(defaultReportTemplate), { recursive: true });
-  await fs.writeFile(defaultReportTemplate, Buffer.from(input.dataBase64, 'base64'));
-  await fs.writeFile(path.join(path.dirname(defaultReportTemplate), 'metadata.json'), JSON.stringify({ originalName: input.name, uploadedAt: new Date().toISOString() }, null, 2));
+  const templatePath = reportTemplateForLevel(input.systemLevel);
+  await fs.mkdir(path.dirname(templatePath), { recursive: true });
+  await fs.writeFile(templatePath, Buffer.from(input.dataBase64, 'base64'));
+  await fs.writeFile(path.join(path.dirname(templatePath), 'metadata.json'), JSON.stringify({ originalName: input.name, uploadedAt: new Date().toISOString() }, null, 2));
   res.json({ stored: true });
 }));
 

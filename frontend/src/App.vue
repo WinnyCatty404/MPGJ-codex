@@ -382,13 +382,13 @@ async function saveInstitution() {
   } catch (error) { notify((error as Error).message); }
 }
 
-async function uploadReportTemplate(event: Event) {
+async function uploadReportTemplate(event: Event, systemLevel = 3) {
   const file = (event.target as HTMLInputElement).files?.[0];
   if (!file) return;
   try {
-    await api('/templates/report', { method: 'POST', body: JSON.stringify({ name: file.name, dataBase64: await fileAsBase64(file) }) });
+    await api('/templates/report', { method: 'POST', body: JSON.stringify({ systemLevel, name: file.name, dataBase64: await fileAsBase64(file) }) });
     templateInfo.value = await api('/templates');
-    notify('默认报告模板已更新');
+    notify(systemLevel === 2 ? '二级报告模板已导入' : '三级报告模板已导入');
   } catch (error) { notify((error as Error).message); }
 }
 
@@ -533,7 +533,7 @@ onMounted(async () => {
 
       <div v-else-if="page==='templates'" class="content settings-page">
         <section class="page-title"><div><small>TEMPLATE CENTER</small><h1>模板设置</h1><p>统一维护正式报告模板与原始记录文件夹模板。</p></div></section>
-        <section class="template-grid"><article class="panel template-card"><div class="template-icon">W</div><div><small>WORD REPORT</small><h2>报告模板</h2><p>导出时保留模板原有目录、分页、页眉页脚和表格，只替换模板中已有字段。</p><div class="template-meta"><b>{{ templateInfo.report?.name || '尚未配置' }}</b><span v-if="templateInfo.report">{{ Math.round(templateInfo.report.size/1024/1024*10)/10 }} MB · 已配置默认模板</span></div></div><label class="primary upload-button">选择 DOCX 模板<input type="file" accept=".docx" @change="uploadReportTemplate" /></label></article>
+        <section class="template-grid"><article class="panel template-card"><div class="template-icon">W</div><div><small>WORD REPORT</small><h2>三级报告模板</h2><p>导出时保留模板原有目录、分页、页眉页脚和表格，只替换模板中已有字段。</p><div class="template-meta"><b>{{ templateInfo.report?.name || '尚未配置' }}</b><span v-if="templateInfo.report">{{ Math.round(templateInfo.report.size/1024/1024*10)/10 }} MB · 已配置默认模板</span></div></div><label class="primary upload-button">导入三级报告模板<input type="file" accept=".docx" @change="uploadReportTemplate($event, 3)" /></label></article><article class="panel template-card"><div class="template-icon">W</div><div><small>WORD REPORT</small><h2>二级报告模板</h2><p>导出时保留模板原有目录、分页、页眉页脚和表格，只替换模板中已有字段。</p><div class="template-meta"><b>{{ templateInfo.report2?.name || '尚未配置' }}</b><span v-if="templateInfo.report2">{{ Math.round(templateInfo.report2.size/1024/1024*10)/10 }} MB · 已配置默认模板</span></div></div><label class="primary upload-button">导入二级报告模板<input type="file" accept=".docx" @change="uploadReportTemplate($event, 2)" /></label></article>
           <article class="panel template-card"><div class="template-icon folder">▰</div><div><small>RAW RECORDS</small><h2>原始记录模板</h2><p>按文件夹结构保存，生成时将完整复制到“报告编号+原始记录”文件夹。</p><div class="template-meta"><b>{{ templateInfo.rawRecords?.length || 0 }} 个文件</b><span>{{ templateInfo.rawRecords?.slice(0,3).map((f:any)=>f.path).join('、') || '尚未导入文件夹' }}</span></div></div><label class="primary upload-button">导入模板文件夹<input type="file" webkitdirectory multiple @change="uploadRawFolder" /></label></article></section>
         <section class="panel template-rules"><h3>报告模板字段规则</h3><p>可在需要系统写入的位置使用 <code>{报告编号}</code>、<code>{项目编号}</code>、<code>{系统名称}</code>、<code>{责任单位}</code>、<code>{测评年度}</code>、<code>{系统等级}</code>。系统只替换模板中真实存在的字段。</p><p>表 A-1 至表 A-8 请保留各测评单元名称和一行数据样板；导出时会按测评对象扩行、合并同一单元的名称与得分，并将该层面的证据截图放在表后。</p></section>
       </div>
@@ -547,3 +547,4 @@ onMounted(async () => {
   <div v-if="showPasswordModal" class="modal-mask" @click.self="showPasswordModal=false"><form class="modal small" @submit.prevent="changePassword"><div class="modal-head"><div><small>ACCOUNT SECURITY</small><h2>修改账户密码</h2></div><button type="button" @click="showPasswordModal=false">×</button></div><div class="form-grid password-grid"><label class="span-2">当前密码<input v-model="passwordForm.currentPassword" type="password" required autocomplete="current-password" /></label><label>新密码<input v-model="passwordForm.newPassword" type="password" minlength="8" required autocomplete="new-password" /></label><label>确认新密码<input v-model="passwordForm.confirmPassword" type="password" minlength="8" required autocomplete="new-password" /></label></div><div class="modal-foot"><button type="button" class="secondary" @click="showPasswordModal=false">取消</button><button class="primary">确认修改</button></div></form></div>
   <transition name="toast"><div v-if="toast" class="toast">✓ {{ toast }}</div></transition>
 </template>
+

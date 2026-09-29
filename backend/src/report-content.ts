@@ -155,10 +155,11 @@ export function writeReportContent(xml: string, styles: string, content: ReportC
     if (active && level && level <= active.level) active = null;
     const section = level ? content.sections.find(s => s.heading === t) : null;
     if (section) { active = { text: section.text, level, written: false }; return block; }
-    if (!active || level || !t || /<w:(drawing|pict)\b/.test(block) || /^图\s*\d/.test(t)) return block;
+    if (!active || level || !t || /\{\{[^{}]+\}\}/.test(t) || /<w:(drawing|pict)\b/.test(block) || /^图\s*\d/.test(t)) return block;
     const updated = writeText(block, active.written ? '' : active.text);
     active.written = true;
     return updated;
   });
   return xml;
 }
+

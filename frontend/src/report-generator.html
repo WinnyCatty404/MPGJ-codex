@@ -1574,11 +1574,11 @@
                 <div style="font-size:13px; font-weight:600; color:#1a3a6c; margin-bottom:8px; padding-left:10px; border-left:3px solid #4caf50;" data-page-node-id="gkMfA18I3j0FGtP4Pqj39E">网络拓扑图及描述</div>
 
                 <div style="margin-bottom:12px;" data-page-node-id="PtkvcgRAlMxQNgSGufEVlj">
-                  <div style="font-size:12px; color:#666; margin-bottom:6px;" data-page-node-id="kCXcDWgUg0dXhXyTYzPEHz">拓扑图（支持点击上传本地图片或在此区域粘贴图片）</div>
-                  <div class="topology-upload" id="topology-upload-area" onclick="document.getElementById('topology-file').click()" data-page-node-id="GymXQxFQBc9FrKXXeuN1Mo">
+                  <div style="font-size:12px; color:#666; margin-bottom:6px;" data-page-node-id="kCXcDWgUg0dXhXyTYzPEHz">拓扑图（点击选中后粘贴，或导入本机图片）</div>
+                  <div class="topology-upload" id="topology-upload-area" tabindex="0" onclick="selectPlanImageArea(this)" data-page-node-id="GymXQxFQBc9FrKXXeuN1Mo">
                     <div class="topology-placeholder" id="topology-placeholder" data-page-node-id="n8UWU5Q5k8B0ZoIuoPNiE3">
                       <div style="font-size:28px; margin-bottom:6px;" data-page-node-id="VhaFUUn78UITsvZJ1EsuZF">🖼️</div>
-                      <div data-page-node-id="ZX6tZk6pMTOKNiU7WzrqA7">点击上传图片，或按 Ctrl+V 粘贴图片</div>
+                      <div data-page-node-id="ZX6tZk6pMTOKNiU7WzrqA7">点击本框选中后 <b>Ctrl+V</b> 粘贴图片，或 <button type="button" class="image-import-link" onclick="event.stopPropagation(); selectPlanImageArea(document.getElementById('topology-upload-area')); document.getElementById('topology-file').click()">导入本机图片</button></div>
                       <div style="font-size:12px; color:#999; margin-top:4px;" data-page-node-id="OWYzmL2c0E6eMNjNwvMdiW">图片将自动命名为：{系统名称}网络拓扑图</div>
                     </div>
                     <img id="topology-image" style="display:none; max-width:100%; max-height:400px; border-radius:6px;" data-page-node-id="3F9XL1JmcP4ryverbba9AH" />
@@ -1618,25 +1618,25 @@
                 <section class="crypto-layer-panel active" data-layer="0" data-image-id="physical-crypto-image">
                   <div class="crypto-layer-main">
                     <div class="crypto-description"><label for="plan-crypto-physical">应用情况描述</label><textarea id="plan-crypto-physical" maxlength="2000" class="text-area indent-text" oninput="updateCryptoLayerUi()"></textarea><span class="crypto-char-count">0/2000</span></div>
-                    <div class="crypto-media"><label>配图（可粘贴截图）</label><div class="crypto-thumb"><img id="physical-crypto-image" style="display:none;"><button type="button" onclick="clearPlanCryptoImage('physical-crypto-image')">×</button></div><label class="crypto-upload">＋ 粘贴/上传<input type="file" accept="image/*" onchange="handlePlanCryptoUpload(this,'physical-crypto-image')"></label></div>
+                    <div class="crypto-media"><label>配图（可粘贴截图）</label><div class="crypto-thumb"><img id="physical-crypto-image" style="display:none;"><button type="button" onclick="clearPlanCryptoImage('physical-crypto-image')">×</button></div><div class="crypto-upload" tabindex="0" onclick="selectPlanImageArea(this)">点击本框选中后 <b>Ctrl+V</b> 粘贴图片，或 <button type="button" class="image-import-link" onclick="event.stopPropagation(); selectPlanImageArea(this.parentElement); this.nextElementSibling.click()">导入本机图片</button><input type="file" accept="image/*" onchange="handlePlanCryptoUpload(this,'physical-crypto-image')"></div></div>
                   </div>
                 </section>
                 <section class="crypto-layer-panel" data-layer="1" data-image-id="network-crypto-image">
                   <div class="crypto-layer-main">
                     <div class="crypto-description"><label for="plan-crypto-network">应用情况描述</label><textarea id="plan-crypto-network" maxlength="2000" class="text-area indent-text" oninput="updateCryptoLayerUi()"></textarea><span class="crypto-char-count">0/2000</span></div>
-                    <div class="crypto-media"><label>配图（可粘贴截图）</label><div class="crypto-thumb"><img id="network-crypto-image" style="display:none;"><button type="button" onclick="clearPlanCryptoImage('network-crypto-image')">×</button></div><label class="crypto-upload">＋ 粘贴/上传<input type="file" accept="image/*" onchange="handlePlanCryptoUpload(this,'network-crypto-image')"></label></div>
+                    <div class="crypto-media"><label>配图（可粘贴截图）</label><div class="crypto-thumb"><img id="network-crypto-image" style="display:none;"><button type="button" onclick="clearPlanCryptoImage('network-crypto-image')">×</button></div><div class="crypto-upload" tabindex="0" onclick="selectPlanImageArea(this)">点击本框选中后 <b>Ctrl+V</b> 粘贴图片，或 <button type="button" class="image-import-link" onclick="event.stopPropagation(); selectPlanImageArea(this.parentElement); this.nextElementSibling.click()">导入本机图片</button><input type="file" accept="image/*" onchange="handlePlanCryptoUpload(this,'network-crypto-image')"></div></div>
                   </div>
                 </section>
                 <section class="crypto-layer-panel" data-layer="2" data-image-id="device-crypto-image">
                   <div class="crypto-layer-main">
                     <div class="crypto-description"><label for="plan-crypto-device">应用情况描述</label><textarea id="plan-crypto-device" maxlength="2000" class="text-area indent-text" oninput="updateCryptoLayerUi()"></textarea><span class="crypto-char-count">0/2000</span></div>
-                    <div class="crypto-media"><label>配图（可粘贴截图）</label><div class="crypto-thumb"><img id="device-crypto-image" style="display:none;"><button type="button" onclick="clearPlanCryptoImage('device-crypto-image')">×</button></div><label class="crypto-upload">＋ 粘贴/上传<input type="file" accept="image/*" onchange="handlePlanCryptoUpload(this,'device-crypto-image')"></label></div>
+                    <div class="crypto-media"><label>配图（可粘贴截图）</label><div class="crypto-thumb"><img id="device-crypto-image" style="display:none;"><button type="button" onclick="clearPlanCryptoImage('device-crypto-image')">×</button></div><div class="crypto-upload" tabindex="0" onclick="selectPlanImageArea(this)">点击本框选中后 <b>Ctrl+V</b> 粘贴图片，或 <button type="button" class="image-import-link" onclick="event.stopPropagation(); selectPlanImageArea(this.parentElement); this.nextElementSibling.click()">导入本机图片</button><input type="file" accept="image/*" onchange="handlePlanCryptoUpload(this,'device-crypto-image')"></div></div>
                   </div>
                 </section>
                 <section class="crypto-layer-panel crypto-layer-application" data-layer="3" data-image-id="application-crypto-image">
                   <div class="crypto-layer-main">
                     <div class="crypto-description"><label for="plan-crypto-application">应用情况描述</label><textarea id="plan-crypto-application" maxlength="2000" class="text-area indent-text" oninput="updateCryptoLayerUi()"></textarea><span class="crypto-char-count">0/2000</span></div>
-                    <div class="crypto-media"><label>配图（可粘贴截图）</label><div class="crypto-thumb"><img id="application-crypto-image" style="display:none;"><button type="button" onclick="clearPlanCryptoImage('application-crypto-image')">×</button></div><label class="crypto-upload">＋ 粘贴/上传<input type="file" accept="image/*" onchange="handlePlanCryptoUpload(this,'application-crypto-image')"></label></div>
+                    <div class="crypto-media"><label>配图（可粘贴截图）</label><div class="crypto-thumb"><img id="application-crypto-image" style="display:none;"><button type="button" onclick="clearPlanCryptoImage('application-crypto-image')">×</button></div><div class="crypto-upload" tabindex="0" onclick="selectPlanImageArea(this)">点击本框选中后 <b>Ctrl+V</b> 粘贴图片，或 <button type="button" class="image-import-link" onclick="event.stopPropagation(); selectPlanImageArea(this.parentElement); this.nextElementSibling.click()">导入本机图片</button><input type="file" accept="image/*" onchange="handlePlanCryptoUpload(this,'application-crypto-image')"></div></div>
                   </div>
                   <div class="crypto-key-card">
                     <div class="crypto-key-title"><strong>非对称密钥列表</strong><span>导出为报告表 2-1</span></div>
@@ -1845,7 +1845,7 @@
                   <thead>
                     <tr>
                       <th style="width:45px;">序号</th>
-                      <th>应用用户名称</th>
+                      <th>应用用户名称</th><th>所属应用</th>
                     </tr>
                   </thead>
                   <tbody id="app-user-tbody"></tbody>
@@ -2189,16 +2189,11 @@
                 </div>
               </div>
               <div id="method-sub-panel-2" class="obj-layer-panel" data-page-node-id="q1rsV3OSUUIbwG0Pegab9f">
-                <div class="obj-table-caption" data-page-node-id="ph8WdLQwzW1I8gjXLFbcPT">测评接入点</div>
-                <div id="access-point-list" data-page-node-id="VwDEbVHq1nc6yoiGLucFOL"></div>
-                <div style="margin-top:4px;" data-page-node-id="N8YOp8TpbWCIYbB893Ewpv">
-                  <button class="btn btn-secondary" style="width:auto; padding:0 14px; height:32px; font-size:13px;" onclick="addAccessPoint()" data-page-node-id="ZuoKs0t89AM8CVYMmTmmUO">＋ 添加接入点</button>
-                </div>
-                <div class="obj-table-caption" style="margin-top:24px;" data-page-node-id="dTS478fDCJrP70jUAcGuxW">图 3-1 工具接入示意图</div>
-                <div class="topology-upload" id="access-upload-area" onclick="document.getElementById('access-file').click()" data-page-node-id="J9w8kXz6JwwVeoojI8ZBcg">
+                <div class="obj-table-caption" data-page-node-id="dTS478fDCJrP70jUAcGuxW">图 3-1 工具接入示意图</div>
+                <div class="topology-upload" id="access-upload-area" tabindex="0" onclick="selectPlanImageArea(this)" data-page-node-id="J9w8kXz6JwwVeoojI8ZBcg">
                   <div class="topology-placeholder" id="access-placeholder" data-page-node-id="GG6OlM4kPnUCFfwq16l8Fl">
                     <div style="font-size:28px; margin-bottom:6px;" data-page-node-id="PLV5mX9mDVM7mHT5sNqEep">🖼️</div>
-                    <div data-page-node-id="kWu5nKA3WctG7li38VVWfi">点击上传图片，或按 Ctrl+V 粘贴图片</div>
+                    <div data-page-node-id="kWu5nKA3WctG7li38VVWfi">点击本框选中后 <b>Ctrl+V</b> 粘贴图片，或 <button type="button" class="image-import-link" onclick="event.stopPropagation(); selectPlanImageArea(document.getElementById('access-upload-area')); document.getElementById('access-file').click()">导入本机图片</button></div>
                     <div style="font-size:12px; color:#999; margin-top:4px;" data-page-node-id="S3nNGeIGSwmBHPlib7zsd2">图片将自动命名为：图3-1 工具接入示意图</div>
                   </div>
                   <img id="access-image" style="display:none; max-width:100%; max-height:400px; border-radius:6px;" data-page-node-id="Z1Wkc82drziHmbXtCroqNm" />
@@ -2207,6 +2202,11 @@
                 <div style="display:flex; justify-content:space-between; align-items:center; margin-top:8px;" data-page-node-id="pxBkZHrtxFn5xutuNxH9Rj">
                   <div style="font-size:12px; color:#666;" data-page-node-id="vuOdOuYr1ALTNQZUb2XvoC">图片名称：<span id="access-filename" data-page-node-id="DxfrDDUZRV9DXk1hco46ED">--</span></div>
                   <button class="btn btn-secondary btn-sm" onclick="clearAccessImage()" data-page-node-id="frCAz5jkHX8l9YjWHBejOQ">清除图片</button>
+                </div>
+                <div class="obj-table-caption" style="margin-top:24px;" data-page-node-id="ph8WdLQwzW1I8gjXLFbcPT">测评接入点</div>
+                <div id="access-point-list" data-page-node-id="VwDEbVHq1nc6yoiGLucFOL"></div>
+                <div style="margin-top:4px;" data-page-node-id="N8YOp8TpbWCIYbB893Ewpv">
+                  <button class="btn btn-secondary" style="width:auto; padding:0 14px; height:32px; font-size:13px;" onclick="addAccessPoint()" data-page-node-id="ZuoKs0t89AM8CVYMmTmmUO">＋ 添加接入点</button>
                 </div>
               </div>
               <div class="form-actions" style="margin-top:20px;" data-page-node-id="doHcuQguZgPBsKxXnCSNgR">
@@ -2318,7 +2318,7 @@
         <div class="report-export-grid">
           <div class="report-export-card">
             <div class="report-export-card-head"><div class="report-export-icon">W</div><strong>Word 版本报告</strong></div>
-            <p>使用已核对的三级模板，写入当前项目保存的字段、表格和图片，并更新目录与页码。</p>
+            <p>按项目等级使用二级或三级模板，写入当前项目保存的字段、表格和图片，并更新目录与页码。</p>
             <button id="export-docx-btn" class="btn btn-primary report-export-btn" onclick="exportProjectReport('docx', this)">导出 Word</button>
           </div>
           <div class="report-export-card">
@@ -2852,6 +2852,11 @@
     const p = projects.find(x => x.id === id);
     if (!p) return;
     currentImplementProject = p;
+    configureAssessmentLevel();
+    onsiteRecords = {};
+    onsiteImportedObjects = {};
+    reportFixes = {};
+    reportCellOverrides = {};
     // 系统名称以新建项目时的值为唯一来源，后续Word导入不覆盖。
     document.getElementById('mi-sys-name').value = p.systemName || '';
     // 项目准备：被测单位名称默认带入项目责任单位，其余清空待填
@@ -2907,7 +2912,7 @@
     // 测评目的模板
     document.getElementById('plan-eval-purpose').value =
       `浙江省电子信息产品检验研究院受${org}的委托，于${startDate}到${endDate}，` +
-      `依据GB/T 39786-2021《信息安全技术 信息系统密码应用基本要求》的第三级别要求，` +
+      `依据GB/T 39786-2021《信息安全技术 信息系统密码应用基本要求》的第${assessmentLevelLabel()}级别要求，` +
       `对${org}从物理和环境安全、网络和通信安全、设备和计算安全、应用和数据安全、管理制度、人员管理、建设运行和应急处置等方面进行密码应用安全性评估，` +
       `通过测评项目的实施，根据被测信息系统当前的安全状况，给出测评结果并提出改进建议，` +
       `以确保被测信息系统达到GB/T 39786-2021《信息安全技术 信息系统密码应用基本要求》的要求，` +
@@ -3117,7 +3122,7 @@
   }
 
   // ===== 测评准备与方案编制 · 测评指标 =====
-  const evaluationIndicatorLevels = [
+  const LEVEL_THREE_INDICATORS = [
     {
       name: '物理和环境安全',
       items: [
@@ -3200,6 +3205,191 @@
       ]
     }
   ];
+
+  const LEVEL_TWO_INDICATORS = [
+  {
+    "name": "物理和环境安全",
+    "items": [
+      {
+        "name": "身份鉴别",
+        "desc": "8.1 a）宜采用密码技术进行物理访问身份鉴别，保证重要区域进入人员身份的真实性；",
+        "level": "宜"
+      },
+      {
+        "name": "电子门禁记录数据存储完整性",
+        "desc": "8.1 b）可采用密码技术保证电子门禁系统进出记录数据的存储完整性；",
+        "level": "可"
+      }
+    ]
+  },
+  {
+    "name": "网络和通信安全",
+    "items": [
+      {
+        "name": "身份鉴别",
+        "desc": "8.2 a）宜采用密码技术对通信实体进行身份鉴别，保证通信实体身份的真实性；",
+        "level": "宜"
+      },
+      {
+        "name": "通信数据完整性",
+        "desc": "8.2 b）可采用密码技术保证通信过程中数据的完整性；",
+        "level": "可"
+      },
+      {
+        "name": "通信过程中重要数据的机密性",
+        "desc": "8.2 c）宜采用密码技术保证通信过程中重要数据的机密性；",
+        "level": "宜"
+      },
+      {
+        "name": "网络边界访问控制信息的完整性",
+        "desc": "8.2 d）可采用密码技术保证网络边界访问控制信息的完整性；",
+        "level": "可"
+      }
+    ]
+  },
+  {
+    "name": "设备和计算安全",
+    "items": [
+      {
+        "name": "身份鉴别",
+        "desc": "8.3 a）宜采用密码技术对登录设备的用户进行身份鉴别，保证用户身份的真实性；",
+        "level": "宜"
+      },
+      {
+        "name": "系统资源访问控制信息完整性",
+        "desc": "8.3 b）可采用密码技术保证系统资源访问控制信息的完整性；",
+        "level": "可"
+      },
+      {
+        "name": "日志记录完整性",
+        "desc": "8.3 c）可采用密码技术保证日志记录的完整性；",
+        "level": "可"
+      }
+    ]
+  },
+  {
+    "name": "应用和数据安全",
+    "items": [
+      {
+        "name": "身份鉴别",
+        "desc": "8.4 a）宜采用密码技术对登录用户进行身份鉴别，保证应用系统用户身份的真实性；",
+        "level": "宜"
+      },
+      {
+        "name": "访问控制信息完整性",
+        "desc": "8.4 b）可采用密码技术保证信息系统应用的访问控制信息的完整性；",
+        "level": "可"
+      },
+      {
+        "name": "重要数据传输机密性",
+        "desc": "8.4 c）宜采用密码技术保证信息系统应用的重要数据在传输过程中的机密性；",
+        "level": "宜"
+      },
+      {
+        "name": "重要数据存储机密性",
+        "desc": "8.4 d）宜采用密码技术保证信息系统应用的重要数据在存储过程中的机密性；",
+        "level": "宜"
+      },
+      {
+        "name": "重要数据传输完整性",
+        "desc": "8.4 e）宜采用密码技术保证信息系统应用的重要数据在传输过程中的完整性；",
+        "level": "宜"
+      },
+      {
+        "name": "重要数据存储完整性",
+        "desc": "8.4 f）宜采用密码技术保证信息系统应用的重要数据在存储过程中的完整性；",
+        "level": "宜"
+      }
+    ]
+  },
+  {
+    "name": "管理制度",
+    "items": [
+      {
+        "name": "具备密码应用安全管理制度",
+        "desc": "8.5 a）应具备密码应用安全管理制度，包括密码人员管理、密钥管理、建设运行、应急处置、密码软硬件及介质管理等制度；",
+        "level": "应"
+      },
+      {
+        "name": "密钥管理规则",
+        "desc": "8.5 b）应根据密码应用方案建立相应密钥管理规则；",
+        "level": "应"
+      },
+      {
+        "name": "建立操作规程",
+        "desc": "8.5 c）应对管理人员或操作人员执行的日常管理操作建立操作规程；",
+        "level": "应"
+      }
+    ]
+  },
+  {
+    "name": "人员管理",
+    "items": [
+      {
+        "name": "了解并遵守密码相关法律法规和密码管理制度",
+        "desc": "8.6 a）相关人员应了解并遵守密码相关法律法规、密码应用安全管理制度；",
+        "level": "应"
+      },
+      {
+        "name": "建立密码应用岗位责任制度",
+        "desc": "8.6 b）应建立密码应用岗位责任制度，明确各岗位在安全系统中的职责和权限：1）根据密码应用的实际情况，设置密钥管理员、密码安全审计员、密码操作员等关键安全岗位；2）对关键岗位建立多人共管机制；3）密钥管理、密码安全审计、密码操作人员职责互相制约互相监督，其中密码安全审计员岗位不可与密钥管理员、密码操作员兼任；4）相关设备与系统的管理和使用账号不得多人共用。",
+        "level": "应"
+      },
+      {
+        "name": "建立上岗人员培训制度",
+        "desc": "8.6 c）应建立上岗人员培训制度，对于涉及密码的操作和管理的人员进行专门培训，确保其具备岗位所需专业技能；",
+        "level": "应"
+      },
+      {
+        "name": "建立关键岗位人员保密制度和调离制度",
+        "desc": "8.6 d）应建立关键人员保密制度和调离制度，签订保密合同，承担保密义务。",
+        "level": "应"
+      }
+    ]
+  },
+  {
+    "name": "建设运行",
+    "items": [
+      {
+        "name": "制定密码应用方案",
+        "desc": "8.7 a）应依据密码相关标准和密码应用需求，制定密码应用方案；",
+        "level": "应"
+      },
+      {
+        "name": "制定密钥安全管理策略",
+        "desc": "8.7 b）应根据密码应用方案，确定系统涉及的密钥种类、体系及其生命周期环节，各环节安全管理要求参照《信息安全技术 信息系统密码应用基本要求》附录B；",
+        "level": "应"
+      },
+      {
+        "name": "制定实施方案",
+        "desc": "8.7 c）应按照应用方案实施建设；",
+        "level": "应"
+      },
+      {
+        "name": "投入运行前进行密码应用安全性评估",
+        "desc": "8.7 d）投入运行前应进行密码应用安全性评估，评估通过后系统方可正式运行；",
+        "level": "应"
+      }
+    ]
+  },
+  {
+    "name": "应急处置",
+    "items": [
+      {
+        "name": "应急策略",
+        "desc": "8.8 a）应制定密码应用应急策略，做好应急资源准备，当密码应用安全事件发生时，应立即启动应急处置措施，结合实际情况及时处置；",
+        "level": "应"
+      }
+    ]
+  }
+];
+  let evaluationIndicatorLevels = LEVEL_THREE_INDICATORS;
+  function assessmentLevel() { return /2|二/.test(String(currentImplementProject?.level || 3)) ? 2 : 3; }
+  function assessmentLevelLabel() { return assessmentLevel() === 2 ? "二" : "三"; }
+  function configureAssessmentLevel() {
+    evaluationIndicatorLevels = assessmentLevel() === 2 ? LEVEL_TWO_INDICATORS : LEVEL_THREE_INDICATORS;
+    REPORT_UNIT_WEIGHTS = assessmentLevel() === 2 ? LEVEL_TWO_WEIGHTS : LEVEL_THREE_WEIGHTS;
+  }
 
   function renderIndicatorTables() {
     evaluationIndicatorLevels.forEach((level, levelIdx) => {
@@ -3317,6 +3507,7 @@
   }
 
   function handleTopologyPaste(e) {
+    if (!document.getElementById('topology-upload-area')?.classList.contains('image-area-selected')) return;
     // 仅在网络拓扑图及描述 tab 激活时处理图片粘贴
     const tabPanel = document.getElementById('plan-tab-11');
     if (!tabPanel || !tabPanel.classList.contains('active')) return;
@@ -3517,7 +3708,7 @@
     const panel = document.getElementById('plan-tab-12');
     if (!panel || !panel.classList.contains('active')) return;
     const activeLayer = panel.querySelector('.crypto-layer-panel.active');
-    if (!activeLayer) return;
+    if (!activeLayer || !activeLayer.querySelector('.image-area-selected')) return;
     const imageId = activeLayer.dataset.imageId;
     if (imageId) handlePlanCryptoPaste(event, imageId);
   });
@@ -3626,7 +3817,7 @@
 
   // ===== 应用用户（关键业务应用子表：同步至现场测评·身份鉴别对象 与 报告表4-5） =====
   function getAppUserRowHtml(idx) {
-    return '<tr><td>' + idx + '</td><td><input type="text" class="full-input" placeholder="如：XX平台的管理员" /></td></tr>';
+    return '<tr><td>' + idx + '</td><td><input type="text" class="full-input" placeholder="如：XX平台的管理员" /></td><td><input type="text" class="full-input" placeholder="填写关键业务应用的完整名称" /></td></tr>';
   }
 
   function addAppUserRow() {
@@ -3908,10 +4099,32 @@
   // 设备和计算安全 A-3.1 起……应急处置 A-8.1 起；编号由系统分配不可编辑，图片名称可自行输入
   let onsiteEvidenceTarget = null; // 当前选中的证据单元格 {t, itemIdx, objIdx}
 
+  function getImportantDataAssets() {
+    return Array.from(document.getElementById('asset-tbody-data')?.rows || []).map(row => {
+      const value = col => row.cells[col]?.querySelector('input, textarea')?.value.trim() || '';
+      return { name: value(1), app: value(3), reqs: Array.from(row.cells[5]?.querySelectorAll('.req-chip') || []).map(chip => chip.getAttribute('data-req')) };
+    }).filter(row => row.name);
+  }
+
+  function dataRequirementApplies(name, unitName) {
+    const req = ONSITE_UNIT_DATA_REQ[unitName];
+    if (!req) return null;
+    const norm = value => impNormName(value);
+    const assets = getImportantDataAssets();
+    let matches = assets.filter(row => norm(row.app ? row.name + '-' + row.app : row.name) === norm(name));
+    if (!matches.length) matches = assets.filter(row => norm(row.name) === norm(name));
+    return matches.length ? matches.some(row => row.reqs.includes(req)) : null;
+  }
+
   function getOnsiteRec(t, itemIdx, objIdx) {
     const k = onsiteKey(t, itemIdx, objIdx);
     if (!onsiteRecords[k]) onsiteRecords[k] = { record: '', D: '', A: '', K: '', evidence: [] };
     if (!onsiteRecords[k].evidence) onsiteRecords[k].evidence = [];
+    const unit = evaluationIndicatorLevels[t]?.items[itemIdx]?.name;
+    if (t === 3 && ONSITE_UNIT_DATA_REQ[unit]) {
+      const name = getOnsiteUnitObjects(t, unit)[objIdx];
+      if (name && dataRequirementApplies(name, unit) === false) return { ...onsiteRecords[k], D: '/', A: '/', K: '/' };
+    }
     return onsiteRecords[k];
   }
 
@@ -4250,7 +4463,7 @@
   // 安全层面权重 wi：技术部分（物理10+网络20+设备10+应用30=70）+ 管理部分（制度8+人员8+建设8+应急6=30）
   const REPORT_LAYER_WEIGHTS = [10, 20, 10, 30, 8, 8, 8, 6];
   // 测评单元权重 wi,j（顺序与 evaluationIndicatorLevels 各层面 items 一致）
-  const REPORT_UNIT_WEIGHTS = [
+  const LEVEL_THREE_WEIGHTS = [
     [1, 0.7, 0.7],                        // 物理和环境安全
     [1, 0.7, 1, 0.4, 0.4],                // 网络和通信安全
     [1, 1, 0.4, 0.4, 0.4, 0.7],           // 设备和计算安全
@@ -4260,6 +4473,8 @@
     [1, 1, 0.7, 1, 0.7],                  // 建设运行
     [1, 0.7, 0.7]                         // 应急处置
   ];
+  const LEVEL_TWO_WEIGHTS = [[0.7, 0.4], [0.7, 0.4, 0.7, 0.4], [0.7, 0.4, 0.4], [0.7, 0.4, 0.7, 0.7, 0.7, 0.7], [1, 0.7, 0.7], [0.7, 1, 0.7, 0.7], [1, 1, 0.7, 1], [1]];
+  let REPORT_UNIT_WEIGHTS = LEVEL_THREE_WEIGHTS;
   // 可作为弥补指标的技术类层面（默认网络和通信安全优先）
   const REPORT_COMP_LAYERS = [1, 0, 2];
   // 分值弥补缓存：key = 被弥补对象 t|itemIdx|objIdx -> { comp: 't|itemIdx|objIdx', reason }
@@ -4589,6 +4804,14 @@
   }
 
   // ----- 表4-5 应用和数据安全身份鉴别测评结果汇总（行=系统资产·应用用户） -----
+  function getAppUserDisplayNames() {
+    return Array.from(document.getElementById('app-user-tbody')?.rows || []).map(row => {
+      const name = row.cells[1]?.querySelector('input, textarea')?.value.trim() || '';
+      const app = row.cells[2]?.querySelector('input, textarea, select')?.value.trim() || '';
+      return { name, label: app && !name.endsWith('-' + app) ? name + '-' + app : name };
+    }).filter(user => user.name).map(user => user.label);
+  }
+
   function renderUaIdentityTable(t) {
     const itemIdx = evaluationIndicatorLevels[t].items.findIndex(it => it.name === '身份鉴别');
     const unitCls = reportClassify(getRawUnitScore(t, itemIdx));
@@ -4601,11 +4824,12 @@
       '<th style="width:45px;">序号</th><th>应用用户</th><th style="width:130px;">身份鉴别</th>' +
       '</tr></thead><tbody>';
     const effList = [];
-    users.forEach(u => {
+    const userLabels = getAppUserDisplayNames();
+    users.forEach((u, userIndex) => {
       const k = 'idn|' + u;
       const eff = reportCellOverrides[k] || unitCls;
       effList.push(eff);
-      html += '<tr><td style="text-align:center;">' + (effList.length) + '</td><td>' + onsiteEsc(u) + '</td>' +
+      html += '<tr><td style="text-align:center;">' + (effList.length) + '</td><td>' + onsiteEsc(userLabels[userIndex] || u) + '</td>' +
         '<td style="text-align:center;"><select class="ua-cls-select" style="color:' + clsColor(eff) + '; font-weight:600;" onchange="reportCellOverrides[\'' + onsiteEsc(k) + '\']=this.value; renderReportUnitAnalysis();">' + clsSelectOptions(eff) + '</select></td></tr>';
     });
     html += '<tr class="ua-sum-row"><td colspan="2" style="text-align:center;">单元测评结果<br/><span style="font-weight:400; font-size:11px;">（符合/部分符合/不符合/不适用）</span></td>' +
@@ -4614,6 +4838,15 @@
   }
 
   // ----- 表4-6 应用和数据安全重要数据测评结果汇总 -----
+  // 仅汇总真实对象记录；缺失对象的展示回填不参与计算。
+  function getUaDataFinalResult(t, itemIdx) {
+    const item = evaluationIndicatorLevels[t]?.items[itemIdx];
+    if (!item) return '未测评';
+    const results = getOnsiteUnitObjects(t, item.name).map((name, pos) =>
+      dataRequirementApplies(name, item.name) === false ? '不适用' : (reportCellOverrides[t + '|' + itemIdx + '|' + pos] || getObjectCls(t, itemIdx, pos)));
+    return results.length ? aggCls(results) : reportClassify(getRawUnitScore(t, itemIdx));
+  }
+
   function renderUaImpDataTable(t) {
     const unitNames = ['重要数据传输机密性', '重要数据存储机密性', '重要数据传输完整性', '重要数据存储完整性'];
     const colNames = ['传输机密性', '存储机密性', '传输完整性', '存储完整性'];
@@ -4634,8 +4867,13 @@
       unitIdxs.forEach((itemIdx, ci) => {
         const objs = getOnsiteUnitObjects(t, unitNames[ci]);
         const pos = objs.indexOf(objName);
+        if (dataRequirementApplies(objName, unitNames[ci]) === false) {
+          html += uaSumRowClsCell('不适用');
+          return;
+        }
         if (pos < 0) {
-          html += '<td style="text-align:center; color:#c3cad6;">—</td>';
+          const finalResult = getUaDataFinalResult(t, itemIdx);
+          html += '<td title="引用该指标的单元测评结果" style="text-align:center; color:' + clsColor(finalResult) + '; font-weight:600;">' + finalResult + '</td>';
           return;
         }
         const k = t + '|' + itemIdx + '|' + pos;
@@ -4646,7 +4884,7 @@
       html += '</tr>';
     });
     html += '<tr class="ua-sum-row"><td colspan="2" style="text-align:center;">单元测评结果<br/><span style="font-weight:400; font-size:11px;">（符合/部分符合/不符合/不适用）</span></td>';
-    colEff.forEach(list => { html += uaSumRowClsCell(aggCls(list)); });
+    unitIdxs.forEach(itemIdx => { html += uaSumRowClsCell(getUaDataFinalResult(t, itemIdx)); });
     html += '</tr></tbody></table>';
     return html;
   }
@@ -4654,6 +4892,7 @@
   // ----- 表4-7 应用和数据安全不可否认性测评结果汇总（操作行为取系统资产·关键业务应用） -----
   function renderUaNonRepudTable(t) {
     const itemIdx = evaluationIndicatorLevels[t].items.findIndex(it => it.name === '不可否认性');
+    if (itemIdx < 0) return '';
     const unitCls = reportClassify(getRawUnitScore(t, itemIdx));
     const apps = getAssetAppNames();
     const onsiteObjs = getOnsiteUnitObjects(t, '不可否认性');
@@ -4685,11 +4924,30 @@
     const rows = [];
     const tokens = name => String(name).split(/[、；;\n]/).map(impNormName).filter(Boolean);
     const contains = (a, b) => b.every(token => a.includes(token));
+    // 网络通道全称/简称兼容：仅处理“系统访问通道”与“访问通道”。
+    // 先检查所有单元，同一单元有多个候选时保留独立行，避免结果错配。
+    const channelKey = name => impNormName(name).replace(/系统访问通道/g, '访问通道');
+    const channelGroups = new Map();
+    if (t === 1) units.forEach(({ item, itemIdx }) => {
+      getOnsiteUnitObjects(t, item.name).forEach(name => {
+        const key = channelKey(name);
+        if (!key.endsWith('访问通道')) return;
+        let group = channelGroups.get(key);
+        if (!group) { group = { counts: new Map(), name: name }; channelGroups.set(key, group); }
+        group.counts.set(itemIdx, (group.counts.get(itemIdx) || 0) + 1);
+        if (impNormName(name).length > impNormName(group.name).length) group.name = name;
+      });
+    });
     units.forEach(({ item, itemIdx }) => {
       getOnsiteUnitObjects(t, item.name).forEach((name, pos) => {
         const parts = tokens(name);
         // 管理对象是文档组合。仅在不同单元、唯一候选且完整文档集合包含时合并。
-        let matches = rows.filter(row => row.positions[itemIdx] === undefined && impNormName(row.name) === impNormName(name));
+        let matches = rows.filter(row => (t >= 4 || row.positions[itemIdx] === undefined) && impNormName(row.name) === impNormName(name));
+        const channelGroup = t === 1 ? channelGroups.get(channelKey(name)) : null;
+        const uniqueChannel = channelGroup && Array.from(channelGroup.counts.values()).every(count => count === 1);
+        if (!matches.length && uniqueChannel) {
+          matches = rows.filter(row => row.positions[itemIdx] === undefined && channelKey(row.name) === channelKey(name));
+        }
         if (!matches.length && t >= 4 && parts.length >= 2) {
           matches = rows.filter(row => row.positions[itemIdx] === undefined && row.parts.length >= 2 &&
             (contains(parts, row.parts) || contains(row.parts, parts)));
@@ -4697,10 +4955,74 @@
         let row = matches.length === 1 ? matches[0] : null;
         if (!row) { row = { name: name, parts: parts, positions: {} }; rows.push(row); }
         else if (parts.length > row.parts.length) { row.name = name; row.parts = parts; }
-        row.positions[itemIdx] = pos;
+        if (uniqueChannel) row.name = channelGroup.name;
+        // 管理文档同名记录归并展示，但保留全部记录索引以汇总结果。
+        if (!row.allPositions) row.allPositions = {};
+        if (!row.allPositions[itemIdx]) row.allPositions[itemIdx] = [];
+        row.allPositions[itemIdx].push(pos);
+        if (row.positions[itemIdx] === undefined) row.positions[itemIdx] = pos;
       });
     });
     return rows;
+  }
+
+  function getUaObjectRowResult(t, itemIdx, row) {
+    const positions = row.allPositions?.[itemIdx] || [];
+    if (!positions.length) return '—';
+    const results = positions.map(pos => getObjectCls(t, itemIdx, pos));
+    if (results.includes('未测评')) return '未测评';
+    return aggCls(results);
+  }
+
+  // 表4-4按所属应用归集现场测评结果；页面和Word共用。
+  function getUaAppResult(appName, item, itemIdx) {
+    const apps = [...new Set(getAssetAppNames())];
+    const norm = value => impNormName(value);
+    const inferOwner = name => {
+      const key = norm(name);
+      const exact = apps.filter(app => norm(app) === key);
+      if (exact.length === 1) return exact;
+      const matches = apps.filter(app => key.includes(norm(app)));
+      return matches.length === 1 ? matches : [];
+    };
+    const belongs = owners => owners.some(owner => norm(owner) === norm(appName));
+    const objects = getOnsiteUnitObjects(3, item.name);
+    const positions = [];
+    const req = ONSITE_UNIT_DATA_REQ[item.name];
+    const appData = req ? getImportantDataAssets().filter(row => norm(row.app) === norm(appName)) : [];
+    if (appData.length && !appData.some(row => row.reqs.includes(req))) return '不适用';
+    const cellText = (row, col) => row.cells[col]?.querySelector('input[type="text"], textarea, select')?.value.trim() || '';
+    objects.forEach((name, pos) => {
+      let owners = [];
+      let explicit = false;
+      if (item.name === '身份鉴别') {
+        Array.from(document.getElementById('app-user-tbody')?.rows || []).forEach(row => {
+          if (norm(cellText(row, 1)) !== norm(name)) return;
+          const owner = cellText(row, 2);
+          if (owner) { explicit = true; owners.push(owner); }
+        });
+      } else if (req) {
+        Array.from(document.getElementById('asset-tbody-data')?.rows || []).forEach(row => {
+          const data = cellText(row, 1), owner = cellText(row, 3);
+          if (!data || !owner) return;
+          const applicable = Array.from(row.cells[5]?.querySelectorAll('.req-chip') || []).some(chip => chip.getAttribute('data-req') === req);
+          if (!applicable) return;
+          if (norm(name) === norm(data + '-' + owner) || norm(name) === norm(data)) {
+            explicit = true; owners.push(owner);
+          }
+        });
+      }
+      if (!explicit) owners = inferOwner(name);
+      // 数据只有名称且在多个应用中重名时，不推断归属。
+      owners = [...new Set(owners.map(norm))];
+      if (owners.length === 1 && belongs(owners)) positions.push(pos);
+    });
+    if (!positions.length) return req ? getUaDataFinalResult(3, itemIdx) : '—';
+    const results = positions.map(pos => req
+      ? (dataRequirementApplies(objects[pos], item.name) === false ? '不适用' : (reportCellOverrides['3|' + itemIdx + '|' + pos] || getObjectCls(3, itemIdx, pos)))
+      : getObjectCls(3, itemIdx, pos));
+    if (results.includes('未测评')) return '未测评';
+    return aggCls(results);
   }
 
   function renderReportUnitAnalysis() {
@@ -4715,11 +5037,8 @@
     const t = reportUaLayer;
     const cfg = ONSITE_LAYERS[t];
     const level = evaluationIndicatorLevels[t];
-    // 表4-4只展示关键业务应用。重要数据对象及其四个专用指标在表4-6单独汇总。
-    const dataUnitNames = ['重要数据传输机密性', '重要数据存储机密性', '重要数据传输完整性', '重要数据存储完整性'];
-    const units = t === 3
-      ? level.items.map((item, itemIdx) => ({ item: item, itemIdx: itemIdx })).filter(x => dataUnitNames.indexOf(x.item.name) < 0)
-      : level.items.map((item, itemIdx) => ({ item: item, itemIdx: itemIdx }));
+    // 各等级汇总表完整展示本层面全部指标，与报告导出一致；专项表保留对象明细。
+    const units = level.items.map((item, itemIdx) => ({ item: item, itemIdx: itemIdx }));
     // 结果汇总矩阵：行=测评对象（层面内并集），列=测评单元
     const objList = [];
     const objectRows = t === 3 ? [] : buildUaObjectRows(t, units);
@@ -4740,19 +5059,15 @@
         units.forEach(({ item, itemIdx }) => {
           const unitObjs = getOnsiteUnitObjects(t, item.name);
           let pos = t === 3 ? unitObjs.indexOf(objName) : (objectRows[oi].positions[itemIdx] ?? -1);
-          if (t === 3 && pos < 0) {
-            // 表4-4的行是关键业务应用，附录A的对象可能写成“系统用户/应用系统”。
-            // 单一应用时按该测评单元的实际结果汇总，避免因名称不同全部显示“—”。
-            if (objList.length === 1 && unitObjs.length) {
-              const unitCls = reportClassify(getRawUnitScore(t, itemIdx));
-              html += '<td style="text-align:center; color:' + clsColor(unitCls) + '; font-weight:600;">' + unitCls + '</td>';
-              return;
-            }
+          if (t === 3) {
+            const cls = getUaAppResult(objName, item, itemIdx);
+            html += '<td style="text-align:center; color:' + (cls === '—' ? '#c3cad6' : clsColor(cls)) + '; font-weight:600;">' + cls + '</td>';
+            return;
           }
           if (pos < 0) {
             html += '<td style="text-align:center; color:#c3cad6;">—</td>';
           } else {
-            const cls = getObjectCls(t, itemIdx, pos);
+            const cls = getUaObjectRowResult(t, itemIdx, objectRows[oi]);
             html += '<td style="text-align:center; color:' + clsColor(cls) + '; font-weight:600;">' + cls + '</td>';
           }
         });
@@ -4918,7 +5233,7 @@
     if (cnt['未测评']) {
       html += '<div class="alert-box"><span class="icon">⚠️</span><div>当前仍有 <strong>' + cnt['未测评'] + '</strong> 个测评单元未完成现场测评判定，其不参与量化评估，以上得分仅供参考。请回到第三步「现场测评」补全判定。</div></div>';
     }
-    html += '<div class="onsite-note">量化评估规则（《商用密码应用安全性评估量化评估规则（2023版）》）：S<sub>i,j</sub> 为测评单元内各测评对象测评结果的算术平均值（管理要求：符合＝1、部分符合＝0.5、不符合＝0；技术要求按表1 DAK规则并结合分值弥补）；S<sub>i</sub> 为层面内适用测评单元的加权平均值（单元权重 w<sub>i,j</sub> 按表4第三级）；综合得分 S＝技术部分×70＋管理部分×30，两部分分别按安全层面权重 w<sub>i</sub>（物理和环境10、网络和通信20、设备和计算10、应用和数据30、管理制度8、人员管理8、建设运行8、应急处置6）加权归一后折算，四舍五入取2位小数；不适用单元不参与量化评估。评估结论判定规则：综合得分100分为符合；小于100分、不低于60分且无高风险为基本符合；否则为不符合。</div>';
+    html += '<div class="onsite-note">量化评估规则（《商用密码应用安全性评估量化评估规则（2023版）》）：S<sub>i,j</sub> 为测评单元内各测评对象测评结果的算术平均值（管理要求：符合＝1、部分符合＝0.5、不符合＝0；技术要求按表1 DAK规则并结合分值弥补）；S<sub>i</sub> 为层面内适用测评单元的加权平均值（单元权重 w<sub>i,j</sub> 按当前' + assessmentLevelLabel() + '级指标权重）；综合得分 S＝技术部分×70＋管理部分×30，两部分分别按安全层面权重 w<sub>i</sub>（物理和环境10、网络和通信20、设备和计算10、应用和数据30、管理制度8、人员管理8、建设运行8、应急处置6）加权归一后折算，四舍五入取2位小数；不适用单元不参与量化评估。评估结论判定规则：综合得分100分为符合；小于100分、不低于60分且无高风险为基本符合；否则为不符合。</div>';
     panel.innerHTML = html;
   }
 
@@ -5018,7 +5333,7 @@
     const riskWord = conclusion === '不符合' ? '高风险' : '中风险';
     const autoText = '通过对' + sys + '的物理和环境安全、网络和通信安全、设备和计算安全、应用和数据安全、管理制度、人员管理、建设运行和应急处置等方面的测评，' +
       '该系统综合得分为' + (totals.total != null ? totals.total : '--') + '分，系统密码应用面临' + riskWord +
-      '，' + conclusion + 'GB/T 39786—2021《信息安全技术 信息系统密码应用基本要求》的第三级别要求。';
+      '，' + conclusion + 'GB/T 39786—2021《信息安全技术 信息系统密码应用基本要求》的第' + assessmentLevelLabel() + '级别要求。';
     html += '<div class="report-section-title">评估结论（自动生成，可编辑）</div>';
     html += reportTextarea('report-conclusion-text', autoText, 160);
     html += '<div class="onsite-note">评估结论判定规则如下：' +
@@ -5081,7 +5396,7 @@
     const riskWord = conclusion === '不符合' ? '高风险' : '中风险';
     return '通过对' + sys + '的物理和环境安全、网络和通信安全、设备和计算安全、应用和数据安全、管理制度、人员管理、建设运行和应急处置等方面的测评，' +
       '该系统综合得分为' + (totals.total != null ? totals.total : '--') + '分，系统密码应用面临' + riskWord +
-      '，' + conclusion + 'GB/T 39786—2021《信息安全技术 信息系统密码应用基本要求》的第三级别要求。';
+      '，' + conclusion + 'GB/T 39786—2021《信息安全技术 信息系统密码应用基本要求》的第' + assessmentLevelLabel() + '级别要求。';
   }
 
   // Word导出功能已按需求移除（原总体评价、安全问题及改进建议导出）
@@ -5100,7 +5415,7 @@
     }
     html += '<div class="doc-card">';
     html += '<div class="doc-title">总体评价</div>';
-    html += '<p class="doc-p">本次信息系统商用密码应用安全性评估依据GB/T 39786—2021《信息安全技术 信息系统密码应用基本要求》的第三级别要求，' +
+    html += '<p class="doc-p">本次信息系统商用密码应用安全性评估依据GB/T 39786—2021《信息安全技术 信息系统密码应用基本要求》的第' + assessmentLevelLabel() + '级别要求，' +
       '选取的测评指标总数为' + cnt.total + '项，其中不适用项为' + cnt['不适用'] + '项，特殊指标0项。' +
       '测评结果为：符合项' + cnt['符合'] + '项，部分符合项' + cnt['部分符合'] + '项，不符合项' + cnt['不符合'] + '项。' +
       '其中，在部分符合和不符合项中：高风险项' + high + '项，中风险项' + mid + '项，低风险项' + low + '项。</p>';
@@ -5387,7 +5702,7 @@
   function apbPreviewImage(e) {
     if (e) e.stopPropagation();
     const w = window.open('', '_blank');
-    if (w) w.document.write('<body style="margin:0;background:#333;text-align:center;"><img src="' + e.target.src + '" style="max-width:100%;max-height:100%;" /></body>');
+    if (w) w.document.write('<body style="margin:0;background:#333;text-align:center;"><img src="' + e.target.src + '" style="max-width:100%;max-height:100%;" /></body>');;
   }
 
   const APB_NO_TRAVEL = '因本项目测试现场在本市区范围内，故未产生差旅、住宿费用。';
@@ -5897,6 +6212,7 @@
   }
 
   function handleAccessPaste(e) {
+    if (!document.getElementById('access-upload-area')?.classList.contains('image-area-selected')) return;
     // 仅在测评方法及工具 tab 且接入点子面板激活时处理
     const tabPanel = document.getElementById('plan-tab-4');
     const subPanel = document.getElementById('method-sub-panel-2');
@@ -6557,7 +6873,9 @@
         t.rows.slice(1).forEach(function (r) {
           const v = r.map(function (c) { return String(c || '').trim(); });
           if (!v[1]) return;
-          dataRows210.push({ data: v[1], desc: v[2] || '', app: v[3] || '', pos: v[4] || '', reqs: v[5] || '' });
+          const header = (t.rows[0] || []).map(c => String(c || '').replace(/\s+/g, ''));
+          const reqIndex = header.findIndex(c => c.includes('安全需求'));
+          dataRows210.push({ data: v[1], desc: v[2] || '', app: v[3] || '', pos: v[4] || '', reqs: v[reqIndex >= 0 ? reqIndex : 5] || '' });
         });
         return;
       }
@@ -6596,7 +6914,7 @@
           const v0 = String(r[0] || '').trim(), name = String(r[1] || '').trim();
           if (!name || /单元测评结果/.test(v0)) return;
           auTbody.insertAdjacentHTML('beforeend',
-            '<tr><td>' + (++auN) + '</td><td><input type="text" class="full-input" value="' + onsiteEsc(name) + '" /></td></tr>');
+            '<tr><td>' + (++auN) + '</td><td><input type="text" class="full-input" value="' + onsiteEsc(name) + '" /></td><td><input type="text" class="full-input" placeholder="填写关键业务应用的完整名称" /></td></tr>');
         });
       }
       if (!auN) auTbody.insertAdjacentHTML('beforeend', getAppUserRowHtml(1));
@@ -6931,7 +7249,7 @@
       if (tbody) {
         tbody.innerHTML = '';
         dataRows210.forEach(function (d, i) {
-          const reqs = DATA_REQ_DEFAULTS.filter(function (r) { return (d.reqs || '').indexOf(r) >= 0; });
+          const reqs = DATA_REQ_DEFAULTS.filter(function (r) { return (d.reqs || '').replace(/\s+/g, '').indexOf(r) >= 0; });
           const chips = reqs.map(function (r) {
             return '<span class="req-chip" data-req="' + r + '">' + r + '<i class="req-chip-x" title="删除该安全需求" onclick="removeDataReq(this)">×</i></span>';
           }).join('');
@@ -7939,6 +8257,8 @@
     assetTypes.forEach(function (type) {
       result[type] = captureRowValues(document.getElementById('asset-tbody-' + type));
     });
+    result.dataRequirements = Array.from(document.getElementById('asset-tbody-data')?.rows || []).map(row =>
+      Array.from(row.querySelectorAll('.req-chip')).map(chip => chip.getAttribute('data-req')));
     result.appUsers = captureRowValues(document.getElementById('app-user-tbody'));
     return result;
   }
@@ -7955,6 +8275,14 @@
       fillRowValues(tbody, rows);
       if (type === 'person') normalizePersonAssetRows();
     });
+    if (Array.isArray(saved.dataRequirements)) {
+      Array.from(document.getElementById('asset-tbody-data')?.rows || []).forEach((row, index) => {
+        const reqs = saved.dataRequirements[index];
+        if (!Array.isArray(reqs) || !row.cells[5]) return;
+        row.cells[5].innerHTML = reqs.filter(req => DATA_REQ_DEFAULTS.includes(req)).map(req =>
+          '<span class="req-chip" data-req="' + req + '">' + req + '<i class="req-chip-x" title="删除该安全需求" onclick="removeDataReq(this)">×</i></span>').join('');
+      });
+    }
     const appRows = saved.appUsers || [];
     const appBody = document.getElementById('app-user-tbody');
     if (appBody) {
@@ -7968,6 +8296,7 @@
     const root = panelForStep(step);
     const data = {
       prototypeVersion: 2,
+      assessmentLevel: assessmentLevel(),
       fields: captureFields(root),
       images: captureImages(root)
     };
@@ -8222,8 +8551,9 @@
     const identityLayer = 3;
     const identityItem = evaluationIndicatorLevels[identityLayer].items.findIndex(item => item.name === '身份鉴别');
     const identityDefault = reportClassify(getRawUnitScore(identityLayer, identityItem));
+    const appUserLabels = getAppUserDisplayNames();
     const appUserRows = appUsers.map(function (name, index) {
-      return [String(index + 1), name, reportCellOverrides['idn|' + name] || identityDefault];
+      return [String(index + 1), appUserLabels[index] || name, reportCellOverrides['idn|' + name] || identityDefault];
     });
     tables.push({
       caption: '应用和数据安全身份鉴别测评结果汇总',
@@ -8242,8 +8572,8 @@
         units.forEach(function ({ item, itemIdx }) {
           const unitObjects = getOnsiteUnitObjects(t, item.name);
           const pos = t === 3 ? unitObjects.indexOf(name) : (objectRows[index].positions[itemIdx] ?? -1);
-          if (pos >= 0) values.push(getObjectCls(t, itemIdx, pos));
-          else if (t === 3 && objects.length === 1 && unitObjects.length) values.push(reportClassify(getRawUnitScore(t, itemIdx)));
+          if (t === 3) values.push(getUaAppResult(name, item, itemIdx));
+          else if (pos >= 0) values.push(getUaObjectRowResult(t, itemIdx, objectRows[index]));
           else values.push('—');
         });
         return values;
@@ -8263,7 +8593,8 @@
       const values = [String(index + 1), name];
       dataUnits.forEach(function (unitName, column) {
         const pos = getOnsiteUnitObjects(3, unitName).indexOf(name);
-        if (pos < 0) { values.push('—'); return; }
+        if (dataRequirementApplies(name, unitName) === false) { values.push('不适用'); return; }
+        if (pos < 0) { values.push(getUaDataFinalResult(3, dataItems[column])); return; }
         const result = reportCellOverrides['3|' + dataItems[column] + '|' + pos] || getObjectCls(3, dataItems[column], pos);
         dataResults[column].push(result);
         values.push(result);
@@ -8272,10 +8603,11 @@
     });
     tables.push({
       caption: '应用和数据安全重要数据测评结果汇总', rows: dataRows, skip: 1, repeat: true,
-      footerRows: [[null, null].concat(dataResults.map(aggCls))]
+      footerRows: [[null, null].concat(dataItems.map(itemIdx => getUaDataFinalResult(3, itemIdx)))]
     });
     // 表4-7：操作行为按关键业务应用逐行汇总。
     const nonRepItem = evaluationIndicatorLevels[3].items.findIndex(item => item.name === '不可否认性');
+    if (nonRepItem >= 0) {
     const nonRepDefault = reportClassify(getRawUnitScore(3, nonRepItem));
     const nonRepObjects = getOnsiteUnitObjects(3, '不可否认性');
     const nonRepRows = getAssetAppNames().map(function (name, index) {
@@ -8287,6 +8619,7 @@
       caption: '应用和数据安全不可否认性测评结果汇总', rows: nonRepRows, skip: 1, repeat: true,
       footerRows: [[null, null, aggCls(nonRepRows.map(row => row[2]))]]
     });
+    }
     // 表5-1：只导出需要分值弥补的传输类重要数据对象。
     const fixRows = [];
     evaluationIndicatorLevels[3].items.forEach(function (item, itemIdx) {
@@ -8355,7 +8688,45 @@
     return { tables: tables, sections: sections, version: 1 };
   }
 
+
+  function migrateAssessmentSnapshot(saved) {
+    const sourceLevel = Number(saved.assessmentLevel || 3);
+    if (sourceLevel === assessmentLevel()) return saved;
+    saved = JSON.parse(JSON.stringify(saved));
+    const source = sourceLevel === 2 ? LEVEL_TWO_INDICATORS : LEVEL_THREE_INDICATORS;
+    const indexFor = (t, i) => evaluationIndicatorLevels[t]?.items.findIndex(item => item.name === source[t]?.items[i]?.name) ?? -1;
+    const keyFor = key => {
+      const match = /^(\d+)\|(\d+)(.*)$/.exec(key);
+      if (!match) return key;
+      const next = indexFor(Number(match[1]), Number(match[2]));
+      return next < 0 ? null : match[1] + '|' + next + match[3];
+    };
+    ['onsiteRecords', 'onsiteImportedObjects', 'reportFixes', 'reportCellOverrides', 'reportRiskStore'].forEach(field => {
+      if (!saved[field]) return;
+      saved[field] = Object.fromEntries(Object.entries(saved[field]).flatMap(([key, value]) => {
+        const next = keyFor(key);
+        if (next === null) return [];
+        if (field === 'reportFixes' && value.comp) {
+          value.comp = keyFor(value.comp);
+          if (!value.comp) return [];
+        }
+        return [[next, value]];
+      }));
+    });
+    saved.fields = (saved.fields || []).filter(field => {
+      const match = /^indicator-(applicable|reason)-(\d+)-(\d+)$/.exec(field.id || '');
+      if (!match) return true;
+      const next = indexFor(Number(match[2]), Number(match[3]));
+      if (next < 0) return false;
+      field.id = 'indicator-' + match[1] + '-' + match[2] + '-' + next;
+      return true;
+    });
+    saved.assessmentLevel = assessmentLevel();
+    return saved;
+  }
+
   function hydrate(step, saved) {
+    if (saved) saved = migrateAssessmentSnapshot(saved);
     if (!saved || !saved.prototypeVersion) return;
     if (step === 2) {
       if (saved.cryptoKeyTables) cryptoKeyTables = clone(saved.cryptoKeyTables);
@@ -8811,6 +9182,35 @@
   });
 })();
 </script>
+
+<style>
+body #page-implement .image-area-selected,
+body #page-implement .evi-cell.selected,
+body #page-implement .apb-img-slot.selected {
+  outline: 3px dashed #287cff !important;
+  outline-offset: -3px;
+  background: #f0f6ff !important;
+}
+body #page-implement .image-import-link {
+  border: 0; background: transparent; color: #1677ff; text-decoration: underline;
+  padding: 0; cursor: pointer; font: inherit; width: auto;
+}
+body #page-implement .crypto-upload { cursor: pointer; }
+body #page-implement .crypto-upload input[type="file"] { display: none; }
+</style>
+<script>
+function selectPlanImageArea(area) {
+  document.querySelectorAll('.image-area-selected').forEach(el => el.classList.remove('image-area-selected'));
+  if (area) { area.classList.add('image-area-selected'); area.focus({preventScroll:true}); }
+}
+document.addEventListener('keydown', function(event) {
+  const area = event.target.closest?.('.topology-upload, .crypto-upload');
+  if (area && event.target === area && (event.key === 'Enter' || event.key === ' ')) {
+    event.preventDefault(); selectPlanImageArea(area);
+  }
+});
+</script>
+
 </body>
 </html>
 

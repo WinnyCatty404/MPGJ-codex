@@ -391,14 +391,14 @@ async function saveInstitution() {
         notify(error.message);
     }
 }
-async function uploadReportTemplate(event) {
+async function uploadReportTemplate(event, systemLevel = 3) {
     const file = event.target.files?.[0];
     if (!file)
         return;
     try {
-        await api('/templates/report', { method: 'POST', body: JSON.stringify({ name: file.name, dataBase64: await fileAsBase64(file) }) });
+        await api('/templates/report', { method: 'POST', body: JSON.stringify({ systemLevel, name: file.name, dataBase64: await fileAsBase64(file) }) });
         templateInfo.value = await api('/templates');
-        notify('默认报告模板已更新');
+        notify(systemLevel === 2 ? '二级报告模板已导入' : '三级报告模板已导入');
     }
     catch (error) {
         notify(error.message);
@@ -1912,7 +1912,76 @@ else {
         /** @type {__VLS_StyleScopedClasses['primary']} */ ;
         /** @type {__VLS_StyleScopedClasses['upload-button']} */ ;
         __VLS_asFunctionalElement1(__VLS_intrinsics.input)({
-            ...{ onChange: (__VLS_ctx.uploadReportTemplate) },
+            ...{ onChange: (...[$event]) => {
+                    if (!!(!__VLS_ctx.token))
+                        throw 0;
+                    if (!!(__VLS_ctx.page === 'dashboard'))
+                        throw 0;
+                    if (!!(__VLS_ctx.page === 'projects'))
+                        throw 0;
+                    if (!!(__VLS_ctx.page === 'workspace' && __VLS_ctx.selectedProject))
+                        throw 0;
+                    if (!!(__VLS_ctx.page === 'users'))
+                        throw 0;
+                    if (!!(__VLS_ctx.page === 'institution'))
+                        throw 0;
+                    if (!(__VLS_ctx.page === 'templates'))
+                        throw 0;
+                    return (__VLS_ctx.uploadReportTemplate($event, 3));
+                    // @ts-ignore
+                    [page, page, saveInstitution, institutionForm, institutionForm, institutionForm, institutionForm, institutionForm, institutionForm, institutionForm, institutionForm, institutionForm, templateInfo, templateInfo, templateInfo, uploadReportTemplate,];
+                } },
+            type: "file",
+            accept: ".docx",
+        });
+        __VLS_asFunctionalElement1(__VLS_intrinsics.article, __VLS_intrinsics.article)({
+            ...{ class: "panel template-card" },
+        });
+        /** @type {__VLS_StyleScopedClasses['panel']} */ ;
+        /** @type {__VLS_StyleScopedClasses['template-card']} */ ;
+        __VLS_asFunctionalElement1(__VLS_intrinsics.div, __VLS_intrinsics.div)({
+            ...{ class: "template-icon" },
+        });
+        /** @type {__VLS_StyleScopedClasses['template-icon']} */ ;
+        __VLS_asFunctionalElement1(__VLS_intrinsics.div, __VLS_intrinsics.div)({});
+        __VLS_asFunctionalElement1(__VLS_intrinsics.small, __VLS_intrinsics.small)({});
+        __VLS_asFunctionalElement1(__VLS_intrinsics.h2, __VLS_intrinsics.h2)({});
+        __VLS_asFunctionalElement1(__VLS_intrinsics.p, __VLS_intrinsics.p)({});
+        __VLS_asFunctionalElement1(__VLS_intrinsics.div, __VLS_intrinsics.div)({
+            ...{ class: "template-meta" },
+        });
+        /** @type {__VLS_StyleScopedClasses['template-meta']} */ ;
+        __VLS_asFunctionalElement1(__VLS_intrinsics.b, __VLS_intrinsics.b)({});
+        (__VLS_ctx.templateInfo.report2?.name || '尚未配置');
+        if (__VLS_ctx.templateInfo.report2) {
+            __VLS_asFunctionalElement1(__VLS_intrinsics.span, __VLS_intrinsics.span)({});
+            (Math.round(__VLS_ctx.templateInfo.report2.size / 1024 / 1024 * 10) / 10);
+        }
+        __VLS_asFunctionalElement1(__VLS_intrinsics.label, __VLS_intrinsics.label)({
+            ...{ class: "primary upload-button" },
+        });
+        /** @type {__VLS_StyleScopedClasses['primary']} */ ;
+        /** @type {__VLS_StyleScopedClasses['upload-button']} */ ;
+        __VLS_asFunctionalElement1(__VLS_intrinsics.input)({
+            ...{ onChange: (...[$event]) => {
+                    if (!!(!__VLS_ctx.token))
+                        throw 0;
+                    if (!!(__VLS_ctx.page === 'dashboard'))
+                        throw 0;
+                    if (!!(__VLS_ctx.page === 'projects'))
+                        throw 0;
+                    if (!!(__VLS_ctx.page === 'workspace' && __VLS_ctx.selectedProject))
+                        throw 0;
+                    if (!!(__VLS_ctx.page === 'users'))
+                        throw 0;
+                    if (!!(__VLS_ctx.page === 'institution'))
+                        throw 0;
+                    if (!(__VLS_ctx.page === 'templates'))
+                        throw 0;
+                    return (__VLS_ctx.uploadReportTemplate($event, 2));
+                    // @ts-ignore
+                    [templateInfo, templateInfo, templateInfo, uploadReportTemplate,];
+                } },
             type: "file",
             accept: ".docx",
         });
@@ -1972,7 +2041,7 @@ if (__VLS_ctx.activePlanningModule) {
                     throw 0;
                 return (__VLS_ctx.activePlanningModule = null);
                 // @ts-ignore
-                [page, page, saveInstitution, institutionForm, institutionForm, institutionForm, institutionForm, institutionForm, institutionForm, institutionForm, institutionForm, institutionForm, templateInfo, templateInfo, templateInfo, templateInfo, templateInfo, uploadReportTemplate, uploadRawFolder, activePlanningModule, activePlanningModule,];
+                [templateInfo, templateInfo, uploadRawFolder, activePlanningModule, activePlanningModule,];
             } },
         ...{ class: "modal-mask" },
     });

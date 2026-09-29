@@ -421,3 +421,42 @@ export function replaceReportSlots(xml: string, replacements: Record<string, str
   });
 }
 
+
+
+// The supplied level-two template contains two malformed slots. Repair across split runs.
+export function prepareLevelTwoTemplate(xml: string, styles: string): string {
+  xml = xml.replace(/<w:p\b[^>]*>[\s\S]*?<\/w:p>/g, paragraph => {
+    const value = textOf(paragraph);
+    if (value.includes('{{总体评价_评估结论}') && !value.includes('{{总体评价_评估结论}}')) {
+      paragraph = replaceInBlock(paragraph, '{{总体评价_评估结论}', '{{总体评价_评估结论}}');
+    }
+    if (value.includes('{密评机构名称}}') && !value.includes('{{密评机构名称}}')) {
+      paragraph = replaceInBlock(paragraph, '{密评机构名称}}', '{{密评机构名称}}');
+    }
+    return paragraph;
+  });
+  // Older templates contain literal reference standards instead of the list slot.
+  if (!textOf(xml).includes('{{参考标准和规范列表}}')) {
+    const levels = new Map<string, number>();
+    for (const style of styles.match(/<w:style\b[^>]*>[\s\S]*?<\/w:style>/g) || []) {
+      const id = /w:styleId="([^"]+)"/.exec(style)?.[1];
+      const level = /<w:outlineLvl\b[^>]*w:val="(\d+)"/.exec(style)?.[1];
+      if (id && level !== undefined) levels.set(id, Number(level));
+    }
+    let active = false, headingLevel = 9, written = false;
+    xml = xml.replace(/<w:p\b[^>]*>[\s\S]*?<\/w:p>/g, paragraph => {
+      const value = textOf(paragraph).trim();
+      const style = /<w:pStyle\b[^>]*w:val="([^"]+)"/.exec(paragraph)?.[1] || '';
+      const level = levels.get(style);
+      if (active && level !== undefined && level <= headingLevel) active = false;
+      if (value === '参考标准和规范') {
+        active = true; headingLevel = level ?? 9; return paragraph;
+      }
+      if (!active || !value || level !== undefined) return paragraph;
+      const updated = replaceInBlock(paragraph, value, written ? '' : '{{参考标准和规范列表}}');
+      written = true;
+      return updated;
+    });
+  }
+  return xml;
+}
