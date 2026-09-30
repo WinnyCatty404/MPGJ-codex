@@ -93,12 +93,23 @@ function updateRunProperties(run: string, unbold = false): string {
     : run.replace(/<w:r\b[^>]*>/, match => match + properties);
 }
 
+function tableRangesOf(xml: string): Array<[number, number]> {
+  const ranges: Array<[number, number]> = [];
+  const stack: number[] = [];
+  for (const match of xml.matchAll(/<w:tbl\b[^>]*>|<\/w:tbl>/g)) {
+    if (match[0].startsWith('<w:tbl')) stack.push(match.index);
+    else {
+      const start = stack.pop();
+      if (start !== undefined) ranges.push([start, match.index + match[0].length]);
+    }
+  }
+  return ranges;
+}
+
 function removeTableParagraphIndent(xml: string): string {
-  let depth = 0;
-  return xml.replace(/<w:tbl\b[^>]*>|<\/w:tbl>|<w:p\b[^>]*>[\s\S]*?<\/w:p>/g, block => {
-    if (block.startsWith('<w:tbl')) { depth++; return block; }
-    if (block === '</w:tbl>') { depth--; return block; }
-    if (depth <= 0) return block;
+  const tableRanges = tableRangesOf(xml);
+  return xml.replace(/<w:p\b[^>]*>[\s\S]*?<\/w:p>/g, (block, offset: number) => {
+    if (!tableRanges.some(([start, end]) => start < offset && offset < end)) return block;
     const indent = '<w:ind w:firstLine="0" w:firstLineChars="0"/>';
     const properties = /<w:pPr\b[^>]*>[\s\S]*?<\/w:pPr>/.exec(block)?.[0];
     if (!properties) return block.replace(/<w:p\b[^>]*>/, match => match + `<w:pPr>${indent}</w:pPr>`);
@@ -140,20 +151,18 @@ function updateTableParagraphMarkProperties(paragraph: string): string {
 }
 
 function formatParagraphMarksInsideTables(xml: string): string {
-  let depth = 0;
-  return xml.replace(/<w:tbl\b[^>]*>|<\/w:tbl>|<w:p\b[^>]*>[\s\S]*?<\/w:p>/g, block => {
-    if (block.startsWith('<w:tbl')) { depth++; return block; }
-    if (block === '</w:tbl>') { depth--; return block; }
-    return depth > 0 ? updateTableParagraphMarkProperties(block) : block;
-  });
+  const tableRanges = tableRangesOf(xml);
+  return xml.replace(/<w:p\b[^>]*>[\s\S]*?<\/w:p>/g, (block, offset: number) =>
+    tableRanges.some(([start, end]) => start < offset && offset < end)
+      ? updateTableParagraphMarkProperties(block)
+      : block);
 }
 function formatRunsInsideTables(xml: string): string {
-  let depth = 0;
-  return xml.replace(/<w:tbl\b[^>]*>|<\/w:tbl>|<w:r\b[^>]*>[\s\S]*?<\/w:r>/g, block => {
-    if (block.startsWith('<w:tbl')) { depth++; return block; }
-    if (block === '</w:tbl>') { depth--; return block; }
-    return depth > 0 ? updateRunProperties(block) : block;
-  });
+  const tableRanges = tableRangesOf(xml);
+  return xml.replace(/<w:r\b[^>]*>[\s\S]*?<\/w:r>/g, (block, offset: number) =>
+    tableRanges.some(([start, end]) => start < offset && offset < end)
+      ? updateRunProperties(block)
+      : block);
 }
 
 function findBalancedTableEnd(xml: string, start: number): number {
@@ -349,11 +358,13 @@ export function specializeReportTemplate(xml: string, values: Record<string, str
     return row;
   });
   // 同名占位符在结论表格内代表“符合/基本符合/不符合”，仅表格外的独立段落代表结论正文。
-  let tableDepth = 0;
-  xml = xml.replace(/<\/?w:tbl\b[^>]*>|<w:p\b[^>]*>[\s\S]*?<\/w:p>/g, block => {
-    if (block.startsWith('<w:tbl')) { tableDepth++; return block; }
-    if (block.startsWith('</w:tbl')) { tableDepth--; return block; }
-    return tableDepth === 0 && textOf(block).trim() === '{{评估结论}}'
+  // 模板含嵌套表格，不能在“表格标签/段落”混合正则中累计深度：段落匹配可能跨过
+  // 内层表格标签，导致深度错位，进而把结论表格误写成完整评价段落。先按 XML 标签建立
+  // 每个完整表格的范围，再依据段落起始位置判断上下文。
+  const tableRanges = tableRangesOf(xml);
+  xml = xml.replace(/<w:p\b[^>]*>[\s\S]*?<\/w:p>/g, (block, offset: number) => {
+    const insideTable = tableRanges.some(([start, end]) => start < offset && offset < end);
+    return !insideTable && textOf(block).trim() === '{{评估结论}}'
       ? replaceInBlock(block, '{{评估结论}}', values['评估结论正文'] || '')
       : block;
   });
@@ -425,6 +436,42 @@ export function replaceReportSlots(xml: string, replacements: Record<string, str
 
 // The supplied level-two template contains two malformed slots. Repair across split runs.
 export function prepareLevelTwoTemplate(xml: string, styles: string): string {
+  const chapterTwoCaptionNumbers = new Map([
+    ['人员', 12],
+    ['密码服务', 13],
+    ['安全威胁', 14],
+  ]);
+  xml = xml.replace(/<w:p\b[^>]*>[\s\S]*?<\/w:p>/g, paragraph => {
+    const caption = textOf(paragraph).replace(/\s/g, '');
+    const target = [...chapterTwoCaptionNumbers].find(([title]) => caption.startsWith('表2') && caption.endsWith(title));
+    if (!target) return paragraph;
+    return paragraph.replace(/(<w:instrText\b[^>]*>)([\s\S]*?)(<\/w:instrText>)/g,
+      (instruction, start: string, value: string, end: string) =>
+        /SEQ\s+表\s/.test(value)
+          ? `${start} SEQ 表 \\r ${target[1]} \\* ARABIC ${end}`
+          : instruction);
+  });
+  // A standalone page-break paragraph immediately after a table can be pushed onto
+  // the next page when the table fills the current page. Word then applies the break
+  // from that new page and leaves it blank. Move the break to the following paragraph
+  // as pageBreakBefore so the next section still starts on a new page without an
+  // intermediate blank page.
+  xml = xml.replace(
+    /(<\/w:tbl>)(<w:p\b[^>]*>[\s\S]*?<\/w:p>)(<w:p\b[^>]*>[\s\S]*?<\/w:p>)/g,
+    (match, tableEnd: string, breakParagraph: string, nextParagraph: string) => {
+      const isStandalonePageBreak =
+        textOf(breakParagraph).trim() === '' &&
+        /<w:br\b[^>]*w:type="page"[^>]*\/>/.test(breakParagraph) &&
+        !/<w:(?:drawing|pict|object|sectPr)\b/.test(breakParagraph);
+      if (!isStandalonePageBreak) return match;
+      if (!/<w:pageBreakBefore\b/.test(nextParagraph)) {
+        nextParagraph = /<w:pPr\b[^>]*>/.test(nextParagraph)
+          ? nextParagraph.replace(/<w:pPr\b([^>]*)>/, '<w:pPr$1><w:pageBreakBefore/>')
+          : nextParagraph.replace(/<w:p\b([^>]*)>/, '<w:p$1><w:pPr><w:pageBreakBefore/></w:pPr>');
+      }
+      return tableEnd + nextParagraph;
+    },
+  );
   xml = xml.replace(/<w:p\b[^>]*>[\s\S]*?<\/w:p>/g, paragraph => {
     const value = textOf(paragraph);
     if (value.includes('{{总体评价_评估结论}') && !value.includes('{{总体评价_评估结论}}')) {
@@ -443,19 +490,27 @@ export function prepareLevelTwoTemplate(xml: string, styles: string): string {
       const level = /<w:outlineLvl\b[^>]*w:val="(\d+)"/.exec(style)?.[1];
       if (id && level !== undefined) levels.set(id, Number(level));
     }
+    const normalizeHeading = (value: string) => value.replace(/\s/g, '').replace(/^\d+(?:[.．]\d+)*[.．]?/, '');
     let active = false, headingLevel = 9, written = false;
     xml = xml.replace(/<w:p\b[^>]*>[\s\S]*?<\/w:p>/g, paragraph => {
       const value = textOf(paragraph).trim();
       const style = /<w:pStyle\b[^>]*w:val="([^"]+)"/.exec(paragraph)?.[1] || '';
       const level = levels.get(style);
-      if (active && level !== undefined && level <= headingLevel) active = false;
-      if (value === '参考标准和规范') {
+      const heading = normalizeHeading(value);
+      if (active && ((level !== undefined && level <= headingLevel) || (/^\d+(?:[.．]\d+)+/.test(value) && heading !== '参考标准和规范'))) {
+        active = false;
+      }
+      if (heading === '参考标准和规范') {
         active = true; headingLevel = level ?? 9; return paragraph;
       }
-      if (!active || !value || level !== undefined) return paragraph;
-      const updated = replaceInBlock(paragraph, value, written ? '' : '{{参考标准和规范列表}}');
-      written = true;
-      return updated;
+      if (!active || level !== undefined) return paragraph;
+      // 二级旧模板在本节保留了多条空白项目符号。仅保留首个有内容的段落作为样板，
+      // 其余项目符号段落（包括完全空白的段落）必须整体删除，不能只清空文字。
+      if (!written && value) {
+        written = true;
+        return replaceInBlock(paragraph, value, '{{参考标准和规范列表}}');
+      }
+      return '';
     });
   }
   return xml;

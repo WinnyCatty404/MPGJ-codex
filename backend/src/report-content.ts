@@ -11,7 +11,8 @@ const repeatableAssetTables = new Set(['物理环境', '物理安防设施', '�
 // Keep paragraph, run and table properties; change only text nodes in an existing slot.
 function writeText(xml: string, value: string): string {
   let first = true;
-  const escaped = escape(value).replace(/\r?\n/g, '</w:t><w:br/><w:t xml:space="preserve">');
+  // 兼容旧项目中已保存为两个字符“\n”的换行，并将实际换行写成 Word 换行符。
+  const escaped = escape(value.replace(/\\n/g, '\n')).replace(/\r?\n/g, '</w:t><w:br/><w:t xml:space="preserve">');
   if (/<w:t\b/.test(xml)) return xml.replace(/<w:t\b[^>]*>[\s\S]*?<\/w:t>/g, () => {
     const result = '<w:t xml:space="preserve">' + (first ? escaped : '') + '</w:t>';
     first = false;

@@ -2318,7 +2318,7 @@
         <div class="report-export-grid">
           <div class="report-export-card">
             <div class="report-export-card-head"><div class="report-export-icon">W</div><strong>Word 版本报告</strong></div>
-            <p>按项目等级使用二级或三级模板，写入当前项目保存的字段、表格和图片，并更新目录与页码。</p>
+            <p>按项目等级使用二级或三级模板，写入当前项目保存的字段、表格和图片，并更新目录与页码。建议使用 Word 打开报告，页码显示正确；使用 WPS 打开时页码可能相差 1 页。</p>
             <button id="export-docx-btn" class="btn btn-primary report-export-btn" onclick="exportProjectReport('docx', this)">导出 Word</button>
           </div>
           <div class="report-export-card">
@@ -2327,7 +2327,7 @@
             <button id="export-pdf-btn" class="btn btn-primary report-export-btn" onclick="exportProjectReport('pdf', this)">导出 PDF</button>
           </div>
           <div class="report-export-card">
-            <div class="report-export-card-head"><div class="report-export-icon folder">夹</div><strong>生成原始记录</strong></div>
+            <div class="report-export-card-head"><div class="report-export-icon folder">原</div><strong>原始记录</strong></div>
             <p>自动使用“模板设置”中的原始记录文件夹，并按“报告编号+原始记录”命名输出目录。</p>
             <button id="export-records-btn" class="btn btn-primary report-export-btn" onclick="generateOriginalRecords(this)">选择位置并生成</button>
           </div>
@@ -8091,14 +8091,10 @@
       const blob = await response.blob();
       updateReportExportTask(taskName, 94);
       const url = URL.createObjectURL(blob);
-      if (format === 'pdf') {
-        window.open(url, '_blank', 'noopener');
-      } else {
-        const link = document.createElement('a');
-        link.href = url;
-        link.download = ((bbProject && (bbProject.report_code || bbProject.code)) || '密评报告') + '-' + ((bbProject && bbProject.system_name) || '') + '.docx';
-        document.body.appendChild(link); link.click(); link.remove();
-      }
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = ((bbProject && (bbProject.report_code || bbProject.code)) || '密评报告') + '-' + ((bbProject && bbProject.system_name) || '') + (format === 'pdf' ? '.pdf' : '.docx');
+      document.body.appendChild(link); link.click(); link.remove();
       setTimeout(function () { URL.revokeObjectURL(url); }, 60000);
       finishReportExportTask(format === 'pdf' ? 'PDF 报告生成完成' : 'Word 报告生成完成');
     } catch (error) {
@@ -8115,13 +8111,14 @@
     updateReportExportTask(taskName, 8);
     try {
       if (!window.showDirectoryPicker) throw new Error('当前浏览器不支持选择文件夹，请使用 Chrome 或 Edge');
-      const response = await api('/templates/records/content');
-      if (!response.files || !response.files.length) throw new Error('请先在“模板设置”中导入原始记录模板文件夹');
-      updateReportExportTask(taskName, 24);
+      await persistAll(true);
+      updateReportExportTask(taskName, 20);
+      const response = await api('/projects/' + projectId + '/original-records', { method: 'POST', body: '{}' });
+      if (!response.files || !response.files.length) throw new Error('没有生成可用的原始记录');
+      updateReportExportTask(taskName, 42);
       const root = await window.showDirectoryPicker({ id: 'bb-miping-raw-records', mode: 'readwrite', startIn: 'documents' });
-      updateReportExportTask(taskName, 34);
-      const reportCode = (bbProject && (bbProject.report_code || bbProject.code)) || '未编号';
-      const folder = await root.getDirectoryHandle(String(reportCode).replace(/[\\/:*?"<>|]/g, '_') + '原始记录', { create: true });
+      updateReportExportTask(taskName, 48);
+      const folder = await root.getDirectoryHandle(response.folderName || '原始记录', { create: true });
       for (let itemIndex = 0; itemIndex < response.files.length; itemIndex += 1) {
         const item = response.files[itemIndex];
         const parts = item.path.replace(/\\/g, '/').split('/').filter(Boolean);
@@ -8131,7 +8128,7 @@
         const writable = await handle.createWritable();
         const bytes = Uint8Array.from(atob(item.dataBase64), function (c) { return c.charCodeAt(0); });
         await writable.write(bytes); await writable.close();
-        updateReportExportTask(taskName, 34 + 64 * (itemIndex + 1) / response.files.length);
+        updateReportExportTask(taskName, 48 + 50 * (itemIndex + 1) / response.files.length);
       }
       showToast('原始记录文件夹已生成');
       finishReportExportTask('原始记录生成完成');
@@ -8537,7 +8534,7 @@
         [String(index + 1), tool.name || '', tool.version || '', tool.vendor || '', tool.desc || '']) });
     ['物理和环境安全', '网络和通信安全', '设备和计算安全', '应用和数据安全', '安全管理'].forEach(function (name, index) {
       const rows = (objData[index + 1] || []).filter(row => row.object || row.desc).map(function (row, rowIndex) {
-        const methods = METHOD_LABELS.map((label, methodIndex) => (row.methods?.[methodIndex] ? '☑' : '□') + label).join('\\n');
+        const methods = METHOD_LABELS.map((label, methodIndex) => (row.methods?.[methodIndex] ? '☑' : '□') + label).join('\n');
         return index === 4
           ? [String(rowIndex + 1), row.unit || '', row.object || '', methods, row.desc || '']
           : [String(rowIndex + 1), row.object || '', methods, row.desc || ''];

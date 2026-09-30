@@ -189,8 +189,36 @@ const appendixImageSlots: Record<string, string[]> = {
   b9: ['定级备案证明'],
 };
 
+function normalizeAppendixB8TableLayout(xml: string): string {
+  const slots = [1, 2, 3, 4].map(index => `{{密评人员考核成绩证明照片${index}}}`);
+  return xml.replace(/<w:tbl\b[^>]*>[\s\S]*?<\/w:tbl>/g, table => {
+    if (!slots.every(slot => paragraphText(table).includes(slot))) return table;
+    const rows = table.match(/<w:tr\b[^>]*>[\s\S]*?<\/w:tr>/g) || [];
+    if (rows.length !== 2 || rows.some(row => (row.match(/<w:tc\b[^>]*>/g) || []).length !== 2)) {
+      throw new Error('表B-8模板必须保持两行两列，每行只放2张证书图片');
+    }
+    const width = Number(/<w:tblW\b[^>]*w:w="(\d+)"/.exec(table)?.[1] || 13948);
+    const columnWidths = [Math.floor(width / 2), width - Math.floor(width / 2)];
+    table = /<w:tblLayout\b/.test(table)
+      ? table.replace(/<w:tblLayout\b[^>]*\/>|<w:tblLayout\b[^>]*>[\s\S]*?<\/w:tblLayout>/, '<w:tblLayout w:type="fixed"/>')
+      : table.replace('</w:tblPr>', '<w:tblLayout w:type="fixed"/></w:tblPr>');
+    table = table.replace(/<w:tblGrid\b[^>]*>[\s\S]*?<\/w:tblGrid>/,
+      `<w:tblGrid><w:gridCol w:w="${columnWidths[0]}"/><w:gridCol w:w="${columnWidths[1]}"/></w:tblGrid>`);
+    return table.replace(/<w:tr\b[^>]*>[\s\S]*?<\/w:tr>/g, row => {
+      let cellIndex = 0;
+      return row.replace(/<w:tc\b[^>]*>[\s\S]*?<\/w:tc>/g, cell => {
+        const cellWidth = `<w:tcW w:w="${columnWidths[cellIndex++]}" w:type="dxa"/>`;
+        return /<w:tcW\b/.test(cell)
+          ? cell.replace(/<w:tcW\b[^>]*\/>|<w:tcW\b[^>]*>[\s\S]*?<\/w:tcW>/, cellWidth)
+          : cell.replace(/<w:tcPr\b[^>]*>/, match => match + cellWidth);
+      });
+    });
+  });
+}
+
 // 附录B四处多图槽：占位符写在对应 Word 表格的图片单元格内，旧项目单张图片自动兼容。
 export async function writeAppendixBImages(xml: string, zip: JSZip, saved: Record<string, string | string[]>): Promise<string> {
+  xml = normalizeAppendixB8TableLayout(xml);
   const relPath = 'word/_rels/document.xml.rels';
   let rels = await zip.file(relPath)?.async('string');
   let types = await zip.file('[Content_Types].xml')?.async('string');
@@ -239,7 +267,12 @@ export async function writeAppendixBImages(xml: string, zip: JSZip, saved: Recor
         ? `<w:p><w:pPr><w:jc w:val="center"/><w:keepLines/><w:wordWrap w:val="0"/><w:spacing w:before="0" w:after="0"/></w:pPr>${replacement.join('')}</w:p>`
         : `<w:p><w:pPr><w:jc w:val="center"/><w:spacing w:after="120"/></w:pPr>${replacement.join('')}</w:p>`)
       : '';
-    xml = xml.slice(0, paragraph.index!) + (hasLabel ? leading : '') + (imageLine || (hasLabel ? '' : '<w:p/>'))
+    // Word 保存文档时会把行尾仅含空段落的单元格压缩成 gridAfter，造成表B-8的
+    // 两列布局丢失。空证书格保留一个不可见的不换行空格，使每行始终显示两个框。
+    const emptyImageCell = /^b8-slot-\d+$/.test(key)
+      ? '<w:p><w:r><w:t xml:space="preserve">&#160;</w:t></w:r></w:p>'
+      : '<w:p/>';
+    xml = xml.slice(0, paragraph.index!) + (hasLabel ? leading : '') + (imageLine || (hasLabel ? '' : emptyImageCell))
       + xml.slice(paragraph.index! + paragraph[0].length);
   }
   zip.file(relPath, rels);

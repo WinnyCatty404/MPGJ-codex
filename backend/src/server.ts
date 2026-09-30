@@ -16,6 +16,7 @@ import { writeReportContent } from './report-content.js';
 import { writeAppendixBImages, writePlanningImages, writeReportEvidence } from './report-evidence.js';
 import { allowLatinWordWrap, formatAppendixBHeadings, formatFigureOneOne, formatLatinFonts, formatReportTables, normalizeBasicInfoTemplateValues, normalizeCheckboxLabelSpacing, prepareLevelTwoTemplate, replaceReportSlots, specializeReportTemplate, unresolvedReportSlots } from './report-template.js';
 import { generatePreviousAssessment } from './previous-assessment.js';
+import { generateRawRecords } from './raw-records.js';
 
 dotenv.config({ path: fileURLToPath(new URL('../../.env', import.meta.url)) });
 
@@ -104,6 +105,7 @@ async function buildProjectDocx(projectId: string) {
     '前次测评情况': previousAssessment || '',
     '电子门禁系统名称': savedValues['电子门禁系统名称'] || '',
   };
+  // 两种结论分开使用：{{评估结论}}为单项判定，{{总体评价_评估结论}}为第7章完整评价段落。
   // 目前尚无录入界面的密码应用分层描述，明确导出为空，绝不沿用模板示例文字。
   for (const name of ['物理和环境安全', '网络和通信安全', '设备和计算安全', '应用和数据安全']) {
     values[`被测系统情况_密码应用情况_${name}`] ??= '';
@@ -122,7 +124,12 @@ async function buildProjectDocx(projectId: string) {
     if (name === 'word/document.xml') {
       if (levelNumber === 2) xml = prepareLevelTwoTemplate(xml, await zip.file('word/styles.xml')!.async('string'));
       xml = specializeReportTemplate(xml, values);
-      xml = writeReportContent(xml, await zip.file('word/styles.xml')!.async('string'), { ...content, sections: levelNumber === 2 ? content.sections : [] });
+      // “现场测评方法”在二级、三级模板中均已按正式报告样式设置为五项项目符号列表。
+      // 不再用页面中的整段文本覆盖模板列表，否则会把全文写进第一项，并遗留空项目符号。
+      const reportSections = levelNumber === 2
+        ? content.sections.filter((section: { heading: string }) => section.heading !== '现场测评方法')
+        : [];
+      xml = writeReportContent(xml, await zip.file('word/styles.xml')!.async('string'), { ...content, sections: reportSections });
       xml = await writePlanningImages(xml, zip, planningImages);
       xml = await writeReportEvidence(xml, zip, stageData.onsite?.onsiteRecords || {});
       xml = await writeAppendixBImages(xml, zip, stageData.reporting?.appendixBImages || {});
@@ -501,7 +508,7 @@ app.get('/api/projects/:id/export/:format', auth, asyncRoute(async (req, res) =>
   catch (error) {
     console.error('Word report field refresh failed', error);
     if (format === 'pdf') {
-      return res.status(500).json({ message: 'PDF 生成失败：无法启动 Microsoft Word 更新目录和页码' });
+      return res.status(500).json({ message: 'PDF 生成失败：' + (error instanceof Error ? error.message : String(error)) });
     }
     // The DOCX still carries w:updateFields so Word can refresh the TOC when opened.
     refreshed = generated.buffer;
@@ -653,6 +660,26 @@ app.get('/api/templates/records/content', auth, asyncRoute(async (_req, res) => 
     dataBase64: (await fs.readFile(path.join(rawTemplateRoot, ...file.path.split('/')))).toString('base64'),
   })));
   res.json({ files: content });
+}));
+
+app.post('/api/projects/:id/original-records', auth, asyncRoute(async (req, res) => {
+  const projectId = String(req.params.id);
+  const [projectResult, stagesResult, institutionResult] = await Promise.all([
+    pool.query(`SELECT p.*,u.display_name AS owner_name FROM projects p LEFT JOIN users u ON u.id=p.owner_id WHERE p.id=$1`, [projectId]),
+    pool.query('SELECT stage_key,data FROM project_stage_records WHERE project_id=$1', [projectId]),
+    pool.query(`SELECT setting_value FROM system_settings WHERE setting_key='institution'`),
+  ]);
+  const project = projectResult.rows[0];
+  if (!project) return res.status(404).json({ message: '项目不存在' });
+  const files = await generateRawRecords(rawTemplateRoot, {
+    project,
+    stages: stagesResult.rows,
+    institution: institutionResult.rows[0]?.setting_value || defaultInstitution,
+  });
+  res.json({
+    folderName: safeFileName(`${project.report_code || project.code}原始记录`),
+    files: files.map(file => ({ path: file.path.replace(/\\/g, '/'), dataBase64: file.data.toString('base64') })),
+  });
 }));
 
 app.use((error: unknown, _req: Request, res: Response, _next: NextFunction) => {
