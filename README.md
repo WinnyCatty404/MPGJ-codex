@@ -1,22 +1,133 @@
 # BB 密评协同管理系统
 
-由现有 HTML 原型和 Word 业务模板重构的前后端分离应用。
+> 面向密评机构的多人协作、可追溯、可持续扩展的密码应用安全性评估（密评）业务系统。
 
-## 技术栈
+本系统由早期 HTML 原型与 Word 业务模板重构而来，采用前后端分离架构，覆盖密评项目从**准备 → 方案 → 现场测评 → 报告编制 → 审核归档**的全流程，并已在 GitHub 开源托管。
 
-- 前端：Vue 3、TypeScript、Vite
-- 后端：Node.js、Express、TypeScript
-- 数据库：PostgreSQL 18
-- 数据结构：关系表保存核心业务，JSONB 保存阶段表单的可扩展字段
+- 仓库地址：https://github.com/WinnyCatty404/MPJG-codex
+- 当前版本：`v1.0`
+- 主分支：`main`
 
-## 本地运行
+## ✨ 功能特性
 
-1. 复制 `.env.example` 为 `.env`，填写数据库口令和 JWT 密钥。
-2. 执行 `database/setup.ps1` 初始化本地数据库。默认安装目录为 `D:\BBMipingDB`，端口为 `54328`。
-3. 执行 `npm install`。
-4. 执行 `npm run dev`。
-5. 浏览器访问 `http://localhost:5173`。
+- **三入口工作台**：工作台、项目管理、用户管理；进入项目后在统一工作区完成五个阶段，项目与阶段信息始终可见。
+- **五阶段实施流程**：
+  1. **项目准备**：被测单位、联系人、密评机构、项目档案
+  2. **测评准备与方案编制**：系统简介、依据、系统情况、十类资产、计划、对象、指标、方法工具、前次测评
+  3. **现场测评**：八个安全层面、测评单元、证据、结果、问题记录
+  4. **报告编制**：安全威胁、风险分析、问题与建议、量化评分、总体评价、报告生成
+  5. **报告审核**：编制人自查、项目负责人审核、技术负责人批准、归档
+- **角色权限**：项目负责人、测评人员、审核人员、系统管理员，支持最小权限与审计留痕。
+- **可变表单**：不同系统等级与模板版本下的表单字段使用 JSONB 扩展，历史项目不被新规则静默覆盖。
+- **报告模板**：内置二级/三级报告模板与测评记录模板（`storage/templates/`）。
 
-日常启动可直接运行 `start-local.ps1`；数据库也可分别用 `database/start.ps1` 和 `database/stop.ps1` 启停。
+## 🧱 技术架构
 
-初始管理员：`admin` / `Admin@123`。首次部署后请立即修改。
+| 层 | 技术 |
+|----|------|
+| 前端 | Vue 3 + TypeScript + Vite |
+| 后端 | Node.js + Express + TypeScript（REST API、身份认证、业务校验）|
+| 数据库 | PostgreSQL 18（默认端口 `54328`，安装与数据位于 `D:\BBMipingDB`）|
+| 文件存储 | 证书 / 证据 / 报告按项目隔离目录存放，数据库仅记录路径、摘要与元数据 |
+
+采用 PostgreSQL 的原因：业务数据关系明确、项目/人员/阶段/资产/指标/风险之间需要强约束；同时 JSONB 可容纳不同等级与模板版本下的可变表单字段。相比 SQLite，更适合多人同时使用、权限隔离、审计与后续服务器部署。
+
+## 📁 目录结构
+
+```
+.
+├── backend/               后端服务（Express + TypeScript）
+├── frontend/              前端应用（Vue 3 + Vite）
+├── database/              数据库初始化 / 启停脚本（PowerShell）
+├── storage/               运行数据：templates（模板）、projects（项目，已 gitignore）
+├── template/              业务 Word 模板源
+├── tools/                 辅助脚本（导出、生成等）
+├── product-design-audit/  产品设计审计资料
+├── report模板/            报告模板资源
+├── start-local.ps1        一键本地启动
+├── package.json           npm workspaces 根配置
+└── SYSTEM_DESIGN.md       详细设计说明
+```
+
+## 🚀 本地部署
+
+环境要求：Node.js 18+、PostgreSQL 18、PowerShell（Windows）。
+
+1. **准备环境配置**
+   ```bash
+   cp .env.example .env
+   # 编辑 .env，填写数据库口令与 JWT 密钥
+   ```
+
+2. **初始化本地数据库**
+   ```powershell
+   database/setup.ps1
+   ```
+   默认安装目录 `D:\BBMipingDB`，端口 `54328`。
+
+3. **安装依赖并启动**
+   ```bash
+   npm install
+   npm run dev
+   ```
+   或直接使用一键脚本 `start-local.ps1`。
+
+4. **访问系统**
+   浏览器打开 `http://localhost:5173`。
+
+> 数据库也可分别用 `database/start.ps1` / `database/stop.ps1` 启停。
+
+## 👤 默认账号
+
+| 角色 | 账号 | 密码 |
+|------|------|------|
+| 系统管理员 | `admin` | `Admin@123` |
+
+> ⚠️ **首次部署后请立即修改**默认管理员密码、数据库应用口令与 JWT 密钥。
+
+## ⚙️ 配置项（`.env`）
+
+参考 `.env.example`，常见字段：
+- 数据库连接：`DB_HOST` / `DB_PORT` / `DB_USER` / `DB_PASSWORD` / `DB_NAME`
+- `JWT_SECRET`：令牌签名密钥
+- 文件存储路径、服务端口等运行参数
+
+> 注意：`.env` 已被 `.gitignore` 忽略，**不会进入版本库**；请勿将真实密钥提交。
+
+## 🗄️ 数据模型概览
+
+- `users`：账号、角色、状态、证书、首次改密标记
+- `projects`：项目主档、报告编号、系统等级、阶段与进度
+- `project_members`：项目成员与项目角色
+- `project_stage_records`：五阶段数据与完成度（JSONB 扩展字段）
+- `asset_items`：物理环境、安防设施、密码产品、服务器、网络设备、数据库、应用、数据、文档、人员等十类资产
+- `assessment_records`：八个安全层面的测评对象、指标、结果、证据、评分与风险级别
+- `risks`：问题、威胁、风险分析、等级、改进建议与闭环状态
+- `evidence_files`：证据文件元数据
+- `audit_logs`：关键操作留痕
+
+## 🔐 安全与运维建议
+
+- 上线前修改数据库口令、JWT 密钥、初始管理员密码。
+- 正式环境启用 HTTPS、密码复杂度、登录失败锁定、最小权限角色。
+- 证据文件按项目隔离存储，限制文件类型与大小，并记录 SHA-256 摘要。
+- 每日执行数据库备份，定期恢复演练；报告归档后生成只读快照。
+- 评分规则、指标版本、报告模板需版本化，历史项目不得被新规则静默覆盖。
+
+## 🛠️ 常用脚本
+
+| 命令 | 说明 |
+|------|------|
+| `npm run dev` | 同时启动前后端（前端 5173 / 后端 API）|
+| `npm run build` | 构建前后端与后端 |
+| `npm run start` | 仅启动后端 |
+| `start-local.ps1` | 一键本地启动（含数据库）|
+
+## 📌 版本与发布
+
+- 版本号遵循 `package.json` 中的 `version` 字段。
+- 发布里程碑使用 Git 标签（如 `v1.0`）：`git tag -a v1.0 -m "说明"` → `git push origin v1.0`。
+
+## 📄 许可证
+
+内部项目，版权所有。
