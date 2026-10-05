@@ -3,12 +3,15 @@ import fs from 'node:fs';
 import JSZip from 'jszip';
 import sharp from 'sharp';
 import { formatReportTables, normalizeBasicInfoTemplateValues, normalizeCheckboxLabelSpacing, replaceReportSlots, specializeReportTemplate, unresolvedReportSlots } from '../backend/dist/report-template.js';
-import { writePlanningImages, writeAppendixBImages, writeReportEvidence } from '../backend/dist/report-evidence.js';
+import { writePlanningImages, writeAppendixBImages, writeReportEvidence, writeTopologyBlocks } from '../backend/dist/report-evidence.js';
 
 const template = new URL('../storage/templates/report/default-report-template.docx', import.meta.url);
 const zip = await JSZip.loadAsync(fs.readFileSync(template));
 const exportCode = fs.readFileSync(new URL('../backend/src/server.ts', import.meta.url), 'utf8');
-assert.match(exportCode, /fs\.readFile\(defaultReportTemplate\)/, '导出应读取“模板设置”上传的当前模板');
+assert.match(exportCode, /fs\.readFile\(reportTemplateForLevel\(Number\(project\.system_level\)\)\)/,
+  '导出应按二级或三级读取“模板设置”上传的当前模板');
+assert.match(exportCode, /w:doNotCompressPictures/, '导出应关闭 Word 图片二次压缩');
+assert.match(exportCode, /w14:defaultImageDpi w14:val="300"/, '导出应使用 300 DPI 图片设置');
 let xml = await zip.file('word/document.xml').async('string');
 assert.ok(xml.includes('TOC'), '模板应包含可更新的目录域');
 const initial = unresolvedReportSlots(xml);
@@ -79,6 +82,7 @@ assert.ok(!conclusionRowAfter.includes('新录入的完整结论'), '结论正�
 assert.ok(xml.includes('新备案名称'));
 assert.ok(xml.includes('新委托单位'));
 assert.ok(xml.includes('□未定级'));
+xml = await writeTopologyBlocks(xml, zip, undefined, undefined, '', '测试系统');
 xml = await writePlanningImages(xml, zip, {});
 xml = await writeReportEvidence(xml, zip, {});
 const largePhoto = await sharp({ create: { width: 3000, height: 1000, channels: 3, background: '#b7c8d9' } }).jpeg().toBuffer();

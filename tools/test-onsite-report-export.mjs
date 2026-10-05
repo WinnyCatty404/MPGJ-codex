@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import JSZip from 'jszip';
+import sharp from 'sharp';
 import { writeReportContent } from '../backend/dist/report-content.js';
 import { writeReportEvidence } from '../backend/dist/report-evidence.js';
 
@@ -46,10 +47,20 @@ for (let layer = 0; layer < 8; layer++) {
   }
 }
 const png = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9Y9V0CIAAAAASUVORK5CYII=';
+// 1800px 截图已满足 13cm 报告图片的高清需求，应原样保留 PNG，不能再降为 1400px JPEG。
+const hdPngBytes = await sharp({
+  create: { width: 1800, height: 1000, channels: 3, background: { r: 248, g: 250, b: 252 } },
+}).png().toBuffer();
+const hdPng = 'data:image/png;base64,' + hdPngBytes.toString('base64');
+const tallPngBytes = await sharp({
+  create: { width: 500, height: 1800, channels: 3, background: { r: 245, g: 247, b: 250 } },
+}).png().toBuffer();
+const tallPng = 'data:image/png;base64,' + tallPngBytes.toString('base64');
 const beforeEvidenceXml = xml;
 xml = await writeReportEvidence(xml, zip, {
   '0|0|0': { evidence: [{ no: '图A-1.1', name: '测试截图', dataUrl: png }] },
-  '7|0|0': { evidence: [{ no: '图A-8.1', name: '应急截图', dataUrl: png }] },
+  '1|0|0': { evidence: [{ no: '图A-2.1', name: '高清截图', dataUrl: hdPng }] },
+  '7|0|0': { evidence: [{ no: '图A-8.1', name: '应急截图', dataUrl: tallPng }] },
 });
 assert.ok(xml.includes('图A-1.1 测试截图'));
 assert.ok(xml.includes('图A-8.1 应急截图'));
@@ -57,30 +68,34 @@ assert.ok(!xml.includes('门禁控制器实物图'));
 assert.ok(!xml.includes('密码安全事件上报'));
 assert.ok(xml.includes('<w:vMerge w:val="restart"/>'));
 assert.ok(xml.includes('<w:vMerge w:val="continue"/>'));
+assert.ok(xml.includes('<w:keepNext/>'), '证据图片段落必须与后续图题保持同页');
+assert.ok(xml.includes('cy="4320000"'), '超高证据图片必须按比例限制为最高12cm');
 assert.equal((xml.match(/<w:sectPr\b/g) || []).length, (await zip.file('word/document.xml').async('string')).match(/<w:sectPr\b/g).length);
-assert.ok(zip.file('word/media/bb-evidence-1-1.png'));
-assert.ok(zip.file('word/media/bb-evidence-8-1.png'));
+assert.ok(zip.file('word/media/bb-evidence-1-1-1.png'));
+assert.deepEqual(await zip.file('word/media/bb-evidence-2-1-1.png').async('nodebuffer'), hdPngBytes);
+assert.ok(zip.file('word/media/bb-evidence-8-1-1.png'));
 const rels = await zip.file('word/_rels/document.xml.rels').async('string');
-assert.ok(rels.includes('bb-evidence-1-1.png'));
-assert.ok(rels.includes('bb-evidence-8-1.png'));
+assert.ok(rels.includes('bb-evidence-1-1-1.png'));
+assert.ok(rels.includes('bb-evidence-8-1-1.png'));
 zip.file('word/document.xml', xml);
 const reopened = await JSZip.loadAsync(await zip.generateAsync({ type: 'nodebuffer' }));
 assert.ok(await reopened.file('word/document.xml').async('string'));
-// 新模板在表后使用双花括号占位符；图片应插入该段落，不能删除周边正文。
+// 新模板已经在各现场测评表后提供双花括号占位符；图片应写入现有段落，不能删除周边正文。
 const placeholderZip = await JSZip.loadAsync(fs.readFileSync(new URL('../storage/templates/report/default-report-template.docx', import.meta.url)));
-const firstCaption = updatedBlocks.findIndex(block => block[0].startsWith('<w:p') && /^表A-1/.test(text(block[0]).replace(/\s/g, '')));
-assert.ok(firstCaption >= 0);
-const firstTable = updatedBlocks[firstCaption + 1];
-const insertionPoint = firstTable.index + firstTable[0].length;
-const slot = '<w:p><w:r><w:t>{{证据截图列表}}</w:t></w:r></w:p>';
-const placeholderXml = beforeEvidenceXml.slice(0, insertionPoint) + slot + beforeEvidenceXml.slice(insertionPoint);
+const placeholderXml = beforeEvidenceXml;
+const placeholderParagraphs = [...placeholderXml.matchAll(/<w:p\b[^>]*>[\s\S]*?<\/w:p>/g)]
+  .filter(match => text(match[0]).trim() === '{{证据截图列表}}');
+assert.equal(placeholderParagraphs.length, 8, '报告模板的8个现场测评表后应各有一个证据截图占位符');
 const placeholderResult = await writeReportEvidence(placeholderXml, placeholderZip, {
   '0|0|0': { evidence: [{ no: '图A-1.1', name: '双括号测试', dataUrl: png }] },
 });
 assert.ok(placeholderResult.includes('图A-1.1 双括号测试'));
 assert.ok(!placeholderResult.includes('{{证据截图列表}}'));
-assert.ok(placeholderResult.includes('门禁控制器实物图'), '占位符模式不得删除表后的其他内容');
-assert.ok(placeholderZip.file('word/media/bb-evidence-1-1.png'));
-const duplicateXml = placeholderXml.slice(0, insertionPoint) + slot + placeholderXml.slice(insertionPoint);
-await assert.rejects(writeReportEvidence(duplicateXml, placeholderZip, {}), /只能有一个/);
+assert.ok(placeholderResult.includes('网络和通信安全'), '占位符模式不得删除下一层面的正文');
+assert.ok(placeholderZip.file('word/media/bb-evidence-1-1-1.png'));
+const firstPlaceholder = placeholderParagraphs[0];
+const duplicateXml = placeholderXml.slice(0, firstPlaceholder.index) + firstPlaceholder[0]
+  + placeholderXml.slice(firstPlaceholder.index);
+const duplicateZip = await JSZip.loadAsync(fs.readFileSync(new URL('../storage/templates/report/default-report-template.docx', import.meta.url)));
+await assert.rejects(writeReportEvidence(duplicateXml, duplicateZip, {}), /只能有一个/);
 console.log('PASS: eight onsite tables expand; old screenshot regions and {{证据截图列表}} placeholders both write images.');

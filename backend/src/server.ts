@@ -13,17 +13,26 @@ import { promisify } from 'node:util';
 import { fileURLToPath } from 'node:url';
 import { randomUUID } from 'node:crypto';
 import { writeReportContent } from './report-content.js';
-import { writeAppendixBImages, writePlanningImages, writeReportEvidence } from './report-evidence.js';
+import { writeAppendixBImages, writePlanningImages, writeReportEvidence, writeTopologyBlocks } from './report-evidence.js';
 import { allowLatinWordWrap, formatAppendixBHeadings, formatFigureOneOne, formatLatinFonts, formatReportTables, normalizeBasicInfoTemplateValues, normalizeCheckboxLabelSpacing, prepareLevelTwoTemplate, replaceReportSlots, specializeReportTemplate, unresolvedReportSlots } from './report-template.js';
 import { generatePreviousAssessment } from './previous-assessment.js';
 import { generateRawRecords } from './raw-records.js';
+import { replaceProjectTextInStageData, syncProjectDatesInStageData } from './project-date-sync.js';
+import { calculateStageCompletion, deriveProjectProgress } from './project-progress.js';
+import { buildRiskTemplateWorkbook, parseRiskTemplateWorkbook } from './risk-template-xlsx.js';
 
 dotenv.config({ path: fileURLToPath(new URL('../../.env', import.meta.url)) });
 
 const { Pool } = pg;
+// PostgreSQL DATE 没有时区语义。保持 YYYY-MM-DD 字符串，避免 Asia/Shanghai 下
+// 被转换为前一天 16:00Z，导致项目编辑框显示并再次保存成前一天。
+pg.types.setTypeParser(1082, value => value);
 const port = Number(process.env.PORT || 3100);
 const jwtSecret = process.env.JWT_SECRET || 'development-only-change-me';
 const execFileAsync = promisify(execFile);
+// 大量证据截图会使报告达到约 30 MB。Word 更新目录、重新分页及 PDF 转换
+// 在此体积下可能超过 3 分钟，保留充足处理时间，避免正常任务被提前终止。
+const WORD_AUTOMATION_TIMEOUT_MS = 10 * 60 * 1000;
 const storageRoot = fileURLToPath(new URL('../../storage/', import.meta.url));
 const defaultReportTemplate = path.join(storageRoot, 'templates', 'report', 'default-report-template.docx');
 const levelTwoReportTemplate = path.join(storageRoot, 'templates', 'report', 'level-2', 'default-report-template.docx');
@@ -53,6 +62,17 @@ const defaultInstitution = {
   email: 'zcm@zdjy.org.cn',
 };
 
+const defaultRiskTemplates = [
+  { id: 'risk-physical', layer: '物理和环境安全', unit: '*', result: '*', threat: 'TP1', analysis: '该测评单元未完全满足密码应用要求，可能导致物理区域身份真实性或相关记录完整性无法得到有效保障。', advice: '建议按照相关标准要求，采用合规密码技术和密码产品完善物理访问身份鉴别及相关记录完整性保护措施。', defaultLevel: '中', version: 1, enabled: true },
+  { id: 'risk-network', layer: '网络和通信安全', unit: '*', result: '*', threat: 'TN2', analysis: '该测评单元未完全满足密码应用要求，可能导致通信实体被仿冒，或者通信数据被窃取、篡改。', advice: '建议采用合规的密码协议、密码算法、密码产品和密码服务，对通信实体及通信数据实施相应保护。', defaultLevel: '中', version: 1, enabled: true },
+  { id: 'risk-device', layer: '设备和计算安全', unit: '*', result: '*', threat: 'TD1', analysis: '该测评单元未完全满足密码应用要求，可能导致设备被非法登录，或者设备资源、日志及重要程序文件被非授权访问和篡改。', advice: '建议采用合规密码技术完善设备身份鉴别、远程管理通道、访问控制信息和日志记录保护措施。', defaultLevel: '中', version: 1, enabled: true },
+  { id: 'risk-application', layer: '应用和数据安全', unit: '*', result: '*', threat: 'TA4', analysis: '该测评单元未完全满足密码应用要求，可能导致应用被非法登录，或者重要数据在传输、存储过程中泄露或被篡改。', advice: '建议根据数据安全需求采用合规密码算法、密码产品和密码服务，完善身份鉴别以及重要数据机密性、完整性保护。', defaultLevel: '中', version: 1, enabled: true },
+  { id: 'risk-policy', layer: '管理制度', unit: '*', result: '*', threat: 'TK7', analysis: '密码应用安全管理制度存在不足，可能导致密码应用和密钥管理活动缺少统一、有效的制度约束。', advice: '建议完善密码应用安全管理制度、密钥管理规则和操作规程，明确发布、修订及执行记录留存要求。', defaultLevel: '低', version: 1, enabled: true },
+  { id: 'risk-personnel', layer: '人员管理', unit: '*', result: '*', threat: 'TK7', analysis: '密码相关人员管理措施存在不足，可能导致岗位职责、培训考核、保密及调离管理不能有效落实。', advice: '建议完善密码应用岗位责任、培训考核、保密和调离制度，并留存相应执行记录。', defaultLevel: '低', version: 1, enabled: true },
+  { id: 'risk-construction', layer: '建设运行', unit: '*', result: '*', threat: 'TK7', analysis: '密码应用方案制定、实施或运行评估存在不足，可能导致密码应用建设与系统实际安全需求不一致。', advice: '建议完善密码应用方案、密钥安全管理策略和实施方案，并按要求开展密码应用安全性评估。', defaultLevel: '低', version: 1, enabled: true },
+  { id: 'risk-emergency', layer: '应急处置', unit: '*', result: '*', threat: 'TK7', analysis: '密码应用安全事件应急处置措施存在不足，可能影响密码安全事件的发现、响应、处置和上报。', advice: '建议完善密码应用应急策略、事件处置和报告机制，定期组织演练并留存记录。', defaultLevel: '低', version: 1, enabled: true },
+];
+
 function safeFileName(value: string) {
   return value.replace(/[\\/:*?"<>|\x00-\x1f]/g, '_').trim() || '未命名';
 }
@@ -61,6 +81,18 @@ function safeRelativePath(value: string) {
   const normalized = value.replace(/\\/g, '/').split('/').filter(part => part && part !== '.');
   if (!normalized.length || normalized.some(part => part === '..')) throw new Error('模板路径无效');
   return normalized.join('/');
+}
+
+function normalizeRawTemplateUploadPaths(paths: string[]) {
+  const normalized = paths.map(safeRelativePath);
+  const parts = normalized.map(item => item.split('/'));
+  const commonFolder = parts[0]?.[0];
+  const stripSelectedFolder = Boolean(commonFolder) && parts.every(item => item.length > 1 && item[0] === commonFolder);
+  const relativePaths = parts.map(item => (stripSelectedFolder ? item.slice(1) : item).join('/'));
+  if (new Set(relativePaths.map(item => item.toLowerCase())).size !== relativePaths.length) {
+    throw new Error('模板文件夹中存在重名文件');
+  }
+  return relativePaths;
 }
 
 async function buildProjectDocx(projectId: string) {
@@ -111,7 +143,13 @@ async function buildProjectDocx(projectId: string) {
     values[`被测系统情况_密码应用情况_${name}`] ??= '';
   }
   // 兼容此前已保存的字段；只删除复选框后的水平空白，不改变其他词间空格或换行。
-  for (const name of Object.keys(values)) values[name] = normalizeCheckboxLabelSpacing(values[name]);
+  for (const name of Object.keys(values)) {
+    values[name] = normalizeCheckboxLabelSpacing(values[name]);
+    // 第8章的问题描述和改进建议按同一层面连续排版；页面中用于区分条目的换行不写入 Word。
+    if (/^安全问题及改进建议_.*_(问题描述|改进建议)$/.test(name)) {
+      values[name] = String(values[name] || '').replace(/(?:\\n|\r?\n)[\t \u3000]*/g, '');
+    }
+  }
   const replacements = Object.fromEntries(Object.entries(values).map(([name, value]) => [`{{${name}}}`, value]));
   replacements['{{报告编号}}}'] = values['报告编号']; // 兼容封面多写的一个右花括号。
   const planningImages = Object.fromEntries((stageData.planning?.images || []).map((image: { id: string; src: string }) => [image.id, image.src]));
@@ -130,8 +168,11 @@ async function buildProjectDocx(projectId: string) {
         ? content.sections.filter((section: { heading: string }) => section.heading !== '现场测评方法')
         : [];
       xml = writeReportContent(xml, await zip.file('word/styles.xml')!.async('string'), { ...content, sections: reportSections });
+      xml = await writeTopologyBlocks(xml, zip, stageData.planning?.topologyBlocks,
+        planningImages['topology-image'], values['被测系统情况_网络拓扑图及描述_描述'], project.system_name);
       xml = await writePlanningImages(xml, zip, planningImages);
-      xml = await writeReportEvidence(xml, zip, stageData.onsite?.onsiteRecords || {});
+      xml = await writeReportEvidence(xml, zip, stageData.onsite?.onsiteRecords || {},
+        stageData.onsite?.onsiteEvidenceGroups || []);
       xml = await writeAppendixBImages(xml, zip, stageData.reporting?.appendixBImages || {});
     }
     xml = replaceReportSlots(xml, replacements);
@@ -152,6 +193,12 @@ async function buildProjectDocx(projectId: string) {
     xml = /<w:updateFields\b[^>]*\/>/.test(xml)
       ? xml.replace(/<w:updateFields\b[^>]*\/>/, '<w:updateFields w:val="true"/>')
       : xml.replace('</w:settings>', '<w:updateFields w:val="true"/></w:settings>');
+    // 保留嵌入图片的原始像素，避免 Word/WPS 再次按屏幕分辨率压缩。
+    if (!/<w:doNotCompressPictures\b/.test(xml)) {
+      xml = xml.replace('</w:settings>', '<w:doNotCompressPictures/><w14:defaultImageDpi w14:val="300"/></w:settings>');
+    } else if (!/<w14:defaultImageDpi\b/.test(xml)) {
+      xml = xml.replace('</w:settings>', '<w14:defaultImageDpi w14:val="300"/></w:settings>');
+    }
     zip.file('word/settings.xml', xml);
   }
   return { project, buffer: await zip.generateAsync({ type: 'nodebuffer', compression: 'DEFLATE' }) };
@@ -196,7 +243,7 @@ async function refreshReportFields(docx: Buffer, format: 'docx' | 'pdf') {
   ].join(' ');
   try {
     await execFileAsync('powershell.exe', ['-NoProfile', '-NonInteractive', '-STA', '-Command', script], {
-      timeout: 180000,
+      timeout: WORD_AUTOMATION_TIMEOUT_MS,
       env: { ...process.env, BB_DOCX_INPUT: input, BB_PDF_OUTPUT: output, BB_REPORT_FORMAT: format },
     });
     const normalizedDocx = await normalizeFinalReportDocx(await fs.readFile(input));
@@ -211,7 +258,7 @@ async function refreshReportFields(docx: Buffer, format: 'docx' | 'pdf') {
       'if($word){$word.Quit(); [void][System.Runtime.InteropServices.Marshal]::ReleaseComObject($word)}; [GC]::Collect(); [GC]::WaitForPendingFinalizers() }',
     ].join(' ');
     await execFileAsync('powershell.exe', ['-NoProfile', '-NonInteractive', '-STA', '-Command', pdfScript], {
-      timeout: 180000,
+      timeout: WORD_AUTOMATION_TIMEOUT_MS,
       env: { ...process.env, BB_DOCX_INPUT: input, BB_PDF_OUTPUT: output },
     });
     return await fs.readFile(output);
@@ -231,6 +278,11 @@ async function ensureRuntimeSchema() {
     `INSERT INTO system_settings(setting_key,setting_value) VALUES('institution',$1)
      ON CONFLICT(setting_key) DO NOTHING`,
     [defaultInstitution],
+  );
+  await pool.query(
+    `INSERT INTO system_settings(setting_key,setting_value) VALUES('risk_templates',$1)
+     ON CONFLICT(setting_key) DO NOTHING`,
+    [JSON.stringify(defaultRiskTemplates)],
   );
   await fs.mkdir(path.dirname(defaultReportTemplate), { recursive: true });
   await fs.mkdir(rawTemplateRoot, { recursive: true });
@@ -404,14 +456,43 @@ app.put('/api/projects/:id', auth, asyncRoute(async (req, res) => {
     startDate: z.string().optional().nullable(),
     endDate: z.string().optional().nullable(),
   }).parse(req.body);
-  const result = await pool.query(
-    `UPDATE projects SET report_code=$1,system_name=$2,org_name=$3,assessment_year=$4,
-      system_level=$5,start_date=$6,end_date=$7,updated_at=now() WHERE id=$8 RETURNING *`,
-    [input.reportCode || null, input.systemName, input.orgName, input.assessmentYear,
-      input.systemLevel, input.startDate || null, input.endDate || null, req.params.id],
-  );
-  if (!result.rows[0]) return res.status(404).json({ message: '项目不存在' });
-  res.json(result.rows[0]);
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    const previousResult = await client.query('SELECT * FROM projects WHERE id=$1 FOR UPDATE', [req.params.id]);
+    const previous = previousResult.rows[0];
+    if (!previous) {
+      await client.query('ROLLBACK');
+      return res.status(404).json({ message: '项目不存在' });
+    }
+    const result = await client.query(
+      `UPDATE projects SET report_code=$1,system_name=$2,org_name=$3,assessment_year=$4,
+        system_level=$5,start_date=$6,end_date=$7,updated_at=now() WHERE id=$8 RETURNING *`,
+      [input.reportCode || null, input.systemName, input.orgName, input.assessmentYear,
+        input.systemLevel, input.startDate || null, input.endDate || null, req.params.id],
+    );
+    const oldStart = previous.start_date ? String(previous.start_date).slice(0, 10) : '';
+    const oldEnd = previous.end_date ? String(previous.end_date).slice(0, 10) : '';
+    const newStart = input.startDate || '';
+    const newEnd = input.endDate || '';
+    if (oldStart !== newStart || oldEnd !== newEnd) {
+      const stages = await client.query('SELECT stage_key,data FROM project_stage_records WHERE project_id=$1 FOR UPDATE', [req.params.id]);
+      for (const stage of stages.rows) {
+        const data = syncProjectDatesInStageData(stage.data || {}, oldStart, newStart, oldEnd, newEnd);
+        await client.query(
+          'UPDATE project_stage_records SET data=$1,updated_at=now(),updated_by=$2 WHERE project_id=$3 AND stage_key=$4',
+          [data, req.user!.id, req.params.id, stage.stage_key],
+        );
+      }
+    }
+    await client.query('COMMIT');
+    res.json(result.rows[0]);
+  } catch (error) {
+    await client.query('ROLLBACK');
+    throw error;
+  } finally {
+    client.release();
+  }
 }));
 
 app.delete('/api/projects/:id', auth, asyncRoute(async (req, res) => {
@@ -422,28 +503,55 @@ app.delete('/api/projects/:id', auth, asyncRoute(async (req, res) => {
 
 app.post('/api/projects/:id/copy', auth, asyncRoute(async (req, res) => {
   const projectId = String(req.params.id);
+  const input = z.object({
+    systemName: z.string().trim().min(1).max(255),
+    reportCode: z.string().trim().max(60).optional().default(''),
+    assessmentYear: z.number().int().min(2000).max(2100),
+    startDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+    endDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+  }).refine(value => value.endDate >= value.startDate, { message: '结束时间不能早于开始时间', path: ['endDate'] }).parse(req.body);
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
     const sourceResult = await client.query('SELECT * FROM projects WHERE id=$1 FOR SHARE', [projectId]);
     const source = sourceResult.rows[0];
     if (!source) { await client.query('ROLLBACK'); return res.status(404).json({ message: '项目不存在' }); }
-    await client.query('SELECT pg_advisory_xact_lock($1)', [900000 + source.assessment_year]);
+    await client.query('SELECT pg_advisory_xact_lock($1)', [900000 + input.assessmentYear]);
     const sequence = await client.query(
       `SELECT COALESCE(MAX((regexp_match(code, '^MP-' || $1 || '-([0-9]+)$'))[1]::int),0)+1 AS next_no
        FROM projects WHERE code ~ ('^MP-' || $1 || '-[0-9]+$')`,
-      [String(source.assessment_year)],
+      [String(input.assessmentYear)],
     );
-    const code = `MP-${source.assessment_year}-${String(sequence.rows[0].next_no).padStart(3, '0')}`;
+    const code = `MP-${input.assessmentYear}-${String(sequence.rows[0].next_no).padStart(3, '0')}`;
     const copied = await client.query(
       `INSERT INTO projects(code,report_code,system_name,org_name,assessment_year,system_level,status,current_stage,progress,start_date,end_date,owner_id,created_by)
-       SELECT $1,report_code,system_name,org_name,assessment_year,system_level,status,current_stage,progress,start_date,end_date,owner_id,$2
-       FROM projects WHERE id=$3 RETURNING *`,
-      [code, req.user!.id, projectId],
+       SELECT $1,$2,$3,org_name,$4,system_level,'draft',1,0,$5,$6,owner_id,$7
+       FROM projects WHERE id=$8 RETURNING *`,
+      [code, input.reportCode || null, input.systemName, input.assessmentYear, input.startDate, input.endDate, req.user!.id, projectId],
     );
     const newId = copied.rows[0].id;
-    await client.query(`INSERT INTO project_stage_records(project_id,stage_key,title,data,completion,updated_by)
-      SELECT $1,stage_key,title,data,completion,$2 FROM project_stage_records WHERE project_id=$3`, [newId, req.user!.id, projectId]);
+    const stageRows = await client.query('SELECT stage_key,title,data FROM project_stage_records WHERE project_id=$1 ORDER BY created_at', [projectId]);
+    const oldStart = source.start_date ? String(source.start_date).slice(0, 10) : '';
+    const oldEnd = source.end_date ? String(source.end_date).slice(0, 10) : '';
+    for (const stage of stageRows.rows) {
+      let data = syncProjectDatesInStageData(structuredClone(stage.data || {}), oldStart, input.startDate, oldEnd, input.endDate);
+      data = replaceProjectTextInStageData(data, source.system_name, input.systemName);
+      data = replaceProjectTextInStageData(data, source.report_code || '', input.reportCode || '');
+      if (stage.stage_key === 'reporting') {
+        // 复测保留第三、四步已整理的文字，但附录B材料属于本次活动，必须重新录入。
+        data.appendixBData = {};
+        data.appendixBImages = {};
+        // 导出内容、分数和模板字段在新项目打开并保存后按新对象、结果及日期重新生成。
+        delete data.exportContent;
+        delete data.templateValues;
+        delete data.systemScore;
+      }
+      await client.query(
+        `INSERT INTO project_stage_records(project_id,stage_key,title,data,completion,updated_by)
+         VALUES($1,$2,$3,$4,0,$5)`,
+        [newId, stage.stage_key, stage.title, data, req.user!.id],
+      );
+    }
     await client.query(`INSERT INTO project_members(project_id,user_id,member_role) SELECT $1,user_id,member_role FROM project_members WHERE project_id=$2`, [newId, projectId]);
     await client.query(`INSERT INTO asset_items(project_id,category,name,importance,details,sort_order) SELECT $1,category,name,importance,details,sort_order FROM asset_items WHERE project_id=$2`, [newId, projectId]);
     await client.query(`INSERT INTO assessment_records(project_id,domain,indicator_code,indicator_name,target_name,applicable,result,score,evidence,analysis,risk_level,updated_by) SELECT $1,domain,indicator_code,indicator_name,target_name,applicable,result,score,evidence,analysis,risk_level,$3 FROM assessment_records WHERE project_id=$2`, [newId, projectId, req.user!.id]);
@@ -526,16 +634,43 @@ app.get('/api/projects/:id/export/:format', auth, asyncRoute(async (req, res) =>
 
 app.put('/api/projects/:id/stages/:stageKey', auth, asyncRoute(async (req, res) => {
   const input = z.object({ data: z.record(z.string(), z.unknown()), completion: z.number().int().min(0).max(100) }).parse(req.body);
-  const result = await pool.query(
-    `UPDATE project_stage_records SET data=$1, completion=$2, updated_by=$3, updated_at=now()
-     WHERE project_id=$4 AND stage_key=$5 RETURNING *`,
-    [input.data, input.completion, req.user!.id, req.params.id, req.params.stageKey],
-  );
-  await pool.query(
-    `UPDATE projects SET progress=(SELECT round(avg(completion)) FROM project_stage_records WHERE project_id=$1), updated_at=now() WHERE id=$1`,
-    [req.params.id],
-  );
-  res.json(result.rows[0]);
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    const projectResult = await client.query('SELECT start_date,end_date FROM projects WHERE id=$1 FOR SHARE', [req.params.id]);
+    const project = projectResult.rows[0];
+    if (!project) {
+      await client.query('ROLLBACK');
+      return res.status(404).json({ message: '项目不存在' });
+    }
+    const currentStart = project.start_date ? String(project.start_date).slice(0, 10) : '';
+    const currentEnd = project.end_date ? String(project.end_date).slice(0, 10) : '';
+    const sourceDates = (input.data.projectDates || {}) as Record<string, unknown>;
+    const data = syncProjectDatesInStageData(input.data,
+      sourceDates.startDate ?? currentStart, currentStart, sourceDates.endDate ?? currentEnd, currentEnd);
+    const existingStage = await client.query(
+      'SELECT completion FROM project_stage_records WHERE project_id=$1 AND stage_key=$2',
+      [req.params.id, req.params.stageKey],
+    );
+    const completion = calculateStageCompletion(String(req.params.stageKey), data, Number(existingStage.rows[0]?.completion || 0));
+    const result = await client.query(
+      `UPDATE project_stage_records SET data=$1, completion=$2, updated_by=$3, updated_at=now()
+       WHERE project_id=$4 AND stage_key=$5 RETURNING *`,
+      [data, completion, req.user!.id, req.params.id, req.params.stageKey],
+    );
+    const stageProgress = await client.query('SELECT stage_key,completion FROM project_stage_records WHERE project_id=$1', [req.params.id]);
+    const summary = deriveProjectProgress(stageProgress.rows);
+    await client.query(`UPDATE projects SET progress=$2,current_stage=$3,
+      status=CASE WHEN status='archived' THEN status ELSE $4 END,updated_at=now() WHERE id=$1`,
+      [req.params.id, summary.progress, summary.currentStage, summary.status]);
+    await client.query('COMMIT');
+    res.json(result.rows[0]);
+  } catch (error) {
+    await client.query('ROLLBACK');
+    throw error;
+  } finally {
+    client.release();
+  }
 }));
 
 app.get('/api/users', auth, asyncRoute(async (_req, res) => {
@@ -601,6 +736,49 @@ app.put('/api/settings/institution', auth, asyncRoute(async (req, res) => {
   res.json(input);
 }));
 
+const riskTemplateSchema = z.object({
+  id: z.string().min(1).max(100),
+  layer: z.string().min(1).max(100),
+  unit: z.string().min(1).max(200),
+  result: z.string().min(1).max(40),
+  threat: z.string().max(100),
+  analysis: z.string().max(5000),
+  advice: z.string().max(5000),
+  defaultLevel: z.enum(['高', '中', '低']),
+  version: z.number().int().min(1).max(9999),
+  enabled: z.boolean(),
+});
+
+app.get('/api/settings/risk-templates', auth, asyncRoute(async (_req, res) => {
+  const result = await pool.query(`SELECT setting_value FROM system_settings WHERE setting_key='risk_templates'`);
+  res.json(result.rows[0]?.setting_value || defaultRiskTemplates);
+}));
+
+app.put('/api/settings/risk-templates', auth, asyncRoute(async (req, res) => {
+  if (req.user!.role !== 'admin') return res.status(403).json({ message: '仅管理员可维护风险模板' });
+  const input = z.array(riskTemplateSchema).max(500).parse(req.body);
+  await pool.query(
+    `INSERT INTO system_settings(setting_key,setting_value,updated_by,updated_at) VALUES('risk_templates',$1,$2,now())
+     ON CONFLICT(setting_key) DO UPDATE SET setting_value=EXCLUDED.setting_value,updated_by=EXCLUDED.updated_by,updated_at=now()`,
+    [JSON.stringify(input), req.user!.id],
+  );
+  res.json(input);
+}));
+
+app.post('/api/settings/risk-templates/import', auth, asyncRoute(async (req, res) => {
+  if (req.user!.role !== 'admin') return res.status(403).json({ message: '仅管理员可导入风险模板' });
+  const input = z.object({ name: z.string().min(1), dataBase64: z.string().min(1) }).parse(req.body);
+  if (!/\.xlsx$/i.test(input.name)) return res.status(400).json({ message: '请选择 .xlsx 风险模板文件' });
+  const rows = await parseRiskTemplateWorkbook(Buffer.from(input.dataBase64, 'base64'));
+  res.json(rows);
+}));
+
+app.post('/api/settings/risk-templates/export', auth, asyncRoute(async (req, res) => {
+  const input = z.array(riskTemplateSchema).max(500).parse(req.body);
+  const workbook = await buildRiskTemplateWorkbook(input);
+  res.json({ name: '风险模板导入模板.xlsx', dataBase64: workbook.toString('base64') });
+}));
+
 async function listRawTemplates(dir = rawTemplateRoot, prefix = ''): Promise<Array<{ path: string; size: number }>> {
   const result: Array<{ path: string; size: number }> = [];
   for (const entry of await fs.readdir(dir, { withFileTypes: true }).catch(() => [])) {
@@ -629,6 +807,36 @@ app.get('/api/templates', auth, asyncRoute(async (_req, res) => {
   res.json({ report, report2, rawRecords: await listRawTemplates() });
 }));
 
+app.get('/api/templates/report/download', auth, asyncRoute(async (req, res) => {
+  const systemLevel = Number(req.query.systemLevel) === 2 ? 2 : 3;
+  const templatePath = reportTemplateForLevel(systemLevel);
+  const fallbackName = systemLevel === 2 ? '二级报告模板.docx' : '三级报告模板.docx';
+  let name = fallbackName;
+  try {
+    const metadata = JSON.parse(await fs.readFile(path.join(path.dirname(templatePath), 'metadata.json'), 'utf8'));
+    name = String(metadata.originalName || fallbackName);
+  } catch { /* metadata is optional */ }
+  const content = await fs.readFile(templatePath).catch(() => null);
+  if (!content) return res.status(404).json({ message: systemLevel === 2 ? '尚未配置二级报告模板' : '尚未配置三级报告模板' });
+  res.type('application/vnd.openxmlformats-officedocument.wordprocessingml.document');
+  res.setHeader('Content-Disposition', `attachment; filename*=UTF-8''${encodeURIComponent(name)}`);
+  res.send(content);
+}));
+
+app.get('/api/templates/records/download', auth, asyncRoute(async (_req, res) => {
+  const files = await listRawTemplates();
+  if (!files.length) return res.status(404).json({ message: '尚未配置原始记录模板' });
+  const archive = new JSZip();
+  for (const file of files) {
+    archive.file(file.path, await fs.readFile(path.join(rawTemplateRoot, ...file.path.split('/'))));
+  }
+  const content = await archive.generateAsync({ type: 'nodebuffer', compression: 'DEFLATE' });
+  const name = '原始记录模板.zip';
+  res.type('application/zip');
+  res.setHeader('Content-Disposition', `attachment; filename*=UTF-8''${encodeURIComponent(name)}`);
+  res.send(content);
+}));
+
 app.post('/api/templates/report', auth, asyncRoute(async (req, res) => {
   if (req.user!.role !== 'admin') return res.status(403).json({ message: '仅管理员可配置模板' });
   const input = z.object({ systemLevel: z.union([z.literal(2), z.literal(3)]).default(3), name: z.string().min(1).max(255), dataBase64: z.string().min(1) }).parse(req.body);
@@ -643,14 +851,39 @@ app.post('/api/templates/report', auth, asyncRoute(async (req, res) => {
 app.post('/api/templates/records', auth, asyncRoute(async (req, res) => {
   if (req.user!.role !== 'admin') return res.status(403).json({ message: '仅管理员可配置模板' });
   const input = z.object({ files: z.array(z.object({ path: z.string().min(1).max(500), dataBase64: z.string() })).min(1).max(1000) }).parse(req.body);
-  await fs.mkdir(rawTemplateRoot, { recursive: true });
-  for (const file of input.files) {
-    const relative = safeRelativePath(file.path);
-    const destination = path.join(rawTemplateRoot, ...relative.split('/'));
-    await fs.mkdir(path.dirname(destination), { recursive: true });
-    await fs.writeFile(destination, Buffer.from(file.dataBase64, 'base64'));
+  const relativePaths = normalizeRawTemplateUploadPaths(input.files.map(file => file.path));
+  if (!relativePaths.some(relative => relative.toLowerCase().endsWith('.docx'))) {
+    return res.status(400).json({ message: '原始记录模板文件夹中必须包含 DOCX 文件' });
   }
-  res.json({ stored: input.files.length });
+  const batchId = randomUUID();
+  const templateParent = path.dirname(rawTemplateRoot);
+  const stagingRoot = path.join(templateParent, `.records-upload-${batchId}`);
+  const backupRoot = path.join(templateParent, `.records-backup-${batchId}`);
+  let previousMoved = false;
+  try {
+    await fs.mkdir(stagingRoot, { recursive: true });
+    for (let index = 0; index < input.files.length; index++) {
+      const destination = path.join(stagingRoot, ...relativePaths[index].split('/'));
+      await fs.mkdir(path.dirname(destination), { recursive: true });
+      await fs.writeFile(destination, Buffer.from(input.files[index].dataBase64, 'base64'));
+    }
+    try {
+      await fs.rename(rawTemplateRoot, backupRoot);
+      previousMoved = true;
+    } catch (error: any) {
+      if (error?.code !== 'ENOENT') throw error;
+    }
+    try {
+      await fs.rename(stagingRoot, rawTemplateRoot);
+    } catch (error) {
+      if (previousMoved) await fs.rename(backupRoot, rawTemplateRoot);
+      throw error;
+    }
+    if (previousMoved) await fs.rm(backupRoot, { recursive: true, force: true });
+    res.json({ stored: input.files.length, replaced: true });
+  } finally {
+    await fs.rm(stagingRoot, { recursive: true, force: true }).catch(() => undefined);
+  }
 }));
 
 app.get('/api/templates/records/content', auth, asyncRoute(async (_req, res) => {
@@ -677,7 +910,7 @@ app.post('/api/projects/:id/original-records', auth, asyncRoute(async (req, res)
     institution: institutionResult.rows[0]?.setting_value || defaultInstitution,
   });
   res.json({
-    folderName: safeFileName(`${project.report_code || project.code}原始记录`),
+    folderName: safeFileName(`${project.report_code || project.code}${project.system_name || ''}原始记录`),
     files: files.map(file => ({ path: file.path.replace(/\\/g, '/'), dataBase64: file.data.toString('base64') })),
   });
 }));
@@ -689,7 +922,23 @@ app.use((error: unknown, _req: Request, res: Response, _next: NextFunction) => {
   res.status(500).json({ message: '服务器处理失败' });
 });
 
-ensureRuntimeSchema().then(() => {
+async function recalculateStoredProjectProgress() {
+  const projects = await pool.query(`SELECT id FROM projects WHERE status NOT IN ('completed','archived')`);
+  for (const project of projects.rows) {
+    const stages = await pool.query('SELECT stage_key,data,completion FROM project_stage_records WHERE project_id=$1', [project.id]);
+    for (const stage of stages.rows) {
+      stage.completion = calculateStageCompletion(stage.stage_key, stage.data || {}, Number(stage.completion || 0));
+      await pool.query('UPDATE project_stage_records SET completion=$3 WHERE project_id=$1 AND stage_key=$2',
+        [project.id, stage.stage_key, stage.completion]);
+    }
+    const summary = deriveProjectProgress(stages.rows);
+    await pool.query('UPDATE projects SET progress=$2,current_stage=$3,status=$4 WHERE id=$1',
+      [project.id, summary.progress, summary.currentStage, summary.status]);
+  }
+}
+
+ensureRuntimeSchema().then(async () => {
+  await recalculateStoredProjectProgress();
   app.listen(port, '127.0.0.1', () => {
     console.log(`BB Miping API listening on http://127.0.0.1:${port}`);
   });

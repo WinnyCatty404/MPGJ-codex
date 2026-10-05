@@ -526,6 +526,14 @@
     .topology-upload:hover { border-color: #1a73e8; background: #f0f7ff; }
     .topology-placeholder { color: #666; font-size: 13px; }
     .topology-upload.has-image { border-style: solid; border-color: #1a73e8; background: #fff; }
+    .topology-block-toolbar { display:flex; gap:8px; margin-bottom:12px; }
+    .topology-block-list { display:flex; flex-direction:column; gap:12px; }
+    .topology-block { padding:12px; border:1px solid #d9e1ec; border-radius:8px; background:#fafcff; }
+    .topology-block-head { display:flex; align-items:center; justify-content:space-between; margin-bottom:8px; color:#52606d; font-size:12px; }
+    .topology-block-actions { display:flex; gap:6px; }
+    .topology-block-actions button { border:1px solid #cbd6e2; border-radius:4px; background:#fff; color:#52606d; cursor:pointer; }
+    .topology-block img { display:block; max-width:100%; max-height:420px; margin:0 auto 8px; border-radius:6px; }
+    .topology-block-caption { width:100%; height:32px; box-sizing:border-box; border:1px solid #cbd6e2; border-radius:5px; padding:0 8px; }
     .form-sheet input[type="radio"] { width: 14px; height: 14px; margin: 0; }
 
     /* ===== 测评对象 · 层面子Tab ===== */
@@ -582,12 +590,39 @@
     .onsite-table th { background: #e0e3e8; padding: 8px 6px; border: 1px solid #9ca3b3; text-align: center; font-weight: 700; color: #333; line-height: 1.5; }
     .onsite-table td { padding: 6px 8px; border: 1px solid #9ca3b3; vertical-align: middle; color: #333; }
     .onsite-table .unit-cell { background: #f9fafc; font-weight: 600; text-align: center; width: 130px; line-height: 1.6; }
-    .onsite-table .obj-cell { width: 150px; line-height: 1.6; }
+    .onsite-table .obj-cell { width: 200px; min-width: 180px; line-height: 1.6; word-break: normal; overflow-wrap: break-word; }
+    #step-panel-3 .onsite-table thead > tr:first-child > th:nth-child(2) { width:200px !important; min-width:180px; }
     .onsite-table .rec-cell textarea {
       width: 100%; min-height: 84px; border: 1px solid #d0d5e0; border-radius: 4px;
       padding: 5px 7px; font-size: 12px; line-height: 1.6; resize: vertical; box-sizing: border-box;
     }
     .onsite-table .rec-cell textarea:focus { border-color: #1a73e8; outline: none; }
+    .onsite-record-summary { position:relative; min-height:58px; padding-bottom:18px; cursor:text; }
+    .onsite-record-summary-text {
+      display:-webkit-box; overflow:hidden; -webkit-box-orient:vertical; -webkit-line-clamp:3;
+      line-clamp:3; line-height:1.65; min-height:19px; white-space:pre-wrap; overflow-wrap:anywhere;
+    }
+    .onsite-record-expand { position:absolute; right:0; bottom:0; border:0; padding:0; background:transparent; color:#2456A6; font-size:11px; font-weight:700; cursor:pointer; }
+    .onsite-record-count { margin-top:4px; color:#8a94a3; font-size:11px; line-height:1.4; }
+    .onsite-record-row.is-editing td { background:#EAF1FA; border-top:2px solid #2456A6; }
+    .onsite-record-row.is-editing .unit-cell { color:#2456A6; font-weight:700; }
+    .onsite-record-editing-tag { display:block; margin-top:3px; color:#2456A6; font-size:10px; font-weight:600; }
+    .onsite-record-collapsed-edit { display:flex; align-items:center; gap:8px; min-height:46px; color:#65758a; font-size:11px; }
+    .onsite-record-collapse { border:0; padding:0; background:transparent; color:#2456A6; font-size:12px; font-weight:700; cursor:pointer; }
+    .onsite-record-editor-row td { padding:12px 16px !important; background:#EAF1FA; border-bottom:2px solid #2456A6; }
+    .onsite-record-editor-head { display:flex; align-items:center; gap:10px; margin-bottom:8px; }
+    .onsite-record-editor-title { color:#2456A6; font-size:12px; font-weight:700; }
+    .onsite-record-editor-tip { color:#7b8797; font-size:10.5px; }
+    .onsite-record-save-state { margin-left:auto; color:#268645; font-size:10.5px; white-space:nowrap; }
+    .onsite-record-save-state.saving { color:#8a94a3; }
+    .onsite-record-save-state.error { color:#c62828; }
+    .onsite-record-editor-wrap { position:relative; }
+    .onsite-record-editor {
+      display:block; width:100%; min-height:112px; overflow:hidden; resize:none; box-sizing:border-box;
+      border:1.5px solid #2456A6; border-radius:6px; padding:9px 11px 25px; background:#fff;
+      color:#263445; font-size:12px; line-height:1.7; outline:none;
+    }
+    .onsite-record-editor-count { position:absolute; right:10px; bottom:7px; color:#7b8797; font-size:10.5px; pointer-events:none; }
     .onsite-table .dak-cell { width: 84px; text-align: center; }
     .onsite-table .result-cell { text-align: center; }
     .onsite-table .result-cell select {
@@ -603,26 +638,81 @@
       color: #e65100; font-weight: 600; font-size: 12px !important;
     }
     .onsite-note { font-size: 11px; color: #999; margin-top: 8px; line-height: 1.8; }
+    .object-match-panel { margin:10px 0 14px; padding:12px; border:1px solid #f0c36d; border-radius:8px; background:#fffaf0; }
+    .object-match-title { font-size:13px; font-weight:700; color:#8a5200; margin-bottom:8px; }
+    .object-match-row { display:grid; grid-template-columns:minmax(180px,1fr) 24px minmax(220px,1fr) 72px; gap:8px; align-items:center; margin-top:7px; }
+    .object-match-row span { font-size:12px; color:#3f4b5a; overflow-wrap:anywhere; }
+    .object-match-row select { height:32px; border:1px solid #cbd6e2; border-radius:5px; background:#fff; }
+    .object-match-row button { height:32px; border:0; border-radius:5px; background:#2456a6; color:#fff; cursor:pointer; }
     .onsite-table .score-cell { width: 76px; text-align: center; font-weight: 700; color: #1a3a6c; }
     .onsite-table .unit-score-cell { width: 110px; text-align: center; font-weight: 700; color: #1a73e8; background: #f7faff; font-size: 13px; }
     .onsite-table .unit-na-badge {
       display: inline-block; margin-top: 4px; padding: 1px 8px; border-radius: 10px;
       background: #eceff1; color: #78909c; font-size: 11px; font-weight: 400;
     }
-    /* 证据截图单元格 */
-    .onsite-table .evi-cell { width: 210px; cursor: pointer; }
-    .onsite-table .evi-cell.selected { outline: 2px dashed #1a73e8; outline-offset: -2px; background: #f0f6ff; }
-    .evi-hint { font-size: 11px; color: #98a2b3; line-height: 1.6; }
-    .evi-import-btn { color: #1a73e8; cursor: pointer; text-decoration: underline; white-space: nowrap; }
-    .evi-import-btn:hover { color: #0d47a1; }
-    .evi-item { margin-top: 6px; border: 1px solid #e3e8f0; border-radius: 6px; padding: 4px; background: #fff; }
-    .evi-item img { width: 100%; height: 64px; object-fit: cover; border-radius: 4px; cursor: zoom-in; display: block; }
-    .evi-meta { display: flex; align-items: center; gap: 4px; margin-top: 4px; }
-    .evi-no { flex: none; font-size: 11px; font-weight: 700; color: #1a73e8; background: #eef4ff; border-radius: 3px; padding: 1px 5px; }
-    .evi-name { flex: 1; min-width: 0; border: 1px solid #e3e8f0; border-radius: 4px; font-size: 11px; padding: 2px 4px; outline: none; }
-    .evi-name:focus { border-color: #1a73e8; }
-    .evi-del { flex: none; cursor: pointer; color: #d93025; font-weight: 700; padding: 0 3px; font-size: 13px; }
-    .evi-del:hover { color: #b3261e; }
+    /* 现场证据库：证据独立于测评对象，一个编号可包含多张图片。 */
+    .evi-record-tools { display:flex; align-items:center; gap:6px; margin-top:5px; flex-wrap:wrap; }
+    .evi-record-tools select { max-width:145px; height:26px; border:1px solid #cbd5e1; border-radius:4px; font-size:11px; background:#fff; }
+    .evi-mini-btn { height:26px; padding:0 8px; border:1px solid #b9c8dc; border-radius:4px; background:#fff; color:#2456a6; font-size:11px; cursor:pointer; }
+    .evi-mini-btn:hover { background:#eef5ff; }
+    .evi-library { margin-top:14px; padding:12px; border:1px solid #d8e1ee; border-radius:8px; background:#f8fbff; }
+    .evi-library-head { display:flex; align-items:center; justify-content:space-between; gap:10px; margin-bottom:9px; }
+    .evi-library-title { font-size:13px; font-weight:700; color:#173b6d; }
+    .evi-library-actions { display:flex; gap:6px; flex-wrap:wrap; }
+    .evi-active-bar { margin-bottom:9px; padding:7px 10px; border:1px solid #72a5ed; border-radius:6px; background:#edf5ff; color:#174b91; font-size:12px; }
+    .evi-empty { padding:16px; border:1px dashed #b9c8dc; border-radius:6px; text-align:center; color:#7d8998; font-size:12px; }
+    .evi-group-list { display:grid; grid-template-columns:repeat(auto-fill,minmax(260px,1fr)); gap:10px; }
+    .evi-group { border:1px solid #d5deea; border-radius:7px; padding:8px; background:#fff; }
+    .evi-group.active { border-color:#1a73e8; box-shadow:0 0 0 2px rgba(26,115,232,.12); }
+    .evi-group-head { display:flex; align-items:center; gap:6px; }
+    .evi-no { flex:none; font-size:11px; font-weight:700; color:#1a73e8; background:#eef4ff; border-radius:3px; padding:2px 6px; }
+    .evi-name { flex:1; min-width:0; border:1px solid #d8e1ee; border-radius:4px; font-size:11px; padding:3px 5px; outline:none; }
+    .evi-name:focus { border-color:#1a73e8; }
+    .evi-del { flex:none; cursor:pointer; color:#d93025; font-weight:700; padding:0 3px; font-size:14px; }
+    .evi-thumbs { display:flex; gap:6px; margin-top:7px; overflow-x:auto; padding-bottom:2px; }
+    .evi-thumb { position:relative; flex:0 0 82px; height:62px; }
+    .evi-thumb img { width:100%; height:100%; object-fit:cover; border-radius:4px; cursor:zoom-in; display:block; }
+    .evi-thumb-del { position:absolute; right:2px; top:2px; width:18px; height:18px; line-height:16px; border-radius:9px; background:rgba(255,255,255,.92); color:#c62828; text-align:center; cursor:pointer; font-weight:700; }
+    .evi-group-foot { display:flex; gap:6px; margin-top:7px; }
+    .evi-hint { font-size:11px; color:#758296; line-height:1.6; }
+    .onsite-evidence-fab {
+      position:fixed; right:18px; top:46%; z-index:1180; display:flex; align-items:center; gap:7px;
+      height:44px; padding:0 14px; border:0; border-radius:22px 0 0 22px;
+      background:#1769d2; color:#fff; box-shadow:0 5px 18px rgba(23,72,135,.28); cursor:pointer;
+      font-size:13px; font-weight:700;
+    }
+    .onsite-evidence-fab:hover { background:#0f58b6; }
+    .onsite-evidence-fab .count { min-width:20px; height:20px; line-height:20px; padding:0 4px; border-radius:10px; background:#fff; color:#1769d2; font-size:11px; }
+    .onsite-evidence-drawer {
+      position:fixed; z-index:1190; top:74px; right:0; bottom:18px; width:min(var(--onsite-evidence-width,420px),calc(100vw - 24px));
+      display:flex; flex-direction:column; background:#fff; border:1px solid #d6e0ed; border-right:0;
+      border-radius:12px 0 0 12px; box-shadow:-8px 5px 28px rgba(28,54,91,.2);
+      transform:translateX(104%); transition:transform .2s ease;
+    }
+    .onsite-evidence-drawer.open { transform:translateX(0); }
+    .onsite-evidence-drawer-head { flex:none; display:flex; align-items:center; gap:9px; padding:13px 14px; border-bottom:1px solid #e3e9f1; background:#f5f9ff; border-radius:12px 0 0 0; }
+    .onsite-evidence-drawer-head strong { flex:1; color:#143d70; font-size:14px; }
+    .onsite-evidence-drawer-head .layer { color:#65758a; font-size:12px; }
+    .onsite-evidence-drawer-close { width:28px; height:28px; border:0; border-radius:14px; background:#e8eef7; color:#526176; font-size:18px; cursor:pointer; }
+    .onsite-evidence-drawer-body { flex:1; min-height:0; overflow:auto; padding:10px; }
+    .onsite-evidence-drawer .evi-library { margin:0; padding:0; border:0; background:transparent; }
+    .onsite-evidence-drawer .evi-group-list { grid-template-columns:1fr; }
+    .onsite-evidence-drawer .evi-library-head { align-items:flex-start; }
+    .onsite-evidence-drawer .evi-library-actions { justify-content:flex-end; }
+    .onsite-evidence-resizer { position:absolute; z-index:2; left:-6px; top:12px; bottom:12px; width:12px; cursor:ew-resize; touch-action:none; }
+    .onsite-evidence-resizer::after { content:""; position:absolute; left:5px; top:42%; width:2px; height:54px; border-radius:2px; background:#aebed3; opacity:.75; }
+    .onsite-evidence-resizer:hover::after,
+    .onsite-evidence-resizer.dragging::after { width:3px; background:#2456A6; opacity:1; }
+    #page-implement #step-panel-3 { box-sizing:border-box; transition:margin-right .2s ease; }
+    #page-implement #step-panel-3.evidence-drawer-open { margin-right:calc(var(--onsite-evidence-width,420px) + 14px) !important; }
+    body.onsite-evidence-resizing { cursor:ew-resize !important; user-select:none !important; }
+    @media (max-width:760px) {
+      #page-implement #step-panel-3.evidence-drawer-open { margin-right:0 !important; }
+      .onsite-evidence-drawer { top:auto; left:8px; right:8px; bottom:0; width:auto; height:72vh; border-right:1px solid #d6e0ed; border-radius:12px 12px 0 0; transform:translateY(104%); }
+      .onsite-evidence-drawer.open { transform:translateY(0); }
+      .onsite-evidence-fab { right:8px; top:auto; bottom:18px; border-radius:22px; }
+      .onsite-evidence-resizer { display:none; }
+    }
     .evi-preview-overlay {
       position: fixed; inset: 0; background: rgba(13, 34, 64, 0.85); z-index: 3000;
       display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px;
@@ -642,20 +732,67 @@
     .report-sub-tabs.wrap { flex-wrap: wrap; row-gap: 8px; }
     .ua-cls-select { padding: 2px 4px; font-size: 12px; border: 1px solid #d0d5e0; border-radius: 4px; background: #fff; color: #333; }
     /* ===== 附录B 证明记录 ===== */
-    .apb-sec-title { font-size: 14px; font-weight: 600; color: #1a3a6c; margin: 22px 0 10px; padding-left: 10px; border-left: 3px solid #1a73e8; }
-    .apb-sec-title:first-child { margin-top: 0; }
-    .apb-img-slot { border: 1.5px dashed #c3cad6; border-radius: 6px; padding: 8px; min-height: 56px; cursor: pointer; background: #fff; position: relative; }
-    .apb-img-slot.selected { border-color: #1a73e8; background: #f0f6ff; }
-    .apb-img-slot:hover { border-color: #93b4f0; }
-    .apb-img-hint { font-size: 12px; color: #98a2b3; text-align: center; padding: 10px 4px; }
-    .apb-img-hint a { color: #1a73e8; cursor: pointer; text-decoration: underline; }
-    .apb-img-slot img { max-width: 100%; max-height: 220px; display: block; margin: 0 auto; border-radius: 4px; }
-    .apb-img-del { position: absolute; top: 6px; right: 8px; color: #c62828; font-size: 16px; font-weight: 700; cursor: pointer; line-height: 1; }
-    .apb-image-list { display: flex; flex-wrap: wrap; gap: 10px; margin: 4px 0 8px; }
-    .apb-image-item { position: relative; width: 170px; min-height: 90px; padding: 4px; border: 1px solid #d7deeb; border-radius: 5px; background: #fff; }
-    .apb-image-item img { max-width: 100%; max-height: 160px; }
-    .apb-image-item .apb-img-del { background: #fff; border-radius: 50%; padding: 2px 5px; }
-    .apb-auto { background: #f5f7fa; color: #445; }
+    .apb-page { max-width:920px; margin:0 auto; padding:4px 0 18px; color:#1f2937; }
+    .apb-page-title { margin:2px 0 16px; text-align:center; color:#173b63; font-size:21px; font-weight:700; }
+    .apb-tabs { display:flex; margin-bottom:18px; overflow-x:auto; border-bottom:1px solid #dfe6ee; scrollbar-width:thin; }
+    .apb-tab { flex:1 0 auto; min-width:128px; padding:10px 13px 9px; border:0; border-bottom:3px solid transparent; background:transparent; color:#7b8796; font-size:12px; cursor:pointer; }
+    .apb-tab:hover { color:#2456a6; background:#f7faff; }
+    .apb-tab.active { border-bottom-color:#2456a6; color:#2456a6; font-weight:700; }
+    .apb-section { animation:apbFade .18s ease-out; }
+    @keyframes apbFade { from { opacity:0; transform:translateY(3px); } to { opacity:1; transform:none; } }
+    .apb-sec-title { margin:0 0 12px; padding-left:10px; border-left:3px solid #2456a6; color:#173b63; font-size:15px; font-weight:700; line-height:20px; }
+    .apb-section .ua-caption { margin:14px 0 0; padding:12px 14px 9px; border:1px solid #dfe6ee; border-bottom:0; border-radius:10px 10px 0 0; background:#fff; color:#243b55; font-size:13px; font-weight:700; text-align:left; }
+    .apb-section .onsite-table { margin:0 0 14px; overflow:hidden; border:1px solid #dfe6ee; border-radius:0 0 10px 10px; background:#fff; box-shadow:0 3px 12px rgba(36,86,166,.05); }
+    .apb-section .onsite-table th { background:#edf4fc; color:#2456a6; font-weight:600; }
+    .apb-section .onsite-table tbody tr:nth-child(even) > td { background:#fafcff; }
+    .apb-form-table, .apb-form-table tbody { display:block; }
+    .apb-form-table tbody > tr { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:0 14px; padding:11px 14px; border-bottom:1px solid #edf0f4; }
+    .apb-form-table tbody > tr:last-child { border-bottom:0; }
+    .apb-form-table tbody > tr > th, .apb-form-table tbody > tr > td { display:block; width:auto!important; padding:0!important; border:0!important; background:transparent!important; }
+    .apb-form-table tbody > tr > th { margin:0 0 6px; color:#48586a; font-size:12px; text-align:left; }
+    .apb-form-table tbody > tr > th:nth-child(1) { grid-column:1; grid-row:1; }
+    .apb-form-table tbody > tr > td:nth-child(2) { grid-column:1; grid-row:2; }
+    .apb-form-table tbody > tr > th:nth-child(3) { grid-column:2; grid-row:1; }
+    .apb-form-table tbody > tr > td:nth-child(4) { grid-column:2; grid-row:2; }
+    .apb-form-table tbody > tr:not(:has(> :nth-child(3))) > * { grid-column:1 / -1!important; }
+    .apb-form-table tbody > tr:has(> :only-child) > * { grid-column:1 / -1!important; grid-row:auto!important; }
+    .apb-section input[type="text"], .apb-section select, .apb-section textarea { border:1px solid #d9e1ea; border-radius:6px; background:#f7f9fb; color:#273444; transition:border-color .15s,box-shadow .15s,background .15s; }
+    .apb-section input[type="text"], .apb-section select { height:38px; min-height:38px; box-sizing:border-box; padding:0 10px; font-size:13px; line-height:36px; }
+    .apb-section input[type="text"]:focus, .apb-section select:focus, .apb-section textarea:focus { outline:none; border-color:#2456a6; background:#fff; box-shadow:0 0 0 3px rgba(36,86,166,.10); }
+    .apb-section input::placeholder, .apb-section textarea::placeholder { color:#a5adb8; text-align:center; }
+    .apb-img-slot { position:relative; min-height:76px; padding:10px; border:1.5px dashed #9eb9db; border-radius:7px; background:#f8fbff; cursor:pointer; }
+    .apb-img-slot.selected { border-color:#2456a6; background:#edf5ff; box-shadow:0 0 0 3px rgba(36,86,166,.10); }
+    .apb-img-slot:hover { border-color:#5f8bc5; }
+    .apb-img-hint { padding:14px 6px; color:#8b96a5; font-size:12px; text-align:center; }
+    .apb-img-hint a { color:#2456a6; cursor:pointer; text-decoration:underline; }
+    .apb-img-slot img { display:block; max-width:100%; max-height:220px; margin:0 auto; border:1px solid #dfe6ee; border-radius:6px; }
+    .apb-img-del { position:absolute; z-index:3; top:6px; right:8px; color:#c94b55; font-size:16px; font-weight:700; cursor:pointer; line-height:1; }
+    .apb-image-list { display:flex; flex-wrap:wrap; gap:10px; margin:3px 0 8px; }
+    .apb-image-item { position:relative; width:150px; min-height:88px; padding:4px; border:1px solid #d7deeb; border-radius:6px; background:#fff; }
+    .apb-image-item img { width:100%; max-height:150px; object-fit:contain; }
+    .apb-image-item .apb-img-del { border-radius:50%; background:#fff; padding:2px 5px; }
+    .apb-auto { display:inline-flex; align-items:center; justify-content:center; min-width:120px; min-height:38px; box-sizing:border-box; padding:7px 10px; border:1px solid #e1e6ed; border-radius:6px; background:#f5f7fa; color:#667085; text-align:center; }
+    .apb-cert-grid-table, .apb-cert-grid-table tbody { display:block; border:0!important; background:transparent!important; box-shadow:none!important; }
+    .apb-cert-grid-table tr { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:12px; margin-bottom:12px; }
+    .apb-cert-grid-table td { display:block; width:auto!important; min-height:210px; padding:12px!important; border:1.5px dashed #9eb9db!important; border-radius:9px; background:#f8fbff!important; }
+    .apb-cert-head { display:flex; align-items:center; justify-content:space-between; gap:10px; margin-bottom:9px; color:#1a3a6c; font-size:12px; font-weight:700; }
+    .apb-cert-head small { color:#98a2b3; font-size:10px; font-weight:400; }
+    .apb-cert-cell.is-empty .apb-img-slot { min-height:150px; border:3px double #9eb9db; background:linear-gradient(#f8fbff,#fff); }
+    .apb-cert-cell.is-empty .apb-img-slot::after { content:'章'; position:absolute; right:16px; bottom:14px; width:34px; height:34px; border:2px solid rgba(201,75,85,.34); border-radius:50%; color:rgba(201,75,85,.42); font-size:10px; line-height:34px; text-align:center; pointer-events:none; }
+    .apb-section-nav { display:flex; justify-content:space-between; gap:12px; margin-top:18px; }
+    .apb-section-nav button { min-width:92px; padding:7px 14px; border:1px solid #d5dde7; border-radius:6px; background:#fff; color:#526274; cursor:pointer; }
+    .apb-section-nav button:hover:not(:disabled) { border-color:#2456a6; color:#2456a6; }
+    .apb-section-nav button.primary { border-color:#2456a6; background:#2456a6; color:#fff; }
+    .apb-section-nav button:disabled { opacity:.38; cursor:not-allowed; }
+    .apb-footnote { margin-top:18px; color:#9aa3af; font-size:11px; text-align:center; }
+    @media (max-width:720px) {
+      .apb-page { padding-left:2px; padding-right:2px; }
+      .apb-tab { min-width:112px; }
+      .apb-cert-grid-table tr { grid-template-columns:1fr; }
+      .apb-form-table tbody > tr { grid-template-columns:1fr; }
+      .apb-form-table tbody > tr > * { grid-column:1!important; grid-row:auto!important; }
+      .apb-form-table tbody > tr > th:nth-child(3) { margin-top:11px; }
+    }
     .quant-table .quant-check { color: #1a73e8; font-weight: 700; }
     .quant-table .quant-total-row td { background: #f0f4fa; font-weight: 600; }
     .fix-table select { width: 100%; max-width: 230px; height: 28px; border: 1px solid #c5cbd6; border-radius: 4px; font-size: 12px; outline: none; cursor: pointer; background: #fff; }
@@ -786,6 +923,9 @@
   #page-implement .tab-sidebar {
     position: sticky; top: 14px; width: 206px; padding: 8px; border-radius: 12px;
   }
+  #page-implement #step-panel-3 .tab-sidebar { width:150px; flex:0 0 150px; padding:6px; }
+  #page-implement #step-panel-3 .tab-item { padding:9px 10px; }
+  #page-implement #step-panel-3 .tab-content { padding:16px; }
   #page-implement .tab-item {
     margin: 2px 0; padding: 10px 12px; border-left: 0; border-radius: 8px;
     color: #4b5e73; line-height: 1.45;
@@ -834,6 +974,13 @@
   #page-implement table .label-cell,
   #page-implement table .sub-label,
   #page-implement .indicator-table .ind-name { background: #f4f7fa; color: #29445f; }
+  #page-implement .mi-table td.sub-label {
+    width:96px;
+    min-width:96px;
+    white-space:nowrap;
+    word-break:keep-all;
+    overflow-wrap:normal;
+  }
   #page-implement input[type="text"],
   #page-implement input[type="number"],
   #page-implement input[type="date"],
@@ -1412,7 +1559,7 @@
                     <tr data-page-node-id="ymHAVzKU6rnmh4a6RGXdbW">
                       <td class="label-cell" data-page-node-id="6fiazjXHeiZMTeYghNBYti">系统是否已投入运行</td>
                       <td colspan="3" data-page-node-id="dUTOzvEmEPH1TaJbFFW517">
-                        <div class="tb-line" data-page-node-id="lAey6bejbkBh1YNCEQ00p2"><label class="cb-label" data-page-node-id="XyMxY1ViF4jwH3BBtHm8yh"><input type="checkbox" data-page-node-id="alyVvBIdRSOueBLcxqNeKI" /> 是，投入运行时间：</label></div>
+                        <div class="tb-line" data-page-node-id="lAey6bejbkBh1YNCEQ00p2"><label class="cb-label" data-page-node-id="XyMxY1ViF4jwH3BBtHm8yh"><input type="checkbox" data-page-node-id="alyVvBIdRSOueBLcxqNeKI" /> 是，投入运行时间：<input type="text" id="mi-operation-date" class="long-input" placeholder="如 2023年6月" /></label></div>
                         <div class="tb-line" data-page-node-id="3YEPvCWrclgOiKfW95jHZp"><label class="cb-label" data-page-node-id="lQHNhktEf2hTVCK92uw0U5"><input type="checkbox" data-page-node-id="tvHVPfUw4BR7aSVHmLV2vI" /> 否，目前情况：<input type="text" class="long-input" data-page-node-id="CgTPqOHaKaGfTxJuH6B7aj" /></label></div>
                       </td>
                     </tr>
@@ -1425,9 +1572,9 @@
                         </div>
                         <div class="tb-line" data-page-node-id="i98cQhKLjj86pai0t0N27e">
                           <label class="cb-label" data-page-node-id="ZJ3jlpBJjX5IAUU7SoREeN"><input type="checkbox" data-page-node-id="yqAmxotal4vZrifrB8YE4s" /> 与本单位其他系统连接</label>
-                          <label class="cb-label" data-page-node-id="K0lEC47CEEc6YL7frPzaeq"><input type="checkbox" data-page-node-id="EWU1Fjr7EOb7orMWaue9AJ" /> 其他 <input type="text" class="mid-input" data-page-node-id="yuC8qwWXAjubY2bJZKhOZw" /></label>
+                          <label class="cb-label" data-page-node-id="K0lEC47CEEc6YL7frPzaeq"><input type="checkbox" data-page-node-id="EWU1Fjr7EOb7orMWaue9AJ" /> 其他 <input id="mi-interconnect-other" type="text" class="mid-input" data-page-node-id="yuC8qwWXAjubY2bJZKhOZw" /></label>
                         </div>
-                        <div class="tb-line" data-page-node-id="GrWi4SSsSOX9XtLS7tREKC">互联系统名称：<input type="text" class="long-input" data-page-node-id="HkAltnczCSZH4O7GLqDlEG" /></div>
+                        <div class="tb-line" data-page-node-id="GrWi4SSsSOX9XtLS7tREKC">互联系统名称：<input id="mi-interconnect-names" type="text" class="long-input" data-page-node-id="HkAltnczCSZH4O7GLqDlEG" /></div>
                       </td>
                     </tr>
                     <tr data-page-node-id="CqPOkgvsFe3pnIlpBhDizx">
@@ -1572,38 +1719,25 @@
               <div class="section-header" style="margin-bottom:20px;"><span class="section-name">网络拓扑图及描述</span><span style="font-size:12px;color:#999;margin-left:8px;">支持上传或粘贴拓扑图片</span></div>
               <div style="margin-bottom:22px;" data-page-node-id="xiWbAYU3ncExp8XAKTEFHT">
                 <div style="font-size:13px; font-weight:600; color:#1a3a6c; margin-bottom:8px; padding-left:10px; border-left:3px solid #4caf50;" data-page-node-id="gkMfA18I3j0FGtP4Pqj39E">网络拓扑图及描述</div>
-
-                <div style="margin-bottom:12px;" data-page-node-id="PtkvcgRAlMxQNgSGufEVlj">
-                  <div style="font-size:12px; color:#666; margin-bottom:6px;" data-page-node-id="kCXcDWgUg0dXhXyTYzPEHz">拓扑图（点击选中后粘贴，或导入本机图片）</div>
-                  <div class="topology-upload" id="topology-upload-area" tabindex="0" onclick="selectPlanImageArea(this)" data-page-node-id="GymXQxFQBc9FrKXXeuN1Mo">
-                    <div class="topology-placeholder" id="topology-placeholder" data-page-node-id="n8UWU5Q5k8B0ZoIuoPNiE3">
-                      <div style="font-size:28px; margin-bottom:6px;" data-page-node-id="VhaFUUn78UITsvZJ1EsuZF">🖼️</div>
-                      <div data-page-node-id="ZX6tZk6pMTOKNiU7WzrqA7">点击本框选中后 <b>Ctrl+V</b> 粘贴图片，或 <button type="button" class="image-import-link" onclick="event.stopPropagation(); selectPlanImageArea(document.getElementById('topology-upload-area')); document.getElementById('topology-file').click()">导入本机图片</button></div>
-                      <div style="font-size:12px; color:#999; margin-top:4px;" data-page-node-id="OWYzmL2c0E6eMNjNwvMdiW">图片将自动命名为：{系统名称}网络拓扑图</div>
-                    </div>
-                    <img id="topology-image" style="display:none; max-width:100%; max-height:400px; border-radius:6px;" data-page-node-id="3F9XL1JmcP4ryverbba9AH" />
-                  </div>
-                  <input type="file" id="topology-file" accept="image/*" style="display:none;" onchange="handleTopologyUpload(this)" data-page-node-id="frh39WDtL2Ha6g5RgE2AKF" />
-                  <div style="display:flex; justify-content:space-between; align-items:center; margin-top:8px;" data-page-node-id="r484xA0MObL15q0cyLDZ6o">
-                    <div style="font-size:12px; color:#666;" data-page-node-id="FqP65kEdUy6aezKU55lPK7">图片名称：<span id="topology-filename" data-page-node-id="i2pygEEI44FqLoUDpmSEe4">--</span></div>
-                    <button class="btn btn-secondary btn-sm" onclick="clearTopologyImage()" data-page-node-id="niNPlAX7SzO5aEQMbL034e">清除图片</button>
-                  </div>
-                </div>
-
-                <div style="margin-bottom:10px;" data-page-node-id="1YHDvy2HOYSDmQjwWiVH2P">
-                  <div style="font-size:12px; color:#666; margin-bottom:4px;" data-page-node-id="NYTDTDuR0xO1BABMdWUioi">图片描述</div>
-                  <textarea id="plan-topology-desc" class="text-area indent-text" style="min-height:220px; width:100%; border:1.5px solid #d0d5e0; border-radius:6px; padding:10px 12px; font-size:13px; line-height:1.75; resize:vertical; box-sizing:border-box;"></textarea>
-                </div>
+                <div class="topology-block-toolbar"><button type="button" class="btn btn-secondary btn-sm" onclick="addTopologyTextBlock()">＋添加文字</button><button type="button" class="btn btn-secondary btn-sm" onclick="document.getElementById('topology-file').click()">＋添加图片</button><span style="font-size:12px;color:#888;align-self:center;">图文块可上下调整顺序，图片支持批量上传或粘贴</span></div>
+                <div id="topology-block-list" class="topology-block-list" tabindex="0"></div>
+                <input type="file" id="topology-file" accept="image/*" multiple style="display:none;" onchange="handleTopologyUpload(this)" />
+                <textarea id="plan-topology-desc" style="display:none;"></textarea><img id="topology-image" style="display:none;" />
               </div>
 
               <div class="form-actions">
-                <button class="btn btn-secondary" style="width:auto;padding:0 20px;" onclick="clearTopologyImage()">清除拓扑图片</button>
+                <button class="btn btn-secondary" style="width:auto;padding:0 20px;" onclick="resetTopologyBlocks()">恢复默认图文</button>
                 <button class="btn btn-primary" style="width:auto;padding:0 28px;" onclick="savePlanSystemSituation()">保存网络拓扑图及描述</button>
               </div>
             </div>
 
             <!-- 密码应用情况 -->
             <div id="plan-tab-12" class="tab-panel crypto-overview">
+              <div class="report-sub-tabs" style="margin-bottom:10px;">
+                <button type="button" id="crypto-module-tab-overview" class="report-sub-tab active" onclick="switchCryptoModule('overview')">密码应用概况</button>
+                <button type="button" id="crypto-module-tab-service" class="report-sub-tab" onclick="switchCryptoModule('service')">密码服务</button>
+              </div>
+              <div id="crypto-module-overview" style="display:flex; min-height:0; flex:1; flex-direction:column;">
               <div class="crypto-overview-title">
                 <div><strong>密码应用概况</strong><span>对应报告 2.3</span></div>
                 <span id="crypto-overview-save-state" class="crypto-save-state">已自动保存 --:--</span>
@@ -1655,6 +1789,21 @@
                 <span id="crypto-layer-completed">0/4 已完成</span>
               </div>
               <div id="crypto-key-undo" class="crypto-key-undo" style="display:none;"><span>已删除一行</span><button type="button" onclick="undoCryptoKeyDelete()">撤销</button></div>
+              </div>
+              <div id="crypto-module-service" style="display:none; overflow:auto;">
+              <div class="section-header" style="margin:6px 0 16px;">
+                <span class="section-name">密码服务</span>
+                <span style="font-size:12px; color:#999; margin-left:8px;">对应报告表 2-13</span>
+              </div>
+              <div class="asset-table-actions">
+                <button type="button" class="btn-add-row" onclick="addCryptoServiceRow()">增加</button>
+                <button type="button" class="btn-del-row" onclick="deleteCryptoServiceRow()">删除</button>
+              </div>
+              <table class="mi-table asset-table">
+                <thead><tr><th style="width:70px;">序号</th><th>密码服务名称</th><th>密码服务提供商</th></tr></thead>
+                <tbody id="crypto-service-body"></tbody>
+              </table>
+              </div>
             </div>
             <!-- 系统资产 -->
             <div id="plan-tab-10" class="tab-panel" data-page-node-id="IB72kaTM10D1fsg6FCPMkY">
@@ -2177,8 +2326,6 @@
                 <div class="obj-layer-tab" onclick="switchMethodSubTab(2)" data-page-node-id="ZDzCbgojOxvAa0OTdGtXhd">测评接入点</div>
               </div>
               <div id="method-sub-panel-1" class="obj-layer-panel active" data-page-node-id="GPPJlPHFDyeDXonQK7V98E">
-                <div class="obj-table-caption">现场测评方法</div>
-                <textarea id="plan-onsite-method" class="text-area indent-text" style="min-height:110px; width:100%; border:1.5px solid #d0d5e0; border-radius:6px; padding:10px 12px; font-size:13px; line-height:1.75; resize:vertical; box-sizing:border-box; margin-bottom:16px;" placeholder="请输入本次评估使用的测评方法描述，如：访谈、文档审查、实地查看、配置检查、工具测试等"></textarea>
                 <div class="obj-table-caption" data-page-node-id="55cExobKMRqgQhxLB4EF9s">表 3-3 测评工具</div>
                 <table class="obj-table" data-page-node-id="KDNXI6rEJ5Pdau4XZQm6ji">
                   <thead data-page-node-id="XJAJ4zEhAuy8u8lMqgr9gD"><tr data-page-node-id="imPAatOhhAgloxwwzADj0F"><th class="col-no" data-page-node-id="RZt5jOuuHM9QQNQH2N6VcR">序号</th><th data-page-node-id="H5LOJsylLRCdl2q9j7COMg">工具名称</th><th style="width:90px;" data-page-node-id="9AZjmwDuF8IfYxwP3SfeE6">版本</th><th style="width:200px;" data-page-node-id="BEoZotqtISe6UXt5hBpo0m">生产厂商</th><th data-page-node-id="4tUM2e49iu9EnN3zF0naE9">工具说明</th><th class="col-action" data-page-node-id="oyfNb9gEATMfKIMWRmQG37"></th></tr></thead>
@@ -2318,22 +2465,25 @@
         <div class="report-export-grid">
           <div class="report-export-card">
             <div class="report-export-card-head"><div class="report-export-icon">W</div><strong>Word 版本报告</strong></div>
-            <p>按项目等级使用二级或三级模板，写入当前项目保存的字段、表格和图片，并更新目录与页码。建议使用 Word 打开报告，页码显示正确；使用 WPS 打开时页码可能相差 1 页。</p>
+            <p>建议使用 Word 打开报告，页码显示正确；使用 WPS 打开时页码可能相差 1 页，无需修改PDF可以正确导出。</p>
+            <small class="report-export-estimate">预计：一般约 30 秒；图片较多或接近 30 MB 时约 1～3 分钟</small>
             <button id="export-docx-btn" class="btn btn-primary report-export-btn" onclick="exportProjectReport('docx', this)">导出 Word</button>
           </div>
           <div class="report-export-card">
             <div class="report-export-card-head"><div class="report-export-icon pdf">PDF</div><strong>PDF 版本报告</strong></div>
-            <p>先生成同版式 Word 报告，再通过本机 Word 转换为 PDF。</p>
+            <p>导出为不可编辑的 PDF 格式，适用于报送与留档。</p>
+            <small class="report-export-estimate">预计：一般约 1 分钟；图片较多或接近 30 MB 时约 2～5 分钟</small>
             <button id="export-pdf-btn" class="btn btn-primary report-export-btn" onclick="exportProjectReport('pdf', this)">导出 PDF</button>
           </div>
           <div class="report-export-card">
             <div class="report-export-card-head"><div class="report-export-icon folder">原</div><strong>原始记录</strong></div>
-            <p>自动使用“模板设置”中的原始记录文件夹，并按“报告编号+原始记录”命名输出目录。</p>
-            <button id="export-records-btn" class="btn btn-primary report-export-btn" onclick="generateOriginalRecords(this)">选择位置并生成</button>
+            <p>包含原始测评记录、底稿与证据材料的归档包，适用于内部留存。</p>
+            <small class="report-export-estimate">预计：一般数秒；证据图片较多时可能需要几十秒</small>
+            <button id="export-records-btn" type="button" class="btn btn-primary report-export-btn" onclick="generateOriginalRecords(this,event)">选择位置并生成</button>
           </div>
         </div>
         <div id="report-export-task" class="report-export-task" style="display:none;">
-          <span id="report-export-task-name" class="report-export-task-name">正在生成</span>
+          <span class="report-export-task-info"><b id="report-export-task-name" class="report-export-task-name">正在生成</b><small id="report-export-task-time">预计需要一些时间</small></span>
           <div class="report-export-progress"><span id="report-export-progress-bar"></span></div>
           <span id="report-export-progress-text" class="report-export-progress-text">0%</span>
         </div>
@@ -2855,8 +3005,11 @@
     configureAssessmentLevel();
     onsiteRecords = {};
     onsiteImportedObjects = {};
+    onsiteEvidenceGroups = [];
+    activeOnsiteEvidenceGroupId = '';
+    onsiteRecordEditorTarget = null;
+    onsiteExpandedRecordKeys.clear();
     reportFixes = {};
-    reportCellOverrides = {};
     // 系统名称以新建项目时的值为唯一来源，后续Word导入不覆盖。
     document.getElementById('mi-sys-name').value = p.systemName || '';
     // 项目准备：被测单位名称默认带入项目责任单位，其余清空待填
@@ -2878,6 +3031,7 @@
     // 测评准备与方案编制 · 被测系统情况：填充默认模板
     fillPlanSystemSituationTemplates(p);
     renderCryptoKeyTables();
+    renderCryptoServices();
     // 测评准备与方案编制 · 前次测评情况：填充默认模板
     fillPlanPrevEvalTemplates(p);
     // 测评准备与方案编制 · 系统资产：初始化表格
@@ -2936,6 +3090,48 @@
     asymmetric: [{ level: '1', type: 'CA公钥', functionText: 'CA公钥是非对称密钥体系的信任根，用于验证站点证书、用户数字证书的真实性和有效性。' }],
     symmetric: [{ level: '', type: '', functionText: '' }]
   };
+  let cryptoServices = [{ name: '', provider: '' }];
+
+  function switchCryptoModule(module) {
+    const overview = module !== 'service';
+    const overviewTab = document.getElementById('crypto-module-tab-overview');
+    const serviceTab = document.getElementById('crypto-module-tab-service');
+    const overviewPanel = document.getElementById('crypto-module-overview');
+    const servicePanel = document.getElementById('crypto-module-service');
+    if (overviewTab) overviewTab.classList.toggle('active', overview);
+    if (serviceTab) serviceTab.classList.toggle('active', !overview);
+    if (overviewPanel) overviewPanel.style.display = overview ? 'flex' : 'none';
+    if (servicePanel) servicePanel.style.display = overview ? 'none' : 'block';
+    if (!overview) renderCryptoServices();
+  }
+
+  function renderCryptoServices() {
+    const body = document.getElementById('crypto-service-body');
+    if (!body) return;
+    body.innerHTML = (cryptoServices || []).map(function (row, index) {
+      return '<tr><td>' + (index + 1) + '</td>' +
+        '<td><textarea class="full-input asset-text" oninput="updateCryptoService(' + index + ',\'name\',this.value)">' + onsiteEsc(row.name || '') + '</textarea></td>' +
+        '<td><textarea class="full-input asset-text" oninput="updateCryptoService(' + index + ',\'provider\',this.value)">' + onsiteEsc(row.provider || '') + '</textarea></td></tr>';
+    }).join('');
+  }
+
+  function updateCryptoService(index, field, value) {
+    if (cryptoServices[index]) cryptoServices[index][field] = value;
+  }
+
+  function addCryptoServiceRow() {
+    cryptoServices.push({ name: '', provider: '' });
+    renderCryptoServices();
+    document.getElementById('crypto-service-body')?.lastElementChild?.querySelector('textarea')?.focus();
+    document.dispatchEvent(new Event('bb:prototype-change'));
+  }
+
+  function deleteCryptoServiceRow() {
+    if (cryptoServices.length > 1) cryptoServices.pop();
+    else cryptoServices[0] = { name: '', provider: '' };
+    renderCryptoServices();
+    document.dispatchEvent(new Event('bb:prototype-change'));
+  }
 
   let cryptoDeletedRow = null;
   let cryptoDeleteTimer = null;
@@ -3386,9 +3582,28 @@
   let evaluationIndicatorLevels = LEVEL_THREE_INDICATORS;
   function assessmentLevel() { return /2|二/.test(String(currentImplementProject?.level || 3)) ? 2 : 3; }
   function assessmentLevelLabel() { return assessmentLevel() === 2 ? "二" : "三"; }
+  function stableAssessmentId(prefix, value) {
+    let hash = 2166136261;
+    const text = String(value || '');
+    for (let i = 0; i < text.length; i++) {
+      hash ^= text.charCodeAt(i);
+      hash = Math.imul(hash, 16777619);
+    }
+    return prefix + '-' + (hash >>> 0).toString(36);
+  }
+
+  function ensureIndicatorIds() {
+    evaluationIndicatorLevels.forEach(function(level, levelIdx) {
+      level.items.forEach(function(item) {
+        if (!item.indicatorId) item.indicatorId = stableAssessmentId('indicator', levelIdx + '|' + level.name + '|' + item.name);
+      });
+    });
+  }
+
   function configureAssessmentLevel() {
     evaluationIndicatorLevels = assessmentLevel() === 2 ? LEVEL_TWO_INDICATORS : LEVEL_THREE_INDICATORS;
     REPORT_UNIT_WEIGHTS = assessmentLevel() === 2 ? LEVEL_TWO_WEIGHTS : LEVEL_THREE_WEIGHTS;
+    ensureIndicatorIds();
   }
 
   function renderIndicatorTables() {
@@ -3452,6 +3667,43 @@
   }
 
   // ===== 测评准备与方案编制 · 被测系统情况 =====
+  let topologyBlocks = [];
+  function topologyDefaultText(sysName) {
+    return `如图2-1所示，${sysName}主要部署于XXX平台，建立在基础设施即服务（IaaS）服务模式下，基于云计算基础服务（网络、计算、安全）搭建面向政务外网和互联网的应用，其中服务器采用Kylin和UOS，数据库采用Kingbase，使用安全组、日志审计系统、数据库审计系统、主机安全及管理系统、APT攻击预警平台、云监控、堡垒机等安全产品对${sysName}网络安全进行保护。\n` +
+      `系统通过配置安全组规则实现云服务器入流量和出流量状态检测和数据包过滤；系统通过部署日志审计系统实现系统各类日志统一存储、日志查询与实时分析，通过部署堡垒机实现系统资产统一运维、文件传输和安全审计为一体的综合性运维管控，通过部署数据库审计系统实现数据库全量行为的审计溯源、危险攻击实时告警，通过部署主机安全及管理系统实现云服务器病毒查杀、网马查杀、勒索挖矿防御、漏洞管理修复、防暴力破解、防端口扫描、Web应用防护等主机安全能力，通过部署APT攻击预警平台实现APT攻击行为进行检测，发现0day漏洞利用、未知恶意代码等高级攻击行为，通过云监控实现云资源监控报警。\n` +
+      `系统运维用户通过接入杭州市政务外网对各云安全产品、云服务器、数据库等进行配置运维管理。`;
+  }
+  function newTopologyBlock(type, extra) { return Object.assign({ id: 'topology-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 8), type: type }, extra || {}); }
+  function syncLegacyTopologyFields() {
+    const desc = document.getElementById('plan-topology-desc');
+    if (desc) desc.value = topologyBlocks.filter(b => b.type === 'text').map(b => b.content || '').filter(Boolean).join('\n');
+    const legacy = document.getElementById('topology-image');
+    const firstImage = topologyBlocks.find(b => b.type === 'image' && b.dataUrl);
+    if (legacy) legacy.src = firstImage?.dataUrl || '';
+  }
+  function renderTopologyBlocks() {
+    const list = document.getElementById('topology-block-list');
+    if (!list) return;
+    if (!topologyBlocks.length) topologyBlocks.push(newTopologyBlock('text', { content: '' }));
+    let imageNo = 0;
+    list.innerHTML = topologyBlocks.map(function(block, index) {
+      const actions = '<div class="topology-block-actions"><button type="button" onclick="moveTopologyBlock(' + index + ',-1)"' + (index ? '' : ' disabled') + '>↑</button><button type="button" onclick="moveTopologyBlock(' + index + ',1)"' + (index < topologyBlocks.length - 1 ? '' : ' disabled') + '>↓</button><button type="button" onclick="removeTopologyBlock(' + index + ')">删除</button></div>';
+      if (block.type === 'image') {
+        imageNo += 1;
+        const defaultCaption = '图 2-' + imageNo + ' ' + ((document.getElementById('mi-sys-name')?.value || '被测信息系统').trim()) + '网络拓扑图';
+        return '<div class="topology-block"><div class="topology-block-head"><span>图片块 ' + imageNo + '</span>' + actions + '</div><img src="' + onsiteEsc(block.dataUrl || '') + '"><input class="topology-block-caption" value="' + onsiteEsc(block.caption || defaultCaption) + '" placeholder="图片说明" oninput="updateTopologyBlock(' + index + ',\'caption\',this.value)"></div>';
+      }
+      return '<div class="topology-block"><div class="topology-block-head"><span>文字块</span>' + actions + '</div><textarea class="text-area indent-text" style="min-height:130px" placeholder="请输入拓扑说明" oninput="updateTopologyBlock(' + index + ',\'content\',this.value)">' + onsiteEsc(block.content || '') + '</textarea></div>';
+    }).join('');
+    syncLegacyTopologyFields();
+  }
+  function updateTopologyBlock(index, key, value) { if (topologyBlocks[index]) topologyBlocks[index][key] = value; syncLegacyTopologyFields(); }
+  function notifyTopologyBlocksChanged() { document.dispatchEvent(new CustomEvent('bb:prototype-change')); }
+  function addTopologyTextBlock() { topologyBlocks.push(newTopologyBlock('text', { content: '' })); renderTopologyBlocks(); notifyTopologyBlocksChanged(); }
+  function moveTopologyBlock(index, offset) { const target = index + offset; if (target < 0 || target >= topologyBlocks.length) return; const block = topologyBlocks.splice(index, 1)[0]; topologyBlocks.splice(target, 0, block); renderTopologyBlocks(); notifyTopologyBlocksChanged(); }
+  function removeTopologyBlock(index) { topologyBlocks.splice(index, 1); renderTopologyBlocks(); notifyTopologyBlocksChanged(); }
+  function resetTopologyBlocks() { const sys = document.getElementById('mi-sys-name')?.value || '{系统名称}'; topologyBlocks = [newTopologyBlock('text', { content: topologyDefaultText(sys) })]; renderTopologyBlocks(); }
+
   function fillPlanSystemSituationTemplates(p) {
     const sysName = p.systemName || '{系统名称}';
 
@@ -3461,53 +3713,47 @@
       `安全设备、服务器等硬件设施设备依托于XXX平台，系统由国产化云服务器、PolarDB数据库提供完整的应用功能，使用安全组、日志审计系统、数据库审计系统、主机安全及管理系统、APT攻击预警平台、云监控、堡垒机等安全产品对数智同心荟网络安全进行保护。`;
 
     // 网络拓扑图描述
-    document.getElementById('plan-topology-desc').value =
-      `如图2-1所示，${sysName}主要部署于XXX平台，建立在基础设施即服务（IaaS）服务模式下，基于云计算基础服务（网络、计算、安全）搭建面向政务外网和互联网的应用，其中服务器采用Kylin和UOS，数据库采用Kingbase，使用安全组、日志审计系统、数据库审计系统、主机安全及管理系统、APT攻击预警平台、云监控、堡垒机等安全产品对${sysName}网络安全进行保护。\n` +
-      `系统通过配置安全组规则实现云服务器入流量和出流量状态检测和数据包过滤；系统通过部署日志审计系统实现系统各类日志统一存储、日志查询与实时分析，通过部署堡垒机实现系统资产统一运维、文件传输和安全审计为一体的综合性运维管控，通过部署数据库审计系统实现数据库全量行为的审计溯源、危险攻击实时告警，通过部署主机安全及管理系统实现云服务器病毒查杀、网马查杀、勒索挖矿防御、漏洞管理修复、防暴力破解、防端口扫描、Web应用防护等主机安全能力，通过部署APT攻击预警平台实现APT攻击行为进行检测，发现0day漏洞利用、未知恶意代码等高级攻击行为，通过云监控实现云资源监控报警。\n` +
-      `系统运维用户通过接入杭州市政务外网对各云安全产品、云服务器、数据库等进行配置运维管理。`;
-
-    // 重置拓扑图
-    clearTopologyImage();
-    document.getElementById('topology-filename').textContent = '图2-1 ' + sysName + '网络拓扑图';
-    const placeholderHint = document.querySelector('#topology-placeholder div:last-child');
-    if (placeholderHint) placeholderHint.textContent = '图片将自动命名为：' + '图2-1 ' + sysName + '网络拓扑图';
+    topologyBlocks = [newTopologyBlock('text', { content: topologyDefaultText(sysName) })];
+    renderTopologyBlocks();
   }
 
   function syncTopologyCaption() {
     const field = document.getElementById('mi-sys-name');
-    const caption = '图2-1 ' + ((field && field.value.trim()) || '{被测系统}') + '网络拓扑图';
-    document.getElementById('topology-filename').textContent = caption;
-    const hint = document.querySelector('#topology-placeholder div:last-child');
-    if (hint) hint.textContent = '图片将自动命名为：' + caption;
+    renderTopologyBlocks();
   }
   document.getElementById('mi-sys-name').addEventListener('input', syncTopologyCaption);
 
   function handleTopologyUpload(input) {
     if (!input.files || input.files.length === 0) return;
-    const file = input.files[0];
-    const sysName = currentImplementProject ? currentImplementProject.systemName : '{系统名称}';
-    displayTopologyImage(file, sysName);
+    const files = Array.from(input.files);
+    input.value = '';
+    Promise.all(files.map(readTopologyImage)).then(function(dataUrls) {
+      dataUrls.forEach(function(dataUrl) {
+        topologyBlocks.push(newTopologyBlock('image', { dataUrl: dataUrl, caption: '' }));
+      });
+      renderTopologyBlocks();
+      notifyTopologyBlocksChanged();
+    }).catch(function() { showToast('拓扑图片读取失败，请重新选择', true); });
   }
 
-  function displayTopologyImage(file, sysName) {
-    const reader = new FileReader();
-    reader.onload = function(e) {
-      const img = document.getElementById('topology-image');
-      const placeholder = document.getElementById('topology-placeholder');
-      const uploadArea = document.getElementById('topology-upload-area');
-      img.src = e.target.result;
-      img.style.display = 'block';
-      placeholder.style.display = 'none';
-      uploadArea.classList.add('has-image');
+  function readTopologyImage(file) {
+    return new Promise(function(resolve, reject) {
+      const reader = new FileReader();
+      reader.onload = function(e) { resolve(String(e.target.result || '')); };
+      reader.onerror = reject;
+      reader.readAsDataURL(file);
+    });
+  }
 
-      const ext = file.name.split('.').pop() || 'png';
-      document.getElementById('topology-filename').textContent = '图2-1 ' + (sysName || '{被测系统}') + '网络拓扑图';
-    };
-    reader.readAsDataURL(file);
+  function displayTopologyImage(file) {
+    readTopologyImage(file).then(function(dataUrl) {
+      topologyBlocks.push(newTopologyBlock('image', { dataUrl: dataUrl, caption: '' }));
+      renderTopologyBlocks();
+      notifyTopologyBlocksChanged();
+    }).catch(function() { showToast('拓扑图片读取失败，请重新粘贴', true); });
   }
 
   function handleTopologyPaste(e) {
-    if (!document.getElementById('topology-upload-area')?.classList.contains('image-area-selected')) return;
     // 仅在网络拓扑图及描述 tab 激活时处理图片粘贴
     const tabPanel = document.getElementById('plan-tab-11');
     if (!tabPanel || !tabPanel.classList.contains('active')) return;
@@ -3519,23 +3765,16 @@
       if (items[i].type.indexOf('image') !== -1) {
         e.preventDefault();
         const blob = items[i].getAsFile();
-        const sysName = currentImplementProject ? currentImplementProject.systemName : '{系统名称}';
-        displayTopologyImage(blob, sysName);
+        displayTopologyImage(blob);
         break;
       }
     }
   }
 
   function clearTopologyImage() {
-    const img = document.getElementById('topology-image');
-    const placeholder = document.getElementById('topology-placeholder');
-    const uploadArea = document.getElementById('topology-upload-area');
-    const fileInput = document.getElementById('topology-file');
-    if (img) { img.src = ''; img.style.display = 'none'; }
-    if (placeholder) placeholder.style.display = 'block';
-    if (uploadArea) uploadArea.classList.remove('has-image');
-    if (fileInput) fileInput.value = '';
-    document.getElementById('topology-filename').textContent = '--';
+    topologyBlocks = topologyBlocks.filter(block => block.type !== 'image');
+    renderTopologyBlocks();
+    notifyTopologyBlocksChanged();
   }
 
   function resetPlanSystemSituation() {
@@ -3605,11 +3844,26 @@
   // 重要数据·安全需求标签：默认 传输机密性/存储机密性/传输完整性/存储完整性，支持单独删除
   const DATA_REQ_DEFAULTS = ['传输机密性', '存储机密性', '传输完整性', '存储完整性'];
 
-  function getDataReqChips() {
-    return DATA_REQ_DEFAULTS.map(r =>
-      '<span class="req-chip" data-req="' + r + '">' + r +
+  function getDataReqChips(requirements) {
+    const reqs = Array.isArray(requirements) ? requirements : DATA_REQ_DEFAULTS;
+    return reqs.map(r =>
+      '<span class="req-chip" data-req="' + onsiteEsc(r) + '">' + onsiteEsc(r) +
       '<i class="req-chip-x" title="删除该安全需求" onclick="removeDataReq(this)">×</i></span>'
     ).join('');
+  }
+
+  // Word 单元格中的安全需求按实际内容导入；空白就是空白，不补默认四项。
+  function parseImportedDataReqs(value) {
+    const text = String(value || '').replace(/\r/g, '').trim();
+    if (!text) return [];
+    let reqs = text.split(/\n+|[、，,；;]+/).map(function (item) { return item.trim(); }).filter(Boolean);
+    // 少数模板把多个段落提取成连续文本，兼容识别其中的标准需求，但不扩大为四项默认值。
+    if (reqs.length === 1) {
+      const compact = text.replace(/\s+/g, '');
+      const matched = DATA_REQ_DEFAULTS.filter(function (req) { return compact.indexOf(req) >= 0; });
+      if (matched.length > 1) reqs = matched;
+    }
+    return reqs.filter(function (req, index) { return reqs.indexOf(req) === index; });
   }
 
   function removeDataReq(el) {
@@ -3721,33 +3975,39 @@
     ['密码操作员', '负责执行密码相关操作']
   ];
 
-  function getAssetRowHtml(type, idx) {
+  function newAssetRowId(prefix) {
+    if (window.crypto && typeof window.crypto.randomUUID === 'function') return prefix + '-' + window.crypto.randomUUID();
+    return prefix + '-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 10);
+  }
+
+  function getAssetRowHtml(type, idx, useDataDefaults, assetId) {
     const empty = '<input type="text" class="full-input" value="" />';
     const check = '<td class="check-cell"><input type="checkbox" /></td>';
+    const tr = '<tr data-asset-id="' + onsiteEsc(assetId || newAssetRowId('asset')) + '">';
     switch (type) {
       case 'env':
-        return `<tr><td>${idx}</td><td>${empty}</td><td>${empty}</td><td>${empty}</td>${check}</tr>`;
+        return `${tr}<td>${idx}</td><td>${empty}</td><td>${empty}</td><td>${empty}</td>${check}</tr>`;
       case 'security':
-        return `<tr><td>${idx}</td><td>${empty}</td><td>${empty}</td><td>${empty}</td><td>${empty}</td>${check}</tr>`;
+        return `${tr}<td>${idx}</td><td>${empty}</td><td>${empty}</td><td>${empty}</td><td>${empty}</td>${check}</tr>`;
       case 'crypto':
-        return `<tr><td>${idx}</td><td>${empty}</td><td>${empty}</td><td>${empty}</td><td>${empty}</td><td>${empty}</td><td>${empty}</td>${check}</tr>`;
+        return `${tr}<td>${idx}</td><td>${empty}</td><td>${empty}</td><td>${empty}</td><td>${empty}</td><td>${empty}</td><td>${empty}</td>${check}</tr>`;
       case 'server':
-        return `<tr><td>${idx}</td><td>${empty}</td><td>${empty}</td><td>${empty}</td><td>${empty}</td><td>${empty}</td><td>${empty}</td><td>${empty}</td><td>${empty}</td>${check}</tr>`;
+        return `${tr}<td>${idx}</td><td>${empty}</td><td>${empty}</td><td>${empty}</td><td>${empty}</td><td>${empty}</td><td>${empty}</td><td>${empty}</td><td>${empty}</td>${check}</tr>`;
       case 'network':
-        return `<tr><td>${idx}</td><td>${empty}</td><td>${empty}</td><td>${empty}</td><td>${empty}</td><td>${empty}</td><td>${empty}</td>${check}</tr>`;
+        return `${tr}<td>${idx}</td><td>${empty}</td><td>${empty}</td><td>${empty}</td><td>${empty}</td><td>${empty}</td><td>${empty}</td>${check}</tr>`;
       case 'db':
-        return `<tr><td>${idx}</td><td>${empty}</td><td>${empty}</td><td>${empty}</td><td>${empty}</td><td>${empty}</td>${check}</tr>`;
+        return `${tr}<td>${idx}</td><td>${empty}</td><td>${empty}</td><td>${empty}</td><td>${empty}</td><td>${empty}</td>${check}</tr>`;
       case 'app':
-        return `<tr><td>${idx}</td><td>${empty}</td><td>${empty}</td><td>${empty}</td><td>${empty}</td>${check}</tr>`;
+        return `${tr}<td>${idx}</td><td>${empty}</td><td>${empty}</td><td>${empty}</td><td>${empty}</td>${check}</tr>`;
       case 'data':
-        return `<tr><td>${idx}</td><td>${empty}</td><td>${empty}</td><td>${empty}</td><td>${empty}</td><td class="req-cell">${getDataReqChips()}</td></tr>`;
+        return `${tr}<td>${idx}</td><td>${empty}</td><td>${empty}</td><td>${empty}</td><td>${empty}</td><td class="req-cell">${useDataDefaults === false ? '' : getDataReqChips()}</td></tr>`;
       case 'doc':
-        return `<tr><td>${idx}</td><td>${empty}</td><td>${empty}</td></tr>`;
+        return `${tr}<td>${idx}</td><td>${empty}</td><td>${empty}</td></tr>`;
       case 'person': {
-        const fixed = PERSON_ASSET_DEFAULTS[idx - 1];
+        const fixed = useDataDefaults === false ? null : PERSON_ASSET_DEFAULTS[idx - 1];
         const role = fixed ? `<input type="text" class="full-input person-fixed" value="${fixed[0]}" readonly />` : empty;
         const duty = fixed ? `<input type="text" class="full-input person-fixed" value="${fixed[1]}" readonly />` : empty;
-        return `<tr><td>${idx}</td><td>${empty}</td><td>${role}</td><td>${duty}</td><td>${empty}</td></tr>`;
+        return `${tr}<td>${idx}</td><td>${empty}</td><td>${role}</td><td>${duty}</td><td>${empty}</td></tr>`;
       }
       default: return '';
     }
@@ -3755,6 +4015,12 @@
 
   // 新增、导入和历史数据恢复均保留控件顺序及原有属性。
   function enhanceAssetEditors() {
+    document.querySelectorAll('[id^="asset-tbody-"] > tr').forEach(function(row) {
+      if (!row.dataset.assetId) row.dataset.assetId = newAssetRowId('asset');
+    });
+    document.querySelectorAll('#app-user-tbody > tr').forEach(function(row) {
+      if (!row.dataset.appUserId) row.dataset.appUserId = newAssetRowId('appuser');
+    });
     document.querySelectorAll('#asset-tbody-person td.check-cell, #asset-tbody-doc td.check-cell').forEach(function (cell) { cell.remove(); });
     document.querySelectorAll('.asset-table input[type="text"]').forEach(function (input) {
       const textarea = document.createElement('textarea');
@@ -3797,17 +4063,18 @@
     });
   }
 
-  function addAssetRow(type) {
+  function addAssetRow(type, useDataDefaults) {
     const tbody = document.getElementById('asset-tbody-' + type);
     if (!tbody) return;
     const idx = tbody.children.length + 1;
-    tbody.insertAdjacentHTML('beforeend', getAssetRowHtml(type, idx));
+    const useDefaults = useDataDefaults !== false && !(type === 'person' && tbody.dataset.imported === '1');
+    tbody.insertAdjacentHTML('beforeend', getAssetRowHtml(type, idx, useDefaults));
   }
 
   function deleteAssetRow(type) {
     const tbody = document.getElementById('asset-tbody-' + type);
     if (!tbody || tbody.children.length === 0) return;
-    if (type === 'person' && tbody.children.length <= PERSON_ASSET_DEFAULTS.length) {
+    if (type === 'person' && tbody.dataset.imported !== '1' && tbody.children.length <= PERSON_ASSET_DEFAULTS.length) {
       showToast('人员表默认六行不可删除', true);
       return;
     }
@@ -3816,8 +4083,8 @@
   }
 
   // ===== 应用用户（关键业务应用子表：同步至现场测评·身份鉴别对象 与 报告表4-5） =====
-  function getAppUserRowHtml(idx) {
-    return '<tr><td>' + idx + '</td><td><input type="text" class="full-input" placeholder="如：XX平台的管理员" /></td><td><input type="text" class="full-input" placeholder="填写关键业务应用的完整名称" /></td></tr>';
+  function getAppUserRowHtml(idx, appUserId) {
+    return '<tr data-app-user-id="' + onsiteEsc(appUserId || newAssetRowId('appuser')) + '"><td>' + idx + '</td><td><input type="text" class="full-input" placeholder="如：XX平台的管理员" /></td><td><input type="text" class="full-input" placeholder="填写关键业务应用的完整名称" /></td></tr>';
   }
 
   function addAppUserRow() {
@@ -3833,18 +4100,23 @@
     Array.from(tbody.children).forEach((tr, i) => { tr.children[0].textContent = i + 1; });
   }
 
-  // 读取应用用户名称列表（去空）
-  function getAppUsers() {
+  function getAppUserEntries() {
     const tbody = document.getElementById('app-user-tbody');
     const list = [];
     if (tbody) {
       Array.from(tbody.rows).forEach(tr => {
+        if (!tr.dataset.appUserId) tr.dataset.appUserId = newAssetRowId('appuser');
         const inp = tr.cells[1] && tr.cells[1].querySelector('input[type="text"], textarea');
         const name = inp ? inp.value.trim() : '';
-        if (name) list.push(name);
+        if (name) list.push({ id: tr.dataset.appUserId, name: name });
       });
     }
     return list;
+  }
+
+  // 读取应用用户名称列表（去空）
+  function getAppUsers() {
+    return getAppUserEntries().map(function(entry) { return entry.name; });
   }
 
   function initPlanAssets() {
@@ -3853,7 +4125,8 @@
       const tbody = document.getElementById('asset-tbody-' + t);
       if (!tbody) return;
       tbody.innerHTML = '';
-      tbody.insertAdjacentHTML('beforeend', getAssetRowHtml(t, 1));
+      if (t === 'person') delete tbody.dataset.imported;
+      tbody.insertAdjacentHTML('beforeend', getAssetRowHtml(t, 1, t !== 'data'));
     });
     normalizePersonAssetRows();
     // 应用用户默认 1 行空行
@@ -3895,7 +4168,7 @@
 
   // ===== 测评准备与方案编制 · 左侧Tab切换 =====
   function switchPlanTab(n) {
-    for (let i = 1; i <= 13; i++) {
+    for (let i = 1; i <= 14; i++) {
       const btn = document.getElementById('plan-tab-btn-' + i);
       const panel = document.getElementById('plan-tab-' + i);
       if (!btn || !panel) continue;
@@ -3922,24 +4195,92 @@
   const ONSITE_RK_OPTIONS = ['1', '1.2', '1.5'];
   const ONSITE_RA_TITLE = 'Ra 密码算法/技术合规性修正参数：1=可较好地提供安全保障（≥112比特）；0.5=可在一定程度上提供安全保障（80~112比特）；0.2=与安全要求不匹配（<80比特）';
   const ONSITE_RK_TITLE = 'Rk 密钥管理安全修正参数：1=不修正；1.2=第三级·使用一级密码模块且满足GM/T 0115-2021密钥管理安全性其他要求；1.5=第四级·使用二级密码模块且满足上述要求';
-  // 现场测评记录缓存：key = tabIdx|指标itemIdx|对象objIdx -> { record, D, A, K }
+  // 现场测评记录缓存：key = indicatorId|objectId -> { record, D, A, K }
   let onsiteRecords = {};
   let onsiteImportedObjects = {};
+  // 测评对象稳定绑定：key = 层面|测评单元，value = 当前行所对应的 objectId 数组。
+  // Word 导入只提供可复用记录；第二步 objData 始终是第三、四步的对象主数据。
+  let onsiteObjectBindings = {};
+  let onsiteUnmatchedObjects = {};
 
   function onsiteEsc(s) {
     return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
   }
 
-  function onsiteKey(t, itemIdx, objIdx) { return t + '|' + itemIdx + '|' + objIdx; }
+  function cloneOnsiteValue(value) {
+    return value == null ? value : JSON.parse(JSON.stringify(value));
+  }
+
+  function indicatorIdFor(t, itemIdx) {
+    ensureIndicatorIds();
+    const item = evaluationIndicatorLevels[t]?.items[itemIdx];
+    return item?.indicatorId || stableAssessmentId('indicator-missing', t + '|' + itemIdx);
+  }
+
+  function onsiteObjectIdFor(t, itemIdx, objIdx) {
+    const unitName = evaluationIndicatorLevels[t]?.items[itemIdx]?.name || '';
+    const entries = getOnsiteUnitObjectEntries(t, unitName);
+    const bindingKey = t + '|' + unitName;
+    // Word 正在导入、尚未建立绑定时，按导入名称匹配；正常编辑时始终按当前对象自己的稳定 ID。
+    if (!onsiteObjectBindings[bindingKey] && onsiteImportedObjects[bindingKey]) {
+      const importedIds = inferOldObjectIds(t, unitName, entries);
+      if (importedIds[objIdx]) return importedIds[objIdx];
+    }
+    return entries[objIdx]?.id || stableAssessmentId('object-missing', t + '|' + unitName + '|' + objIdx);
+  }
+
+  function onsiteKey(t, itemIdx, objIdx) {
+    return indicatorIdFor(t, itemIdx) + '|' + onsiteObjectIdFor(t, itemIdx, objIdx);
+  }
+
+  function locateOnsiteRecordKey(key) {
+    ensureIndicatorIds();
+    const split = String(key || '').indexOf('|');
+    if (split < 0) return null;
+    const indicatorId = key.slice(0, split);
+    const objectId = key.slice(split + 1);
+    for (let t = 0; t < evaluationIndicatorLevels.length; t++) {
+      const itemIdx = evaluationIndicatorLevels[t].items.findIndex(function(item) { return item.indicatorId === indicatorId; });
+      if (itemIdx < 0) continue;
+      const unitName = evaluationIndicatorLevels[t].items[itemIdx].name;
+      const entries = getOnsiteUnitObjectEntries(t, unitName);
+      const objIdx = entries.findIndex(function(entry) { return entry.id === objectId; });
+      return { t: t, itemIdx: itemIdx, objIdx: objIdx, objectId: objectId, unitName: unitName };
+    }
+    return null;
+  }
+
+  function onsiteKeyBelongsToLayer(key, t) {
+    ensureIndicatorIds();
+    const indicatorId = String(key || '').split('|')[0];
+    return !!evaluationIndicatorLevels[t]?.items.some(function(item) { return item.indicatorId === indicatorId; });
+  }
+
+  function onsiteNormObjectName(value) {
+    return String(value || '').replace(/[\s\u3000]+/g, '').replace(/[（(][^）)]*[）)]$/g, '').toLowerCase();
+  }
+
+  function onsiteManagementObjectCore(value) {
+    let text = String(value || '').trim().replace(/[\s\u3000]+/g, '');
+    // 管理类附录A常写成“管理体系（包括……）”，而测评对象表只保存括号内对象清单。
+    const wrapped = /^管理体系[（(](?:包括)?([\s\S]+)[）)]$/.exec(text);
+    if (wrapped) text = wrapped[1];
+    return text.replace(/[，,；;、]+$/g, '').toLowerCase();
+  }
 
   // 读取本层面对象列表（来自第二步·测评对象）
-  function getOnsiteObjects(t) {
+  function getOnsiteObjectEntries(t) {
     const cfg = ONSITE_LAYERS[t];
+    ensureObjDataIds();
     const rows = objData[cfg.objLayer] || [];
     const list = cfg.mgmtUnit
       ? rows.filter(r => (r.unit || '').trim() === cfg.mgmtUnit)
       : rows;
-    return list.map(r => (r.object || '').trim()).filter(o => o);
+    return list.filter(r => (r.object || '').trim()).map(r => ({ id: r.objectId, name: (r.object || '').trim() }));
+  }
+
+  function getOnsiteObjects(t) {
+    return getOnsiteObjectEntries(t).map(entry => entry.name);
   }
 
   // 应用和数据安全层面：重要数据相关测评单元的对象，改从第二步「系统资产 → 重要数据」读取
@@ -3952,12 +4293,17 @@
   };
 
   function getOnsiteUnitObjects(t, unitName) {
-    const imported = onsiteImportedObjects[t + '|' + unitName];
-    if (imported) return imported.slice();
     // 应用和数据安全·身份鉴别：测评对象 = 系统资产「关键业务应用 → 应用用户」
     if (t === 3 && unitName === '身份鉴别') return getAppUsers();
     const req = (t === 3) ? ONSITE_UNIT_DATA_REQ[unitName] : null;
-    if (!req) return getOnsiteObjects(t);
+    if (!req) {
+      const current = getOnsiteObjects(t);
+      if (current.length) return current;
+      // 已建立稳定绑定后，第二步对象表是唯一主数据；全部删除时不得回退显示旧导入对象。
+      if (onsiteObjectBindings[t + '|' + unitName]) return [];
+      const imported = onsiteImportedObjects[t + '|' + unitName];
+      return imported ? imported.slice() : [];
+    }
     const tbody = document.getElementById('asset-tbody-data');
     const list = [];
     if (tbody) {
@@ -3974,6 +4320,164 @@
       });
     }
     return list;
+  }
+
+  function getOnsiteUnitObjectEntries(t, unitName) {
+    if (t === 3 && unitName === '身份鉴别') return getAppUserEntries();
+    if (t === 3 && ONSITE_UNIT_DATA_REQ[unitName]) {
+      const req = ONSITE_UNIT_DATA_REQ[unitName];
+      return getImportantDataAssets().filter(function(asset) { return asset.reqs.includes(req); }).map(function(asset) {
+        return { id: asset.id, name: asset.app ? asset.name + '-' + asset.app : asset.name };
+      });
+    }
+    const entries = getOnsiteObjectEntries(t);
+    if (entries.length) return entries;
+    return getOnsiteUnitObjects(t, unitName).map(function(name, index) {
+      return { id: stableAssessmentId('imported', t + '|' + unitName + '|' + index + '|' + onsiteNormObjectName(name)), name: name };
+    });
+  }
+
+  function matchImportedObjectEntry(t, unitName, importedName, entries, used) {
+    const norm = onsiteNormObjectName(importedName);
+    let match = entries.find(function(entry) {
+      return !used.has(entry.id) && onsiteNormObjectName(entry.name) === norm;
+    });
+    if (match) return match;
+
+    // 管理制度、人员管理、建设运行、应急处置兼容“管理体系（包括对象清单）”写法。
+    if (t >= 4) {
+      const core = onsiteManagementObjectCore(importedName);
+      const candidates = entries.filter(function(entry) {
+        return !used.has(entry.id) && onsiteManagementObjectCore(entry.name) === core;
+      });
+      if (candidates.length === 1) return candidates[0];
+    }
+
+    // 普通测评对象改名后，历史名称仍可用于匹配旧报告。
+    if (!(t === 3 && ONSITE_UNIT_DATA_REQ[unitName])) {
+      const rows = objData[ONSITE_LAYERS[t].objLayer] || [];
+      const aliasRow = rows.find(function(row) {
+        return !used.has(row.objectId) && (row.aliases || []).some(function(alias) {
+          return onsiteNormObjectName(alias) === norm;
+        });
+      });
+      if (aliasRow) return entries.find(function(entry) { return entry.id === aliasRow.objectId; }) || null;
+      return null;
+    }
+
+    // 重要数据兼容旧报告命名：旧报告只有“数据名称”，系统当前显示“数据名称-所属应用”。
+    // 仅当该数据名称在当前测评单元下唯一时自动关联，多个应用同名时不猜测。
+    const req = ONSITE_UNIT_DATA_REQ[unitName];
+    const assets = getImportantDataAssets().filter(function(asset) {
+      return asset.reqs.includes(req) && onsiteNormObjectName(asset.name) === norm;
+    });
+    const candidateNames = Array.from(new Set(assets.map(function(asset) {
+      return asset.app ? asset.name + '-' + asset.app : asset.name;
+    })));
+    const candidates = entries.filter(function(entry) {
+      return !used.has(entry.id) && candidateNames.some(function(name) {
+        return onsiteNormObjectName(name) === onsiteNormObjectName(entry.name);
+      });
+    });
+    return candidates.length === 1 ? candidates[0] : null;
+  }
+
+  function inferOldObjectIds(t, unitName, entries) {
+    const key = t + '|' + unitName;
+    if (onsiteObjectBindings[key] && onsiteObjectBindings[key].length) return onsiteObjectBindings[key].slice();
+    const oldNames = onsiteImportedObjects[key] || entries.map(entry => entry.name);
+    const used = new Set();
+    return oldNames.map(function(name, index) {
+      const norm = onsiteNormObjectName(name);
+      const match = matchImportedObjectEntry(t, unitName, name, entries, used);
+      if (match) { used.add(match.id); return match.id; }
+      return stableAssessmentId('legacy', t + '|' + unitName + '|' + index + '|' + norm);
+    });
+  }
+
+  function reconcileOnsiteUnitObjects(t, itemIdx, unitName) {
+    const bindingKey = t + '|' + unitName;
+    const entries = getOnsiteUnitObjectEntries(t, unitName);
+    const oldNames = (onsiteImportedObjects[bindingKey] || []).slice();
+    const oldIds = inferOldObjectIds(t, unitName, entries);
+    const newIds = entries.map(entry => entry.id);
+    const indicatorId = indicatorIdFor(t, itemIdx);
+    oldIds.forEach(function(id, oldIndex) {
+      if (newIds.indexOf(id) >= 0 || !/^(legacy|imported)-/.test(id)) return;
+      const recordKey = indicatorId + '|' + id;
+      const rec = onsiteRecords[recordKey];
+      if (!rec) return;
+      const hasValue = Object.keys(rec).some(function(field) {
+        if (field === 'evidence') return Array.isArray(rec.evidence) && rec.evidence.length > 0;
+        return String(rec[field] == null ? '' : rec[field]).trim() !== '';
+      });
+      if (!hasValue) return;
+      const list = onsiteUnmatchedObjects[bindingKey] || (onsiteUnmatchedObjects[bindingKey] = []);
+      const name = oldNames[oldIndex] || ('导入对象' + (oldIndex + 1));
+      const signature = onsiteNormObjectName(name) + '|' + JSON.stringify(rec);
+      if (!list.some(function(row) { return row.signature === signature; })) {
+        list.push({ signature: signature, name: name, itemIdx: itemIdx, record: cloneOnsiteValue(rec) });
+      }
+      delete onsiteRecords[recordKey];
+    });
+    onsiteObjectBindings[bindingKey] = newIds;
+    onsiteImportedObjects[bindingKey] = entries.map(entry => entry.name);
+  }
+
+  function renderOnsiteObjectMatchPanel(t) {
+    const rows = [];
+    Object.keys(onsiteUnmatchedObjects).forEach(function(key) {
+      if (key.split('|')[0] !== String(t)) return;
+      const unitName = key.slice(key.indexOf('|') + 1);
+      (onsiteUnmatchedObjects[key] || []).forEach(function(row, index) {
+        rows.push({ key: key, unitName: unitName, index: index, row: row });
+      });
+    });
+    if (!rows.length) return '';
+    let html = '<div class="object-match-panel"><div class="object-match-title">有 ' + rows.length + ' 条 Word 现场记录尚未匹配当前测评对象</div>';
+    rows.forEach(function(item, order) {
+      const entries = getOnsiteUnitObjectEntries(t, item.unitName);
+      const selectId = 'object-match-' + t + '-' + order;
+      const options = ['<option value="">请选择当前对象</option>'].concat(entries.map(function(entry) {
+        return '<option value="' + onsiteEsc(entry.id) + '">' + onsiteEsc(entry.name) + '</option>';
+      })).join('');
+      html += '<div class="object-match-row"><span><b>' + onsiteEsc(item.unitName) + '</b> · ' + onsiteEsc(item.row.name) + '</span><span>→</span>' +
+        '<select id="' + selectId + '">' + options + '</select>' +
+        '<button type="button" onclick="applyOnsiteObjectMatch(' + t + ',\'' + encodeURIComponent(item.unitName) + '\',' + item.index + ',\'' + selectId + '\')">关联</button></div>';
+    });
+    return html + '</div>';
+  }
+
+  function applyOnsiteObjectMatch(t, encodedUnitName, unmatchedIndex, selectId) {
+    const unitName = decodeURIComponent(encodedUnitName);
+    const key = t + '|' + unitName;
+    const targetId = document.getElementById(selectId)?.value || '';
+    if (!targetId) { showToast('请先选择当前测评对象', true); return; }
+    const entries = getOnsiteUnitObjectEntries(t, unitName);
+    const targetIndex = entries.findIndex(function(entry) { return entry.id === targetId; });
+    const pending = onsiteUnmatchedObjects[key]?.[unmatchedIndex];
+    if (targetIndex < 0 || !pending) { showToast('匹配项已变化，请重新选择', true); renderOnsiteTables(); return; }
+    onsiteRecords[onsiteKey(t, pending.itemIdx, targetIndex)] = cloneOnsiteValue(pending.record);
+    onsiteUnmatchedObjects[key].splice(unmatchedIndex, 1);
+    if (!onsiteUnmatchedObjects[key].length) delete onsiteUnmatchedObjects[key];
+    showToast('已关联到“' + entries[targetIndex].name + '”');
+    renderOnsiteTables();
+  }
+
+  function reconcileOnsiteLayerObjects(t) {
+    const level = evaluationIndicatorLevels[t];
+    if (!level) return;
+    level.items.forEach(function(item, itemIdx) { reconcileOnsiteUnitObjects(t, itemIdx, item.name); });
+  }
+
+  function reconcileObjLayerObjects(layer) {
+    ONSITE_LAYERS.forEach(function(cfg, t) {
+      if (cfg.objLayer === Number(layer)) reconcileOnsiteLayerObjects(t);
+    });
+  }
+
+  function reconcileAllOnsiteObjectBindings() {
+    ONSITE_LAYERS.forEach(function(_cfg, t) { reconcileOnsiteLayerObjects(t); });
   }
 
   // 读取本层面全部测评单元（来自第二步·测评指标；不适用项也展示，DAK置///计N/A）
@@ -4068,8 +4572,8 @@
   // 重算某测评单元下所有测评对象评分及测评单元得分（Si,j = ΣSi,j,k / ni,j）
   // 全部对象为 N/A 时，测评单元得分记为 N/A；对象按测评单元读取（重要数据单元读系统资产）
   function recalcOnsiteScores(t, itemIdx) {
-    const unitEl = document.getElementById('onsite-unit-score-' + t + '-' + itemIdx);
-    if (!unitEl) return;
+    const unitEls = document.querySelectorAll('[data-onsite-unit-score="' + t + '-' + itemIdx + '"]');
+    if (!unitEls.length) return;
     const level = evaluationIndicatorLevels[t];
     const unitName = level && level.items[itemIdx] ? level.items[itemIdx].name : '';
     const objects = getOnsiteUnitObjects(t, unitName);
@@ -4086,23 +4590,33 @@
       if (s === 'NA') naCount++;
     });
     if (rowScores.length) {
-      unitEl.textContent = (rowScores.reduce((a, b) => a + b, 0) / rowScores.length).toFixed(4);
+      unitEls.forEach(function(unitEl) { unitEl.textContent = (rowScores.reduce((a, b) => a + b, 0) / rowScores.length).toFixed(4); });
     } else if (naCount === objects.length && objects.length > 0) {
-      unitEl.textContent = 'N/A';
+      unitEls.forEach(function(unitEl) { unitEl.textContent = 'N/A'; });
     } else {
-      unitEl.textContent = '--';
+      unitEls.forEach(function(unitEl) { unitEl.textContent = '--'; });
     }
   }
 
-  // ===== 现场测评 · 证据截图（Ctrl+V 粘贴 / 本机导入） =====
-  // 图片编号规则：层面内全局连续递增——物理和环境安全 图A-1.1 起、网络和通信安全 图A-2.1 起、
-  // 设备和计算安全 A-3.1 起……应急处置 A-8.1 起；编号由系统分配不可编辑，图片名称可自行输入
-  let onsiteEvidenceTarget = null; // 当前选中的证据单元格 {t, itemIdx, objIdx}
+  // ===== 现场测评 · 独立证据库（Ctrl+V 粘贴 / 本机导入） =====
+  // 证据不再强制绑定某个测评对象；一个证据编号可包含多张图片，正文只保存可自动维护的编号引用。
+  let onsiteEvidenceGroups = [];
+  let activeOnsiteEvidenceGroupId = '';
+  let onsiteRecordEditorTarget = null; // 当前结果描述编辑框 {t,itemIdx,objIdx,key,element}
+  let currentOnsiteLayer = 0;
+  let onsiteEvidenceWidth = 420;
+  try {
+    const savedEvidenceWidth = Number(localStorage.getItem('bbOnsiteEvidenceDrawerWidth'));
+    if (savedEvidenceWidth >= 300 && savedEvidenceWidth <= 680) onsiteEvidenceWidth = savedEvidenceWidth;
+  } catch (error) { /* 浏览器禁用本地存储时使用默认宽度 */ }
+  const onsiteExpandedRecordKeys = new Set();
+  const onsiteRecordSaveTimers = {};
 
   function getImportantDataAssets() {
     return Array.from(document.getElementById('asset-tbody-data')?.rows || []).map(row => {
+      if (!row.dataset.assetId) row.dataset.assetId = newAssetRowId('asset');
       const value = col => row.cells[col]?.querySelector('input, textarea')?.value.trim() || '';
-      return { name: value(1), app: value(3), reqs: Array.from(row.cells[5]?.querySelectorAll('.req-chip') || []).map(chip => chip.getAttribute('data-req')) };
+      return { id: row.dataset.assetId, name: value(1), app: value(3), reqs: Array.from(row.cells[5]?.querySelectorAll('.req-chip') || []).map(chip => chip.getAttribute('data-req')) };
     }).filter(row => row.name);
   }
 
@@ -4128,145 +4642,334 @@
     return onsiteRecords[k];
   }
 
-  // 按当前编号顺序重排整个层面的证据编号；删除中间图片后，后续编号自动前移。
-  function renumberOnsiteEvidence(t) {
-    const prefix = '图A-' + (t + 1) + '.';
-    const items = [];
-    let order = 0;
-    Object.keys(onsiteRecords).forEach(k => {
-      if (k.split('|')[0] !== String(t)) return;
-      (onsiteRecords[k].evidence || []).forEach(ev => {
-        const match = new RegExp('^图A-' + (t + 1) + '\\.(\\d+)$').exec(String(ev.no || ''));
-        items.push({ ev: ev, number: match ? Number(match[1]) : Number.MAX_SAFE_INTEGER, order: order++ });
+  function onsiteRecordCharCount(value) {
+    return String(value || '').replace(/\s/g, '').length;
+  }
+
+  function formatOnsiteSaveTime(date) {
+    return String(date.getHours()).padStart(2, '0') + ':' + String(date.getMinutes()).padStart(2, '0');
+  }
+
+  function setOnsiteRecordSaveState(key, state, text) {
+    const el = document.getElementById('onsite-record-save-' + key);
+    if (!el) return;
+    el.className = 'onsite-record-save-state' + (state ? ' ' + state : '');
+    el.textContent = text;
+  }
+
+  async function saveOnsiteRecordNow(key) {
+    clearTimeout(onsiteRecordSaveTimers[key]);
+    delete onsiteRecordSaveTimers[key];
+    setOnsiteRecordSaveState(key, 'saving', '保存中…');
+    try {
+      await persist(3, true, true);
+      setOnsiteRecordSaveState(key, '', '已自动保存 ' + formatOnsiteSaveTime(new Date()));
+    } catch (error) {
+      setOnsiteRecordSaveState(key, 'error', '保存失败');
+    }
+  }
+
+  function scheduleOnsiteRecordSave(key) {
+    clearTimeout(onsiteRecordSaveTimers[key]);
+    setOnsiteRecordSaveState(key, 'saving', '保存中…');
+    onsiteRecordSaveTimers[key] = setTimeout(function() { saveOnsiteRecordNow(key); }, 1000);
+  }
+
+  function autoGrowOnsiteRecordEditor(el) {
+    if (!el) return;
+    el.style.height = 'auto';
+    el.style.height = Math.max(112, el.scrollHeight) + 'px';
+  }
+
+  function updateOnsiteExpandedRecord(t, itemIdx, objIdx, el) {
+    const key = onsiteKey(t, itemIdx, objIdx);
+    updateOnsiteField(t, itemIdx, objIdx, 'record', el.value);
+    autoGrowOnsiteRecordEditor(el);
+    const count = document.getElementById('onsite-record-editor-count-' + key);
+    if (count) count.textContent = onsiteRecordCharCount(el.value) + ' 字';
+    scheduleOnsiteRecordSave(key);
+  }
+
+  function expandOnsiteRecord(t, itemIdx, objIdx) {
+    const key = onsiteKey(t, itemIdx, objIdx);
+    onsiteExpandedRecordKeys.add(key);
+    renderOnsiteTables();
+    requestAnimationFrame(function() {
+      const editor = document.getElementById('onsite-record-editor-' + key);
+      if (editor) { autoGrowOnsiteRecordEditor(editor); editor.focus(); editor.setSelectionRange(editor.value.length, editor.value.length); }
+    });
+  }
+
+  function collapseOnsiteRecord(t, itemIdx, objIdx) {
+    const key = onsiteKey(t, itemIdx, objIdx);
+    saveOnsiteRecordNow(key);
+    onsiteExpandedRecordKeys.delete(key);
+    renderOnsiteTables();
+  }
+
+  function handleOnsiteRecordEditorKeydown(event, t, itemIdx, objIdx) {
+    if (event.key !== 'Escape') return;
+    event.preventDefault();
+    collapseOnsiteRecord(t, itemIdx, objIdx);
+  }
+
+  function onsiteRecordSummaryHtml(t, itemIdx, objIdx, value) {
+    const key = onsiteKey(t, itemIdx, objIdx);
+    return '<div class="onsite-record-summary" onclick="expandOnsiteRecord(' + t + ',' + itemIdx + ',' + objIdx + ')">' +
+      '<div class="onsite-record-summary-text" id="onsite-record-summary-' + key + '">' + onsiteEsc(value || '（暂无结果记录）') + '</div>' +
+      '<button type="button" class="onsite-record-expand" id="onsite-record-expand-' + key + '" onclick="event.stopPropagation();expandOnsiteRecord(' + t + ',' + itemIdx + ',' + objIdx + ')">编辑</button></div>' +
+      '<div class="onsite-record-count">共 ' + onsiteRecordCharCount(value) + ' 字</div>';
+  }
+
+  function onsiteRecordCollapsedEditHtml(t, itemIdx, objIdx) {
+    return '<div class="onsite-record-collapsed-edit"><span>正在编辑全文，摘要已折叠</span></div>';
+  }
+
+  function onsiteRecordEditorRowHtml(t, itemIdx, objIdx, value, colspan) {
+    const key = onsiteKey(t, itemIdx, objIdx);
+    return '<tr class="onsite-record-editor-row"><td colspan="' + colspan + '"><div class="onsite-record-editor-head">' +
+      '<span class="onsite-record-editor-title">结果记录 · 全文编辑</span><span class="onsite-record-editor-tip">高度随内容自动增长 · Esc 或“收起”退出</span>' +
+      '<button type="button" class="onsite-record-collapse" onclick="collapseOnsiteRecord(' + t + ',' + itemIdx + ',' + objIdx + ')">收起 ▴</button>' +
+      '<span class="onsite-record-save-state" id="onsite-record-save-' + key + '">已自动保存 ' + formatOnsiteSaveTime(new Date()) + '</span></div>' +
+      '<div class="onsite-record-editor-wrap"><textarea class="onsite-record-editor" id="onsite-record-editor-' + key + '" data-onsite-record-key="' + key + '" ' +
+      'onfocus="focusOnsiteRecordEditor(' + t + ',' + itemIdx + ',' + objIdx + ',this)" ' +
+      'oninput="updateOnsiteExpandedRecord(' + t + ',' + itemIdx + ',' + objIdx + ',this)" ' +
+      'onkeydown="handleOnsiteRecordEditorKeydown(event,' + t + ',' + itemIdx + ',' + objIdx + ')">' + onsiteEsc(value) + '</textarea>' +
+      '<span class="onsite-record-editor-count" id="onsite-record-editor-count-' + key + '">' + onsiteRecordCharCount(value) + ' 字</span></div></td></tr>';
+  }
+
+  function refreshOnsiteRecordSummaries() {
+    document.querySelectorAll('.onsite-record-summary-text').forEach(function(summary) {
+      const key = summary.id.replace('onsite-record-summary-', '');
+      const link = document.getElementById('onsite-record-expand-' + key);
+      if (link) link.textContent = summary.scrollHeight > summary.clientHeight + 1 ? '…展开' : '编辑';
+    });
+    document.querySelectorAll('.onsite-record-editor').forEach(autoGrowOnsiteRecordEditor);
+  }
+
+  function newOnsiteEvidenceId() {
+    if (window.crypto && typeof window.crypto.randomUUID === 'function') return 'evi-' + window.crypto.randomUUID();
+    return 'evi-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 9);
+  }
+
+  function onsiteEvidenceLayerGroups(t) {
+    return onsiteEvidenceGroups.filter(function(group) { return Number(group.layer) === Number(t); });
+  }
+
+  function onsiteEvidenceNumberValue(no) {
+    return Number(/\.(\d+)$/.exec(String(no || ''))?.[1] || Number.MAX_SAFE_INTEGER);
+  }
+
+  function syncOnsiteRecordEditors() {
+    document.querySelectorAll('textarea[data-onsite-record-key]').forEach(function(el) {
+      const record = onsiteRecords[el.getAttribute('data-onsite-record-key')];
+      if (record && el.value !== String(record.record || '')) el.value = record.record || '';
+    });
+  }
+
+  function replaceOnsiteEvidenceReferences(changes) {
+    if (!changes.length) return;
+    Object.keys(onsiteRecords).forEach(function(key) {
+      const rec = onsiteRecords[key];
+      if (!rec || typeof rec.record !== 'string') return;
+      changes.forEach(function(change) {
+        rec.record = rec.record.split(change.oldNo).join('__BB_EVI_' + change.id + '__');
+      });
+      changes.forEach(function(change) {
+        rec.record = rec.record.split('__BB_EVI_' + change.id + '__').join(change.newNo);
       });
     });
-    items.sort((a, b) => a.number - b.number || a.order - b.order);
-    items.forEach((item, index) => { item.ev.no = prefix + (index + 1); });
+    syncOnsiteRecordEditors();
   }
 
-  // 分配层面内下一个连续证据编号，编号形如 图A-1.1。
-  function nextOnsiteEviNo(t) {
+  // 按证据组顺序重排整个层面的编号；删除中间证据后，正文中已插入的编号同步前移。
+  function renumberOnsiteEvidence(t) {
     const prefix = '图A-' + (t + 1) + '.';
-    let count = 0;
-    Object.keys(onsiteRecords).forEach(k => {
-      if (k.split('|')[0] !== String(t)) return;
-      count += (onsiteRecords[k].evidence || []).length;
+    const groups = onsiteEvidenceLayerGroups(t).sort(function(a, b) {
+      return onsiteEvidenceNumberValue(a.no) - onsiteEvidenceNumberValue(b.no);
     });
-    return prefix + (count + 1);
+    const changes = [];
+    groups.forEach(function(group, index) {
+      const next = prefix + (index + 1);
+      if (group.no && group.no !== next) changes.push({ id: group.id, oldNo: group.no, newNo: next });
+      group.no = next;
+    });
+    replaceOnsiteEvidenceReferences(changes);
   }
 
-  // 证据单元格 HTML（新增/删除后可单独刷新，无需重渲整表）
-  function onsiteEviCellHtml(t, itemIdx, objIdx) {
-    const rec = getOnsiteRec(t, itemIdx, objIdx);
-    let html = '<div class="evi-hint">点击本格选中后 <strong>Ctrl+V</strong> 粘贴截图，或 <a class="evi-import-btn" onclick="onsiteEviImport(' + t + ',' + itemIdx + ',' + objIdx + ',event)">导入本机图片</a></div>';
-    if (rec.evidence.length) {
-      html += rec.evidence.map((ev, i) =>
-        '<div class="evi-item">' +
-        '<img src="' + ev.dataUrl + '" title="点击放大预览" onclick="onsiteEviPreview(' + t + ',' + itemIdx + ',' + objIdx + ',' + i + ',event)" />' +
-        '<div class="evi-meta">' +
-        '<span class="evi-no">' + onsiteEsc(ev.no) + '</span>' +
-        '<input class="evi-name" placeholder="图片名称" value="' + onsiteEsc(ev.name) + '" onclick="event.stopPropagation()" onchange="onsiteEviRename(' + t + ',' + itemIdx + ',' + objIdx + ',' + i + ',this.value)" />' +
-        '<span class="evi-del" title="删除该证据" onclick="onsiteEviDelete(' + t + ',' + itemIdx + ',' + objIdx + ',' + i + ',event)">×</span>' +
-        '</div></div>'
-      ).join('');
+  function nextOnsiteEviNo(t) {
+    return '图A-' + (t + 1) + '.' + (onsiteEvidenceLayerGroups(t).length + 1);
+  }
+
+  function focusOnsiteRecordEditor(t, itemIdx, objIdx, element) {
+    const key = onsiteKey(t, itemIdx, objIdx);
+    if (onsiteRecordEditorTarget && onsiteRecordEditorTarget.key !== key) activeOnsiteEvidenceGroupId = '';
+    onsiteRecordEditorTarget = { t: t, itemIdx: itemIdx, objIdx: objIdx, key: key, element: element };
+    refreshOnsiteEvidenceLibrary(t);
+  }
+
+  function insertOnsiteEvidenceReference(no) {
+    const target = onsiteRecordEditorTarget;
+    if (!target || !target.element || !document.body.contains(target.element)) {
+      showToast('请先点击需要插入证据编号的结果描述框', true);
+      return false;
     }
-    return html;
+    const el = target.element;
+    let start = typeof el.selectionStart === 'number' ? el.selectionStart : el.value.length;
+    let end = typeof el.selectionEnd === 'number' ? el.selectionEnd : start;
+    let before = el.value.slice(0, start);
+    // 用户已经输入“如图”时，去掉最后一个“图”再插入完整编号，结果自然成为“如图A-x.x”。
+    if (before.endsWith('如图')) { before = before.slice(0, -1); start--; }
+    const needsSpace = before && !/[\s，。；：、（(]$/.test(before) && !before.endsWith('如');
+    const inserted = (needsSpace ? ' ' : '') + no;
+    el.value = before + inserted + el.value.slice(end);
+    const caret = before.length + inserted.length;
+    el.setSelectionRange(caret, caret);
+    el.focus();
+    updateOnsiteField(target.t, target.itemIdx, target.objIdx, 'record', el.value);
+    return true;
   }
 
-  function applyOnsiteEviSelection() {
-    document.querySelectorAll('.onsite-table .evi-cell').forEach(el => el.classList.remove('selected'));
-    if (!onsiteEvidenceTarget) return;
-    const cell = document.getElementById('onsite-evi-' + onsiteKey(onsiteEvidenceTarget.t, onsiteEvidenceTarget.itemIdx, onsiteEvidenceTarget.objIdx));
-    if (cell) cell.classList.add('selected');
+  function startNewOnsiteEvidenceGroup(t, insertReference) {
+    if (insertReference && (!onsiteRecordEditorTarget || onsiteRecordEditorTarget.t !== t)) {
+      showToast('请先点击本层面需要引用证据的结果描述框', true);
+      return null;
+    }
+    const group = { id: newOnsiteEvidenceId(), layer: t, no: nextOnsiteEviNo(t), name: '', images: [] };
+    onsiteEvidenceGroups.push(group);
+    activeOnsiteEvidenceGroupId = group.id;
+    if (insertReference) insertOnsiteEvidenceReference(group.no);
+    refreshOnsiteEvidenceLibrary(t);
+    toggleOnsiteEvidenceDrawer(true);
+    return group;
   }
 
-  function selectOnsiteEvi(t, itemIdx, objIdx) {
-    onsiteEvidenceTarget = { t: t, itemIdx: itemIdx, objIdx: objIdx };
-    applyOnsiteEviSelection();
+  function activeOnsiteEvidenceGroup(t, create) {
+    let group = onsiteEvidenceGroups.find(function(item) { return item.id === activeOnsiteEvidenceGroupId && Number(item.layer) === Number(t); });
+    if (!group && create) group = startNewOnsiteEvidenceGroup(t, true);
+    return group || null;
   }
 
-  function refreshOnsiteEviCell(t, itemIdx, objIdx) {
-    const cell = document.getElementById('onsite-evi-' + onsiteKey(t, itemIdx, objIdx));
-    if (cell) cell.innerHTML = onsiteEviCellHtml(t, itemIdx, objIdx);
-    applyOnsiteEviSelection();
-  }
-
-  // 大图自动压缩（长边 ≤1400px、JPEG 85%），避免内存截图撑爆内存
+  // 普通截图保留原图；仅对超大图片做一次高质量缩放，避免文字和细线变糊。
   function onsiteEviProcessImage(dataUrl, cb) {
     const img = new Image();
     img.onload = function() {
-      if (dataUrl.length <= 400 * 1024) { cb(dataUrl); return; }
-      const MAX = 1400;
+      const MAX = 2400;
+      if (dataUrl.length <= 8 * 1024 * 1024 && img.width <= MAX && img.height <= MAX) { cb(dataUrl); return; }
       let w = img.width, h = img.height;
       if (w > MAX || h > MAX) { const r = Math.min(MAX / w, MAX / h); w = Math.round(w * r); h = Math.round(h * r); }
       const cv = document.createElement('canvas');
       cv.width = w; cv.height = h;
       cv.getContext('2d').drawImage(img, 0, 0, w, h);
       let out;
-      try { out = cv.toDataURL('image/jpeg', 0.85); } catch (e) { out = dataUrl; }
+      try { out = cv.toDataURL('image/jpeg', 0.94); } catch (e) { out = dataUrl; }
       cb(out && out.length < dataUrl.length ? out : dataUrl);
     };
     img.onerror = function() { cb(dataUrl); };
     img.src = dataUrl;
   }
 
-  function addOnsiteEvidence(t, itemIdx, objIdx, dataUrl) {
-    const rec = getOnsiteRec(t, itemIdx, objIdx);
-    renumberOnsiteEvidence(t);
-    const no = nextOnsiteEviNo(t);
-    rec.evidence.push({ no: no, name: '', dataUrl: dataUrl });
-    refreshOnsiteEviCell(t, itemIdx, objIdx);
-    showToast('已添加证据截图 ' + no);
+  function addOnsiteEvidenceImage(group, dataUrl) {
+    if (!group) return;
+    if (!Array.isArray(group.images)) group.images = [];
+    group.images.push({ id: newOnsiteEvidenceId(), dataUrl: dataUrl });
+    refreshOnsiteEvidenceLibrary(group.layer);
+    toggleOnsiteEvidenceDrawer(true);
+    showToast('已加入 ' + group.no + '（共' + group.images.length + '张）');
   }
 
-  function onsiteEviRename(t, itemIdx, objIdx, idx, val) {
-    const rec = getOnsiteRec(t, itemIdx, objIdx);
-    if (rec.evidence[idx]) rec.evidence[idx].name = val;
+  function onsiteEviRename(groupId, value) {
+    const group = onsiteEvidenceGroups.find(function(item) { return item.id === groupId; });
+    if (group) group.name = value;
   }
 
-  function onsiteEviDelete(t, itemIdx, objIdx, idx, ev) {
-    if (ev) ev.stopPropagation();
-    const rec = getOnsiteRec(t, itemIdx, objIdx);
-    if (rec.evidence[idx]) rec.evidence.splice(idx, 1);
-    renumberOnsiteEvidence(t);
-    Object.keys(onsiteRecords).forEach(k => {
-      const parts = k.split('|');
-      if (parts[0] === String(t)) refreshOnsiteEviCell(Number(parts[0]), Number(parts[1]), Number(parts[2]));
+  function activateOnsiteEvidenceGroup(groupId) {
+    const group = onsiteEvidenceGroups.find(function(item) { return item.id === groupId; });
+    if (!group) return;
+    activeOnsiteEvidenceGroupId = group.id;
+    refreshOnsiteEvidenceLibrary(group.layer);
+    toggleOnsiteEvidenceDrawer(true);
+    showToast('后续粘贴或导入的图片将加入 ' + group.no);
+  }
+
+  function finishOnsiteEvidenceGroup(t) {
+    activeOnsiteEvidenceGroupId = '';
+    refreshOnsiteEvidenceLibrary(t);
+  }
+
+  function insertSelectedOnsiteEvidence(selectId) {
+    const select = document.getElementById(selectId);
+    if (!select || !select.value) { showToast('请先选择证据编号', true); return; }
+    const group = onsiteEvidenceGroups.find(function(item) { return item.id === select.value; });
+    if (group) insertOnsiteEvidenceReference(group.no);
+  }
+
+  function insertOnsiteEvidenceGroupReference(groupId) {
+    const group = onsiteEvidenceGroups.find(function(item) { return item.id === groupId; });
+    if (group) insertOnsiteEvidenceReference(group.no);
+  }
+
+  function deleteOnsiteEvidenceImage(groupId, imageId) {
+    const group = onsiteEvidenceGroups.find(function(item) { return item.id === groupId; });
+    if (!group) return;
+    group.images = (group.images || []).filter(function(image) { return image.id !== imageId; });
+    refreshOnsiteEvidenceLibrary(group.layer);
+  }
+
+  function deleteOnsiteEvidenceGroup(groupId) {
+    const index = onsiteEvidenceGroups.findIndex(function(item) { return item.id === groupId; });
+    if (index < 0) return;
+    const group = onsiteEvidenceGroups[index];
+    const referenced = Object.values(onsiteRecords).some(function(rec) { return String(rec?.record || '').includes(group.no); });
+    if (!window.confirm((referenced ? group.no + ' 已在结果描述中引用，删除后引用位置会标记为“【证据已删除】”。\n' : '') + '确定删除该证据组及其中全部图片吗？')) return;
+    Object.values(onsiteRecords).forEach(function(rec) {
+      if (rec && typeof rec.record === 'string') rec.record = rec.record.split(group.no).join('【证据已删除】');
+    });
+    onsiteEvidenceGroups.splice(index, 1);
+    if (activeOnsiteEvidenceGroupId === groupId) activeOnsiteEvidenceGroupId = '';
+    renumberOnsiteEvidence(group.layer);
+    syncOnsiteRecordEditors();
+    refreshOnsiteEvidenceLibrary(group.layer);
+  }
+
+  function readOnsiteEvidenceFiles(files, group) {
+    Array.from(files || []).filter(function(file) { return file.type && file.type.indexOf('image/') === 0; }).forEach(function(file) {
+      const reader = new FileReader();
+      reader.onload = function() { onsiteEviProcessImage(reader.result, function(url) { addOnsiteEvidenceImage(group, url); }); };
+      reader.readAsDataURL(file);
     });
   }
 
-  // 从本机导入图片
-  function onsiteEviImport(t, itemIdx, objIdx, ev) {
-    if (ev) ev.stopPropagation();
-    selectOnsiteEvi(t, itemIdx, objIdx);
+  // 从本机一次选择多张图片；没有活动证据组时自动新建并插入编号。
+  function onsiteEviImport(t, groupId) {
+    if (groupId) activateOnsiteEvidenceGroup(groupId);
+    let group = activeOnsiteEvidenceGroup(t, false);
+    if (!group) {
+      const canInsert = !!(onsiteRecordEditorTarget && onsiteRecordEditorTarget.t === t &&
+        onsiteRecordEditorTarget.element && document.body.contains(onsiteRecordEditorTarget.element));
+      group = startNewOnsiteEvidenceGroup(t, canInsert);
+    }
+    if (!group) return;
     let inp = document.getElementById('onsite-evi-file');
     if (!inp) {
       inp = document.createElement('input');
       inp.type = 'file'; inp.id = 'onsite-evi-file';
-      inp.accept = 'image/*'; inp.style.display = 'none';
+      inp.accept = 'image/*'; inp.multiple = true; inp.style.display = 'none';
       inp.onchange = function() {
-        const f = inp.files && inp.files[0];
-        if (!f) return;
-        const tg = onsiteEvidenceTarget;
-        if (!tg) return;
-        const rd = new FileReader();
-        rd.onload = function() {
-          onsiteEviProcessImage(rd.result, function(url) { addOnsiteEvidence(tg.t, tg.itemIdx, tg.objIdx, url); });
-        };
-        rd.readAsDataURL(f);
+        const current = onsiteEvidenceGroups.find(function(item) { return item.id === inp.dataset.groupId; });
+        if (current && inp.files?.length) readOnsiteEvidenceFiles(inp.files, current);
         inp.value = '';
       };
       document.body.appendChild(inp);
     }
+    inp.dataset.groupId = group.id;
     inp.click();
   }
 
-  // 大图预览
-  function onsiteEviPreview(t, itemIdx, objIdx, idx, ev) {
-    if (ev) ev.stopPropagation();
-    const rec = getOnsiteRec(t, itemIdx, objIdx);
-    const e = rec.evidence[idx];
-    if (!e) return;
+  function onsiteEviPreview(groupId, imageId) {
+    const group = onsiteEvidenceGroups.find(function(item) { return item.id === groupId; });
+    const image = group?.images?.find(function(item) { return item.id === imageId; });
+    if (!group || !image) return;
     let ov = document.getElementById('onsite-evi-preview');
     if (ov) ov.remove();
     ov = document.createElement('div');
@@ -4274,12 +4977,152 @@
     ov.className = 'evi-preview-overlay';
     ov.onclick = function() { ov.remove(); };
     ov.innerHTML = '<span class="close">×</span>' +
-      '<img src="' + e.dataUrl + '" />' +
-      '<div class="cap">' + onsiteEsc(e.no) + (e.name ? '　' + onsiteEsc(e.name) : '') + '　（点击任意处关闭）</div>';
+      '<img src="' + image.dataUrl + '" />' +
+      '<div class="cap">' + onsiteEsc(group.no) + (group.name ? '　' + onsiteEsc(group.name) : '') + '　（点击任意处关闭）</div>';
     document.body.appendChild(ov);
   }
 
-  // 全局 Ctrl+V 粘贴截图：第3步证据单元格 或 第4步附录B图片槽，不影响文本粘贴及其他步骤
+  function onsiteEvidenceRecordToolsHtml(t, key) {
+    const groups = onsiteEvidenceLayerGroups(t);
+    const selectId = 'onsite-evi-select-' + key;
+    return '<div class="evi-record-tools">' +
+      '<span class="evi-hint">在此框按 Ctrl+V 可新建/追加证据</span>' +
+      '<select id="' + selectId + '"><option value="">选择已有证据</option>' + groups.map(function(group) {
+        return '<option value="' + onsiteEsc(group.id) + '">' + onsiteEsc(group.no + (group.name ? ' ' + group.name : '')) + '</option>';
+      }).join('') + '</select>' +
+      '<button type="button" class="evi-mini-btn" onclick="insertSelectedOnsiteEvidence(\'' + selectId + '\')">插入编号</button>' +
+      '</div>';
+  }
+
+  function onsiteEvidenceLibraryHtml(t) {
+    const groups = onsiteEvidenceLayerGroups(t).sort(function(a, b) { return onsiteEvidenceNumberValue(a.no) - onsiteEvidenceNumberValue(b.no); });
+    const active = groups.find(function(group) { return group.id === activeOnsiteEvidenceGroupId; });
+    let html = '<div class="evi-library-head"><div class="evi-library-title">证据列表（与测评对象不强制绑定）</div><div class="evi-library-actions">' +
+      '<button type="button" class="evi-mini-btn" onclick="startNewOnsiteEvidenceGroup(' + t + ',true)">新建证据并插入编号</button>' +
+      '<button type="button" class="evi-mini-btn" onclick="onsiteEviImport(' + t + ',\'\')">批量导入图片</button></div></div>';
+    if (active) html += '<div class="evi-active-bar">正在录入 <strong>' + onsiteEsc(active.no) + '</strong>，继续 Ctrl+V 或导入图片会加入同一编号（当前 ' + (active.images || []).length + ' 张）。 <button type="button" class="evi-mini-btn" onclick="finishOnsiteEvidenceGroup(' + t + ')">完成本组</button></div>';
+    if (!groups.length) return html + '<div class="evi-empty">先点击某条结果描述，再直接 Ctrl+V 粘贴图片；系统会建立证据编号并插入到光标处。</div>';
+    html += '<div class="evi-group-list">' + groups.map(function(group) {
+      return '<div class="evi-group' + (group.id === activeOnsiteEvidenceGroupId ? ' active' : '') + '">' +
+        '<div class="evi-group-head"><span class="evi-no">' + onsiteEsc(group.no) + '</span>' +
+        '<input class="evi-name" placeholder="证据名称（可选）" value="' + onsiteEsc(group.name || '') + '" onchange="onsiteEviRename(\'' + group.id + '\',this.value)" />' +
+        '<span class="evi-del" title="删除证据组" onclick="deleteOnsiteEvidenceGroup(\'' + group.id + '\')">×</span></div>' +
+        '<div class="evi-thumbs">' + (group.images || []).map(function(image) {
+          return '<div class="evi-thumb"><img src="' + image.dataUrl + '" onclick="onsiteEviPreview(\'' + group.id + '\',\'' + image.id + '\')" />' +
+            '<span class="evi-thumb-del" title="删除本张图片" onclick="deleteOnsiteEvidenceImage(\'' + group.id + '\',\'' + image.id + '\')">×</span></div>';
+        }).join('') + ((group.images || []).length ? '' : '<span class="evi-hint">暂无图片</span>') + '</div>' +
+        '<div class="evi-group-foot"><button type="button" class="evi-mini-btn" onclick="activateOnsiteEvidenceGroup(\'' + group.id + '\')">继续添加图片</button>' +
+        '<button type="button" class="evi-mini-btn" onclick="onsiteEviImport(' + t + ',\'' + group.id + '\')">导入多张</button>' +
+        '<button type="button" class="evi-mini-btn" onclick="insertOnsiteEvidenceGroupReference(\'' + group.id + '\')">插入编号</button></div></div>';
+    }).join('') + '</div>';
+    return html;
+  }
+
+  function applyOnsiteEvidenceDrawerWidth(width) {
+    const maxWidth = Math.max(320, Math.min(680, window.innerWidth - 640));
+    onsiteEvidenceWidth = Math.max(300, Math.min(maxWidth, Math.round(Number(width) || 420)));
+    document.documentElement.style.setProperty('--onsite-evidence-width', onsiteEvidenceWidth + 'px');
+  }
+
+  function startOnsiteEvidenceResize(event) {
+    if (window.innerWidth <= 760) return;
+    event.preventDefault();
+    const resizer = event.currentTarget;
+    const startX = event.clientX;
+    const startWidth = onsiteEvidenceWidth;
+    resizer.classList.add('dragging');
+    document.body.classList.add('onsite-evidence-resizing');
+    function move(moveEvent) {
+      applyOnsiteEvidenceDrawerWidth(startWidth + startX - moveEvent.clientX);
+    }
+    function finish() {
+      document.removeEventListener('pointermove', move);
+      document.removeEventListener('pointerup', finish);
+      document.removeEventListener('pointercancel', finish);
+      resizer.classList.remove('dragging');
+      document.body.classList.remove('onsite-evidence-resizing');
+      try { localStorage.setItem('bbOnsiteEvidenceDrawerWidth', String(onsiteEvidenceWidth)); } catch (error) { /* ignore */ }
+    }
+    document.addEventListener('pointermove', move);
+    document.addEventListener('pointerup', finish);
+    document.addEventListener('pointercancel', finish);
+  }
+
+  function ensureOnsiteEvidenceDrawer() {
+    const host = document.getElementById('step-panel-3');
+    if (!host) return;
+    applyOnsiteEvidenceDrawerWidth(onsiteEvidenceWidth);
+    if (document.getElementById('onsite-evidence-drawer')) return;
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.id = 'onsite-evidence-fab';
+    button.className = 'onsite-evidence-fab';
+    button.onclick = function() { toggleOnsiteEvidenceDrawer(); };
+    const drawer = document.createElement('aside');
+    drawer.id = 'onsite-evidence-drawer';
+    drawer.className = 'onsite-evidence-drawer';
+    drawer.innerHTML = '<div class="onsite-evidence-resizer" title="左右拖动调整证据栏宽度"></div>' +
+      '<div class="onsite-evidence-drawer-head"><strong>现场测评证据</strong>' +
+      '<span class="layer" id="onsite-evidence-drawer-layer"></span>' +
+      '<button type="button" class="onsite-evidence-drawer-close" title="收起" onclick="toggleOnsiteEvidenceDrawer(false)">×</button></div>' +
+      '<div class="onsite-evidence-drawer-body"><div class="evi-library" id="onsite-evidence-library-drawer"></div></div>';
+    host.appendChild(button);
+    host.appendChild(drawer);
+    drawer.querySelector('.onsite-evidence-resizer').addEventListener('pointerdown', startOnsiteEvidenceResize);
+  }
+
+  function toggleOnsiteEvidenceDrawer(force) {
+    ensureOnsiteEvidenceDrawer();
+    const drawer = document.getElementById('onsite-evidence-drawer');
+    if (!drawer) return;
+    const open = typeof force === 'boolean' ? force : !drawer.classList.contains('open');
+    drawer.classList.toggle('open', open);
+    const host = document.getElementById('step-panel-3');
+    if (host) host.classList.toggle('evidence-drawer-open', open);
+    const button = document.getElementById('onsite-evidence-fab');
+    if (button) button.style.display = open ? 'none' : 'flex';
+  }
+
+  function refreshOnsiteEvidenceLibrary(t) {
+    ensureOnsiteEvidenceDrawer();
+    if (Number(t) === Number(currentOnsiteLayer)) {
+      const library = document.getElementById('onsite-evidence-library-drawer');
+      if (library) library.innerHTML = onsiteEvidenceLibraryHtml(t);
+      const layer = document.getElementById('onsite-evidence-drawer-layer');
+      if (layer) layer.textContent = ONSITE_LAYERS[t]?.name || '';
+      const button = document.getElementById('onsite-evidence-fab');
+      if (button) button.innerHTML = '<span>证据列表</span><span class="count">' + onsiteEvidenceLayerGroups(t).length + '</span>';
+    }
+    const groups = onsiteEvidenceLayerGroups(t);
+    document.querySelectorAll('select[id^="onsite-evi-select-"]').forEach(function(select) {
+      if (!select.closest('#onsite-panel-' + t)) return;
+      const selected = select.value;
+      select.innerHTML = '<option value="">选择已有证据</option>' + groups.map(function(group) {
+        return '<option value="' + onsiteEsc(group.id) + '">' + onsiteEsc(group.no + (group.name ? ' ' + group.name : '')) + '</option>';
+      }).join('');
+      if (groups.some(function(group) { return group.id === selected; })) select.value = selected;
+    });
+  }
+
+  function migrateLegacyOnsiteEvidence() {
+    const created = [];
+    Object.keys(onsiteRecords).forEach(function(key) {
+      const rec = onsiteRecords[key];
+      if (!rec || !Array.isArray(rec.evidence) || !rec.evidence.length) return;
+      const located = locateOnsiteRecordKey(key);
+      const legacyLayer = Number(String(key).split('|')[0]);
+      const layer = located ? located.t : (legacyLayer >= 0 && legacyLayer < 8 ? legacyLayer : 0);
+      rec.evidence.forEach(function(evidence) {
+        if (!evidence?.dataUrl) return;
+        created.push({ id: newOnsiteEvidenceId(), layer: layer, no: evidence.no || '', name: evidence.name || '', images: [{ id: newOnsiteEvidenceId(), dataUrl: evidence.dataUrl }] });
+      });
+      rec.evidence = [];
+    });
+    if (created.length) onsiteEvidenceGroups = onsiteEvidenceGroups.concat(created);
+    for (let t = 0; t < 8; t++) renumberOnsiteEvidence(t);
+  }
+
+  // 全局 Ctrl+V：结果描述框中粘贴图片时自动建立证据组；后续粘贴追加到当前组。
   document.addEventListener('paste', async function(e) {
     const panel3 = document.getElementById('step-panel-3');
     const panel4 = document.getElementById('step-panel-4');
@@ -4312,17 +5155,25 @@
       }
       return;
     }
-    if (!onsiteEvidenceTarget) { showToast('请先点击选中要粘贴证据截图的单元格'); return; }
+    if (!onsiteRecordEditorTarget || !onsiteRecordEditorTarget.element || !document.body.contains(onsiteRecordEditorTarget.element)) {
+      showToast('请先点击需要引用证据的结果描述框', true); return;
+    }
     e.preventDefault();
-    const tg = onsiteEvidenceTarget;
-    const rd = new FileReader();
-    rd.onload = function() {
-      onsiteEviProcessImage(rd.result, function(url) { addOnsiteEvidence(tg.t, tg.itemIdx, tg.objIdx, url); });
-    };
-    rd.readAsDataURL(imageFiles[0]);
+    const group = activeOnsiteEvidenceGroup(onsiteRecordEditorTarget.t, true);
+    if (group) readOnsiteEvidenceFiles(imageFiles, group);
   });
 
+  function onsiteRecordCellHtml(t, itemIdx, objIdx, recordVal) {
+    const key = onsiteKey(t, itemIdx, objIdx);
+    return (onsiteExpandedRecordKeys.has(key)
+      ? onsiteRecordCollapsedEditHtml(t, itemIdx, objIdx)
+      : onsiteRecordSummaryHtml(t, itemIdx, objIdx, recordVal)) + onsiteEvidenceRecordToolsHtml(t, key);
+  }
+
   function renderOnsiteTables() {
+    // 每次进入第三步时，以第二步当前对象清单重新对齐记录；新增对象生成空记录，
+    // 已删除对象不再进入当前报告，原有对象改名仍通过 objectId 保留记录。
+    reconcileAllOnsiteObjectBindings();
     ONSITE_LAYERS.forEach((cfg, t) => {
       const panel = document.getElementById('onsite-panel-' + t);
       if (!panel) return;
@@ -4331,6 +5182,7 @@
       // 应用和数据安全层面：重要数据相关单元的对象来自系统资产，层面级空判需一并考虑
       const specialAny = (t === 3) && units.some(u => ONSITE_UNIT_DATA_REQ[u.name] && getOnsiteUnitObjects(t, u.name).length);
       let html = '<div class="onsite-table-caption">表A-' + (t + 1) + ' ' + onsiteEsc(cfg.name) + '测评结果记录</div>';
+      html += renderOnsiteObjectMatchPanel(t);
       if (!units.length) {
         html += '<div class="alert-box"><span class="icon">ℹ️</span><div>本层面暂无适用的测评单元，请先在<strong>第二步「测评指标」</strong>中确认 ' + onsiteEsc(cfg.name) + ' 层面的指标适用性。</div></div>';
       } else if (!objects.length && !specialAny) {
@@ -4338,7 +5190,7 @@
       } else if (!cfg.mgmtUnit) {
         // ===== 技术类层面（物理/网络/设备/应用）：DAK量化指标表 =====
         html += '<table class="onsite-table"><thead>' +
-          '<tr><th rowspan="2" style="width:130px;">测评单元</th><th rowspan="2" style="width:150px;">测评对象</th><th rowspan="2" style="min-width:280px;">结果记录</th><th rowspan="2" style="width:210px;">证据截图</th><th colspan="4">量化指标</th><th rowspan="2" style="width:110px;">测评单元得分<br/><span style="font-weight:400; font-size:11px;">S<sub>i,j</sub> = ΣS<sub>i,j,k</sub> / n<sub>i,j</sub></span></th></tr>' +
+          '<tr><th rowspan="2" style="width:130px;">测评单元</th><th rowspan="2" style="width:150px;">测评对象</th><th rowspan="2" style="min-width:340px;">结果记录</th><th colspan="4">量化指标</th><th rowspan="2" style="width:110px;">测评单元得分<br/><span style="font-weight:400; font-size:11px;">S<sub>i,j</sub> = ΣS<sub>i,j,k</sub> / n<sub>i,j</sub></span></th></tr>' +
           '<tr><th style="width:82px;">密码使用<br/>有效性 D</th><th style="width:82px;">密码算法/<br/>技术合规性 A</th><th style="width:82px;">密钥管理<br/>安全 K</th><th style="width:76px;">测评对象<br/>评分 S<sub>i,j,k</sub></th></tr>' +
           '</thead><tbody>';
         units.forEach(u => {
@@ -4347,12 +5199,16 @@
           if (!uObjects.length) {
             html += '<tr><td class="unit-cell">' + onsiteEsc(u.name) +
               (u.applicable ? '' : '<br/><span class="unit-na-badge">不适用</span>') +
-              '</td><td class="obj-cell" colspan="6" style="color:#b45309; font-weight:400;">该测评单元暂无对应的重要数据测评对象——请先在第二步「系统资产 → 重要数据」中维护重要数据，并在其安全需求中勾选「' + onsiteEsc(ONSITE_UNIT_DATA_REQ[u.name]) + '」</td></tr>';
+              '</td><td class="obj-cell" colspan="7" style="color:#b45309; font-weight:400;">该测评单元暂无对应的重要数据测评对象——请先在第二步「系统资产 → 重要数据」中维护重要数据，并在其安全需求中勾选「' + onsiteEsc(ONSITE_UNIT_DATA_REQ[u.name]) + '」</td></tr>';
             return;
           }
+          const unitHasExpanded = uObjects.some(function(objName, objIdx) {
+            return onsiteExpandedRecordKeys.has(onsiteKey(t, u.itemIdx, objIdx));
+          });
           uObjects.forEach((objName, objIdx) => {
             const rec = getOnsiteRec(t, u.itemIdx, objIdx);
             const key = onsiteKey(t, u.itemIdx, objIdx);
+            const expanded = onsiteExpandedRecordKeys.has(key);
             const dis = u.applicable ? '' : ' disabled';
             // 结果记录：不适用的测评单元自动带入第二步填写的不适用原因
             let recordVal = rec.record;
@@ -4377,22 +5233,24 @@
               }
               return cell;
             };
-            html += '<tr>';
-            if (objIdx === 0) {
-              html += '<td class="unit-cell" rowspan="' + uObjects.length + '">' + onsiteEsc(u.name) +
-                (u.applicable ? '' : '<br/><span class="unit-na-badge">不适用</span>') + '</td>';
+            html += '<tr class="onsite-record-row' + (expanded ? ' is-editing' : '') + '">';
+            if (unitHasExpanded || objIdx === 0) {
+              html += '<td class="unit-cell"' + (!unitHasExpanded && uObjects.length > 1 ? ' rowspan="' + uObjects.length + '"' : '') + '>' + onsiteEsc(u.name) +
+                (u.applicable ? '' : '<br/><span class="unit-na-badge">不适用</span>') +
+                (expanded ? '<span class="onsite-record-editing-tag">编辑中</span>' : '') + '</td>';
             }
             html += '<td class="obj-cell">' + onsiteEsc(objName) + '</td>' +
-              '<td class="rec-cell"><textarea placeholder="请输入测评结果记录" oninput="updateOnsiteField(' + t + ',' + u.itemIdx + ',' + objIdx + ',\'record\',this.value)">' + onsiteEsc(recordVal) + '</textarea></td>' +
-              '<td class="evi-cell" id="onsite-evi-' + key + '" onclick="selectOnsiteEvi(' + t + ',' + u.itemIdx + ',' + objIdx + ')">' + onsiteEviCellHtml(t, u.itemIdx, objIdx) + '</td>' +
+              '<td class="rec-cell">' + onsiteRecordCellHtml(t, u.itemIdx, objIdx, recordVal) + '</td>' +
               '<td class="dak-cell">' + dakCell('D') + '</td>' +
               '<td class="dak-cell">' + dakCell('A') + '</td>' +
               '<td class="dak-cell">' + dakCell('K') + '</td>' +
               '<td class="score-cell" id="onsite-row-score-' + key + '">' + fmtOnsiteScore(calcOnsiteRowScore(rec, u.applicable)) + '</td>';
-            if (objIdx === 0) {
-              html += '<td class="unit-score-cell" rowspan="' + uObjects.length + '" id="onsite-unit-score-' + t + '-' + u.itemIdx + '">--</td>';
+            if (unitHasExpanded || objIdx === 0) {
+              html += '<td class="unit-score-cell" data-onsite-unit-score="' + t + '-' + u.itemIdx + '"' +
+                (!unitHasExpanded && uObjects.length > 1 ? ' rowspan="' + uObjects.length + '"' : '') + '>--</td>';
             }
             html += '</tr>';
+            if (expanded) html += onsiteRecordEditorRowHtml(t, u.itemIdx, objIdx, recordVal, 8);
           });
         });
         html += '</tbody></table>';
@@ -4403,12 +5261,16 @@
       } else {
         // ===== 管理类层面（管理制度/人员管理/建设运行/应急处置）：测评指标符合情况表 =====
         html += '<table class="onsite-table"><thead>' +
-          '<tr><th style="width:130px;">测评单元</th><th style="width:150px;">测评对象</th><th style="min-width:280px;">结果记录</th><th style="width:210px;">证据截图</th><th style="width:150px;">测评指标符合情况</th><th style="width:110px;">测评单元得分<br/>S<sub>i,j</sub></th></tr>' +
+          '<tr><th style="width:130px;">测评单元</th><th style="width:150px;">测评对象</th><th style="min-width:340px;">结果记录</th><th style="width:150px;">测评指标符合情况</th><th style="width:110px;">测评单元得分<br/>S<sub>i,j</sub></th></tr>' +
           '</thead><tbody>';
         units.forEach(u => {
+          const unitHasExpanded = objects.some(function(objName, objIdx) {
+            return onsiteExpandedRecordKeys.has(onsiteKey(t, u.itemIdx, objIdx));
+          });
           objects.forEach((objName, objIdx) => {
             const rec = getOnsiteRec(t, u.itemIdx, objIdx);
             const key = onsiteKey(t, u.itemIdx, objIdx);
+            const expanded = onsiteExpandedRecordKeys.has(key);
             const dis = u.applicable ? '' : ' disabled';
             let recordVal = rec.record;
             if (!u.applicable && !recordVal) {
@@ -4420,20 +5282,22 @@
             const resultSelect = '<select id="onsite-result-' + key + '"' + dis + ' onchange="updateOnsiteField(' + t + ',' + u.itemIdx + ',' + objIdx + ',\'result\',this.value)">' +
               ['<option value="">--</option>'].concat(ONSITE_MGMT_OPTIONS.map(o =>
                 '<option value="' + o + '"' + (cur === o ? ' selected' : '') + '>' + o + '</option>'
-              )).join('') + '</select>';
-            html += '<tr>';
-            if (objIdx === 0) {
-              html += '<td class="unit-cell" rowspan="' + objects.length + '">' + onsiteEsc(u.name) +
-                (u.applicable ? '' : '<br/><span class="unit-na-badge">不适用</span>') + '</td>';
+            )).join('') + '</select>';
+            html += '<tr class="onsite-record-row' + (expanded ? ' is-editing' : '') + '">';
+            if (unitHasExpanded || objIdx === 0) {
+              html += '<td class="unit-cell"' + (!unitHasExpanded && objects.length > 1 ? ' rowspan="' + objects.length + '"' : '') + '>' + onsiteEsc(u.name) +
+                (u.applicable ? '' : '<br/><span class="unit-na-badge">不适用</span>') +
+                (expanded ? '<span class="onsite-record-editing-tag">编辑中</span>' : '') + '</td>';
             }
             html += '<td class="obj-cell">' + onsiteEsc(objName) + '</td>' +
-              '<td class="rec-cell"><textarea placeholder="请输入测评结果记录" oninput="updateOnsiteField(' + t + ',' + u.itemIdx + ',' + objIdx + ',\'record\',this.value)">' + onsiteEsc(recordVal) + '</textarea></td>' +
-              '<td class="evi-cell" id="onsite-evi-' + key + '" onclick="selectOnsiteEvi(' + t + ',' + u.itemIdx + ',' + objIdx + ')">' + onsiteEviCellHtml(t, u.itemIdx, objIdx) + '</td>' +
+              '<td class="rec-cell">' + onsiteRecordCellHtml(t, u.itemIdx, objIdx, recordVal) + '</td>' +
               '<td class="result-cell">' + resultSelect + '</td>';
-            if (objIdx === 0) {
-              html += '<td class="unit-score-cell" rowspan="' + objects.length + '" id="onsite-unit-score-' + t + '-' + u.itemIdx + '">--</td>';
+            if (unitHasExpanded || objIdx === 0) {
+              html += '<td class="unit-score-cell" data-onsite-unit-score="' + t + '-' + u.itemIdx + '"' +
+                (!unitHasExpanded && objects.length > 1 ? ' rowspan="' + objects.length + '"' : '') + '>--</td>';
             }
             html += '</tr>';
+            if (expanded) html += onsiteRecordEditorRowHtml(t, u.itemIdx, objIdx, recordVal, 5);
           });
         });
         html += '</tbody></table>';
@@ -4441,14 +5305,17 @@
       }
       html += '<div class="form-actions" style="margin-top:16px;">' +
         '<button class="btn btn-primary" style="width:auto; padding:0 28px;" onclick="showToast(\'' + cfg.name + '测评记录已保存\')">保存测评记录</button></div>';
-      html += '<div class="onsite-note">证据截图：点击单元格选中后可直接 Ctrl+V 粘贴截图，或点击「导入本机图片」上传；图片编号按层面自动分配（' + onsiteEsc(cfg.name) + ' 层面为 图A-' + (t + 1) + '.1 起，层面内连续递增，删除后自动顺延），编号固定不可编辑，图片名称可自行输入；点击缩略图可放大预览。</div>';
+      html += '<div class="onsite-note">证据使用：在结果描述框内按 Ctrl+V 粘贴图片，首次会新建证据并在光标处插入编号，继续粘贴会把多张图片加入同一编号；点击“完成本组”后可开始下一组。证据编号按层面连续分配，删除后自动顺延，并同步更新结果描述中的引用。</div>';
       panel.innerHTML = html;
       units.forEach(u => recalcOnsiteScores(t, u.itemIdx));
     });
-    applyOnsiteEviSelection();
+    requestAnimationFrame(refreshOnsiteRecordSummaries);
+    ensureOnsiteEvidenceDrawer();
+    refreshOnsiteEvidenceLibrary(currentOnsiteLayer);
   }
 
   function switchOnsiteTab(n) {
+    currentOnsiteLayer = n;
     for (let i = 0; i < 8; i++) {
       const btn = document.getElementById('onsite-tab-btn-' + i);
       const panel = document.getElementById('onsite-panel-' + i);
@@ -4456,6 +5323,7 @@
       btn.className = 'tab-item' + (i === n ? ' active' : '');
       panel.className = 'tab-panel' + (i === n ? ' active' : '');
     }
+    refreshOnsiteEvidenceLibrary(n);
   }
 
   // ===== 报告编制 =====
@@ -4482,9 +5350,47 @@
   // 报告正文缓存（自动生成、可编辑）
   let reportTexts = {};
 
-  function reportKey(t, itemIdx, objIdx) { return t + '|' + itemIdx + '|' + objIdx; }
+  function reportKey(t, itemIdx, objIdx) { return onsiteKey(t, itemIdx, objIdx); }
 
-  function saveReportText(id, v) { reportTexts[id] = v; }
+  function currentConclusionScoreText() {
+    const total = getReportTotalScore().total;
+    return total == null ? '--' : String(total);
+  }
+
+  // 评估结论正文允许编辑，但其中的综合得分始终以量化评估实时结果为准。
+  function lockConclusionScore(text) {
+    return String(text || '').replace(/综合得分为[^，。；\n]{0,20}?分/g,
+      '综合得分为' + currentConclusionScoreText() + '分');
+  }
+
+  function saveReportText(id, v, el) {
+    let value = v;
+    if (id === 'report-conclusion-text') {
+      value = lockConclusionScore(value);
+      if (el && el.value !== value) {
+        const cursor = Math.min(Number(el.selectionStart || 0), value.length);
+        el.value = value;
+        try { el.setSelectionRange(cursor, cursor); } catch (error) { /* textarea不可聚焦时忽略 */ }
+      }
+    }
+    reportTexts[id] = value;
+  }
+
+  function protectConclusionScoreEdit(event, el) {
+    const match = /综合得分为([^，。；\n]{0,20}?)分/.exec(String(el && el.value || ''));
+    if (!match) return true;
+    const scoreStart = match.index + '综合得分为'.length;
+    const scoreEnd = scoreStart + match[1].length;
+    let start = Number(el.selectionStart || 0);
+    let end = Number(el.selectionEnd || start);
+    if (event && event.inputType === 'deleteContentBackward' && start === end) start = Math.max(0, start - 1);
+    if (event && event.inputType === 'deleteContentForward' && start === end) end++;
+    if (start < scoreEnd && end > scoreStart || (start === end && start >= scoreStart && start <= scoreEnd)) {
+      event.preventDefault();
+      return false;
+    }
+    return true;
+  }
 
   // 测评对象得分（报告口径）：现场测评得分 + 分值弥补修正 MAX(0.5×PA, PB)
   function getReportObjectScore(t, itemIdx, objIdx, applyFix) {
@@ -4508,9 +5414,10 @@
 
   // 弥补指标（测评对象A）的分值 PA（取其现场测评原始得分）
   function getReportCompScore(compKey) {
-    const p = compKey.split('|');
-    const applicable = isOnsiteUnitApplicable(+p[0], +p[1]);
-    const s = calcOnsiteRowScore(getOnsiteRec(+p[0], +p[1], +p[2]), applicable);
+    const pos = locateOnsiteRecordKey(compKey);
+    if (!pos || pos.objIdx < 0) return null;
+    const applicable = isOnsiteUnitApplicable(pos.t, pos.itemIdx);
+    const s = calcOnsiteRowScore(getOnsiteRec(pos.t, pos.itemIdx, pos.objIdx), applicable);
     return typeof s === 'number' ? parseFloat(s.toFixed(4)) : null;
   }
 
@@ -4631,11 +5538,31 @@
     return id || '';
   }
 
-  // ===== 风险分析数据层：现场测评中得分≠1（部分符合/不符合）的测评单元 =====
-  // 用户编辑缓存：key = t|itemIdx -> { desc(问题描述), threat(关联威胁), analysis(风险分析), level(高/中/低) }
+  // ===== 风险分析数据层：每个部分符合/不符合的测评单元对应一条风险 =====
+  // 使用稳定指标ID作为键；对象增删改只会更新该单元的问题描述。
   let reportRiskStore = {};
-  // Word报告中的风险行是报告级权威数据；保留每一行，不再按测评单元合并。
+  // Word报告中的多条同单元风险在页面中合并为一条，保留其文字作为初值。
   let reportImportedRiskRows = [];
+  let riskTemplateLibrary = [];
+
+  function findRiskTemplate(t, unitName, result) {
+    const layer = ONSITE_LAYERS[t]?.name || '';
+    const candidates = riskTemplateLibrary.filter(function(item) {
+      return item && item.enabled !== false && (item.layer === '*' || item.layer === layer) &&
+        (item.unit === '*' || impNormName(item.unit) === impNormName(unitName)) &&
+        (item.result === '*' || item.result === result);
+    });
+    candidates.sort(function(a, b) {
+      const score = function(item) { return (item.layer === layer ? 4 : 0) + (item.unit !== '*' ? 2 : 0) + (item.result !== '*' ? 1 : 0) + Number(item.version || 0) / 10000; };
+      return score(b) - score(a);
+    });
+    return candidates[0] || null;
+  }
+
+  function fillRiskTemplateText(value, t, unitName) {
+    const sys = document.getElementById('mi-sys-name')?.value?.trim() || '被测信息系统';
+    return String(value || '').replaceAll('{系统名称}', sys).replaceAll('{安全层面}', ONSITE_LAYERS[t]?.name || '').replaceAll('{测评单元}', unitName || '');
+  }
 
   // 测评单元现场测评原始得分（不含分值弥补）
   function getRawUnitScore(t, itemIdx) {
@@ -4655,35 +5582,114 @@
     return null;
   }
 
-  // 汇总风险行（合并用户编辑）
-  function getRiskRows() {
-    if (reportImportedRiskRows.length) {
-      return reportImportedRiskRows.map(function (src) {
-        const store = reportRiskStore[src.key] || {};
-        return Object.assign({}, src, store);
-      });
-    }
-    const rows = [];
-    ONSITE_LAYERS.forEach((cfg, t) => {
-      const level = evaluationIndicatorLevels[t];
-      level.items.forEach((item, itemIdx) => {
-        const s = getRawUnitScore(t, itemIdx);
-        if (typeof s !== 'number' || s >= 1) return; // 仅纳入得分≠1的测评单元
-        const k = t + '|' + itemIdx;
-        const store = reportRiskStore[k] || {};
-        const cls = reportClassify(s);
-        const level_ = store.level || (t < 4 ? '中' : '低');
-        rows.push({
-          t: t, itemIdx: itemIdx, key: k, layer: cfg.name, unit: item.name,
-          score: s, cls: cls,
-          desc: store.desc || '',
-          threat: store.threat || defaultThreatFor(t, item.name),
-          analysis: store.analysis || '',
-          level: level_
+  function uniqueRiskTexts(values, separator) {
+    const out = [];
+    values.forEach(function(value) {
+      const text = String(value || '').trim();
+      if (text && !out.includes(text)) out.push(text);
+    });
+    return out.join(separator);
+  }
+
+  function strongestRiskLevel(values, fallback) {
+    if (values.includes('高')) return '高';
+    if (values.includes('中')) return '中';
+    if (values.includes('低')) return '低';
+    return fallback;
+  }
+
+  function getActiveRiskUnits() {
+    const active = [];
+    ONSITE_LAYERS.forEach(function(cfg, t) {
+      evaluationIndicatorLevels[t].items.forEach(function(item, itemIdx) {
+        // 与总体评价完全采用同一个单元结果口径（包含分值修正）。
+        const score = getReportUnitScore(t, itemIdx);
+        const cls = reportClassify(score);
+        if (cls !== '部分符合' && cls !== '不符合') return;
+        const issues = getReportUnitIssues(t, itemIdx);
+        const objectSummary = issues.map(function(issue) {
+          return issue.name + '（' + reportClassify(issue.raw) + '）';
+        }).join('、');
+        active.push({
+          t: t, itemIdx: itemIdx, key: 'risk-unit|' + indicatorIdFor(t, itemIdx),
+          layer: cfg.name, unit: item.name, score: score, cls: cls, issues: issues,
+          autoDesc: objectSummary
+            ? objectSummary + '在“' + item.name + '”测评单元中存在密码应用不足'
+            : '“' + item.name + '”测评单元的整体测评结果为' + cls
         });
       });
     });
-    return rows;
+    return active;
+  }
+
+  // 每个问题测评单元只生成一条风险；对象删除或单元恢复符合/不适用时同步移除。
+  function getRiskRows() {
+    const active = getActiveRiskUnits();
+    const activePairs = new Set(active.map(function(row) { return row.t + '|' + row.itemIdx; }));
+    const activeKeys = new Set(active.map(function(row) { return row.key; }));
+
+    reportImportedRiskRows = reportImportedRiskRows.filter(function(row) {
+      const keep = activePairs.has(Number(row.t) + '|' + Number(row.itemIdx));
+      if (!keep) delete reportRiskStore[row.key];
+      return keep;
+    });
+    Object.keys(reportRiskStore).forEach(function(key) {
+      if (key.indexOf('risk-unit|') === 0 && !activeKeys.has(key)) delete reportRiskStore[key];
+    });
+
+    return active.map(function(unit) {
+      const legacyKey = unit.t + '|' + unit.itemIdx;
+      if (!reportRiskStore[unit.key] && reportRiskStore[legacyKey]) {
+        reportRiskStore[unit.key] = Object.assign({}, reportRiskStore[legacyKey]);
+        delete reportRiskStore[legacyKey];
+      }
+
+      // 兼容上一版按对象保存的人工内容，合并进所属测评单元后删除旧键。
+      const objectStores = [];
+      Object.keys(reportRiskStore).forEach(function(key) {
+        if (key.indexOf('risk-object|') !== 0) return;
+        const pos = locateOnsiteRecordKey(key.slice('risk-object|'.length));
+        if (pos && pos.t === unit.t && pos.itemIdx === unit.itemIdx) {
+          objectStores.push(reportRiskStore[key]);
+          delete reportRiskStore[key];
+        }
+      });
+
+      const imported = reportImportedRiskRows.filter(function(row) {
+        return Number(row.t) === unit.t && Number(row.itemIdx) === unit.itemIdx;
+      }).map(function(row) {
+        return Object.assign({}, row, reportRiskStore[row.key] || {});
+      });
+      const hasImportedRisk = imported.length > 0;
+      // 有Word来源时只采用Word行；旧版对象级缓存不得混入导入原文。
+      const sources = hasImportedRisk ? imported : objectStores;
+      const importedDesc = uniqueRiskTexts(sources.map(function(row) { return row.desc; }), '；');
+      const importedThreat = uniqueRiskTexts(sources.map(function(row) { return row.threat; }), '、');
+      const importedAnalysis = uniqueRiskTexts(sources.map(function(row) { return row.analysis; }), '\n');
+      const template = findRiskTemplate(unit.t, unit.unit, unit.cls);
+      if (objectStores.length && !hasImportedRisk) {
+        reportRiskStore[unit.key] = Object.assign({
+          desc: uniqueRiskTexts(objectStores.map(function(row) { return row.desc; }), '；'),
+          threat: uniqueRiskTexts(objectStores.map(function(row) { return row.threat; }), '、'),
+          analysis: uniqueRiskTexts(objectStores.map(function(row) { return row.analysis; }), '\n'),
+          level: strongestRiskLevel(objectStores.map(function(row) { return row.level; }), '')
+        }, reportRiskStore[unit.key] || {});
+      }
+      const store = reportRiskStore[unit.key] || {};
+      const storedLevel = ['高', '中', '低'].includes(store.level) ? store.level : '';
+      const defaultLevel = ['高', '中', '低'].includes(template?.defaultLevel) ? template.defaultLevel : (unit.t < 4 ? '中' : '低');
+      const wasEdited = function(field) { return !!(store._manualFields && store._manualFields[field]); };
+      return Object.assign({}, unit, {
+        // Word已导入该测评单元时，即使原单元格为空也不以自动汇总或模板补写；
+        // 当前项目中新出现的风险单元才使用对象汇总和风险模板。
+        desc: hasImportedRisk && !wasEdited('desc') ? importedDesc : (store.desc || unit.autoDesc),
+        threat: hasImportedRisk && !wasEdited('threat') ? importedThreat : (store.threat || template?.threat || defaultThreatFor(unit.t, unit.unit)),
+        analysis: hasImportedRisk && !wasEdited('analysis') ? importedAnalysis : (store.analysis || fillRiskTemplateText(template?.analysis, unit.t, unit.unit)),
+        level: hasImportedRisk && !wasEdited('level')
+          ? strongestRiskLevel(imported.map(function(row) { return row.level; }), defaultLevel)
+          : (storedLevel || strongestRiskLevel(sources.map(function(row) { return row.level; }), defaultLevel))
+      });
+    });
   }
 
   function getRiskLevelCount(lv) { return getRiskRows().filter(r => r.level === lv).length; }
@@ -4714,8 +5720,13 @@
   }
 
   function reportTextarea(id, autoText, minHeight) {
-    const v = reportTexts.hasOwnProperty(id) ? reportTexts[id] : autoText;
-    return '<textarea id="' + id + '" class="report-textarea" style="min-height:' + (minHeight || 200) + 'px;" oninput="saveReportText(\'' + id + '\',this.value)">' + onsiteEsc(v) + '</textarea>';
+    let v = reportTexts.hasOwnProperty(id) ? reportTexts[id] : autoText;
+    if (id === 'report-conclusion-text') {
+      v = lockConclusionScore(v);
+      if (reportTexts.hasOwnProperty(id)) reportTexts[id] = v;
+    }
+    const scoreLock = id === 'report-conclusion-text' ? ' onbeforeinput="return protectConclusionScoreEdit(event,this)"' : '';
+    return '<textarea id="' + id + '" class="report-textarea" style="min-height:' + (minHeight || 200) + 'px;"' + scoreLock + ' oninput="saveReportText(\'' + id + '\',this.value,this)">' + onsiteEsc(v) + '</textarea>';
   }
 
   // ----- Tab 0：单元测评结果分析 -----
@@ -4759,18 +5770,10 @@
 
   // 单元测评结果分析：当前选中的层面（8个子tab）
   let reportUaLayer = 0;
-  // 行内结果手工覆盖：key = t|itemIdx|objIdx（表4-6）、'neg|应用名'（表4-7）或 'idn|用户名'（表4-5）
-  let reportCellOverrides = {};
-
   function switchReportUaLayer(t) { reportUaLayer = t; renderReportUnitAnalysis(); }
 
   // 表号编排：t=0..2 → 表4-1~4-3；应用(t=3)矩阵为表4-4，另增表4-5~4-7；管理类(t=4..7) → 表4-8~4-11
   function uaTableNo(t) { return t <= 3 ? '4-' + (t + 1) : '4-' + (t + 4); }
-
-  function clsSelectOptions(sel) {
-    return ['符合', '部分符合', '不符合', '不适用'].map(c =>
-      '<option value="' + c + '"' + (c === sel ? ' selected' : '') + '>' + c + '</option>').join('');
-  }
 
   // 单元测评结果汇总规则：全不适用→不适用；有不符合→（全不符合?不符合:部分符合）；有部分符合→部分符合；全符合→符合
   function aggCls(list) {
@@ -4814,7 +5817,6 @@
 
   function renderUaIdentityTable(t) {
     const itemIdx = evaluationIndicatorLevels[t].items.findIndex(it => it.name === '身份鉴别');
-    const unitCls = reportClassify(getRawUnitScore(t, itemIdx));
     const users = getAppUsers();
     let html = '<div class="ua-caption">表4-5 ' + onsiteEsc(ONSITE_LAYERS[t].name) + '身份鉴别测评结果汇总</div>';
     if (!users.length) {
@@ -4826,11 +5828,10 @@
     const effList = [];
     const userLabels = getAppUserDisplayNames();
     users.forEach((u, userIndex) => {
-      const k = 'idn|' + u;
-      const eff = reportCellOverrides[k] || unitCls;
+      const eff = getObjectCls(t, itemIdx, userIndex);
       effList.push(eff);
       html += '<tr><td style="text-align:center;">' + (effList.length) + '</td><td>' + onsiteEsc(userLabels[userIndex] || u) + '</td>' +
-        '<td style="text-align:center;"><select class="ua-cls-select" style="color:' + clsColor(eff) + '; font-weight:600;" onchange="reportCellOverrides[\'' + onsiteEsc(k) + '\']=this.value; renderReportUnitAnalysis();">' + clsSelectOptions(eff) + '</select></td></tr>';
+        '<td style="text-align:center; color:' + clsColor(eff) + '; font-weight:600;">' + eff + '</td></tr>';
     });
     html += '<tr class="ua-sum-row"><td colspan="2" style="text-align:center;">单元测评结果<br/><span style="font-weight:400; font-size:11px;">（符合/部分符合/不符合/不适用）</span></td>' +
       uaSumRowClsCell(aggCls(effList)) + '</tr></tbody></table>';
@@ -4843,7 +5844,7 @@
     const item = evaluationIndicatorLevels[t]?.items[itemIdx];
     if (!item) return '未测评';
     const results = getOnsiteUnitObjects(t, item.name).map((name, pos) =>
-      dataRequirementApplies(name, item.name) === false ? '不适用' : (reportCellOverrides[t + '|' + itemIdx + '|' + pos] || getObjectCls(t, itemIdx, pos)));
+      dataRequirementApplies(name, item.name) === false ? '不适用' : getObjectCls(t, itemIdx, pos));
     return results.length ? aggCls(results) : reportClassify(getRawUnitScore(t, itemIdx));
   }
 
@@ -4876,10 +5877,9 @@
           html += '<td title="引用该指标的单元测评结果" style="text-align:center; color:' + clsColor(finalResult) + '; font-weight:600;">' + finalResult + '</td>';
           return;
         }
-        const k = t + '|' + itemIdx + '|' + pos;
-        const eff = reportCellOverrides[k] || getObjectCls(t, itemIdx, pos);
+        const eff = getObjectCls(t, itemIdx, pos);
         colEff[ci].push(eff);
-        html += '<td style="text-align:center;"><select class="ua-cls-select" style="color:' + clsColor(eff) + '; font-weight:600;" onchange="reportCellOverrides[\'' + k + '\']=this.value; renderReportUnitAnalysis();">' + clsSelectOptions(eff) + '</select></td>';
+        html += '<td style="text-align:center; color:' + clsColor(eff) + '; font-weight:600;">' + eff + '</td>';
       });
       html += '</tr>';
     });
@@ -4909,11 +5909,10 @@
       let def = unitCls;
       const pos = onsiteObjs.findIndex(o => o === appName || o.indexOf(appName) >= 0 || appName.indexOf(o) >= 0);
       if (pos >= 0) def = getObjectCls(t, itemIdx, pos);
-      const k = 'neg|' + appName;
-      const eff = reportCellOverrides[k] || def;
+      const eff = def;
       effList.push(eff);
       html += '<tr><td style="text-align:center;">' + (i + 1) + '</td><td>' + onsiteEsc(appName) + '</td>' +
-        '<td style="text-align:center;"><select class="ua-cls-select" style="color:' + clsColor(eff) + '; font-weight:600;" onchange="reportCellOverrides[\'' + onsiteEsc(k) + '\']=this.value; renderReportUnitAnalysis();">' + clsSelectOptions(eff) + '</select></td></tr>';
+        '<td style="text-align:center; color:' + clsColor(eff) + '; font-weight:600;">' + eff + '</td></tr>';
     });
     html += '<tr class="ua-sum-row"><td colspan="2" style="text-align:center;">单元测评结果<br/><span style="font-weight:400; font-size:11px;">（符合/部分符合/不符合/不适用）</span></td>' +
       uaSumRowClsCell(aggCls(effList)) + '</tr></tbody></table>';
@@ -5019,7 +6018,7 @@
     });
     if (!positions.length) return req ? getUaDataFinalResult(3, itemIdx) : '—';
     const results = positions.map(pos => req
-      ? (dataRequirementApplies(objects[pos], item.name) === false ? '不适用' : (reportCellOverrides['3|' + itemIdx + '|' + pos] || getObjectCls(3, itemIdx, pos)))
+      ? (dataRequirementApplies(objects[pos], item.name) === false ? '不适用' : getObjectCls(3, itemIdx, pos))
       : getObjectCls(3, itemIdx, pos));
     if (results.includes('未测评')) return '未测评';
     return aggCls(results);
@@ -5265,7 +6264,7 @@
     if (!panel) return;
     const rows = getRiskRows();
     let html = '<div class="onsite-table-caption">表6-1 风险分析</div>';
-    html += '<div class="onsite-note" style="margin:0 0 10px;">本表自动读取第三步「现场测评」中测评单元得分不等于1（部分符合/不符合）的测评单元；问题描述由测评单元名称＋具体威胁描述（可输入）组成，关联威胁取值参照《安全威胁》表2-14，风险等级可按实际情况调整。</div>';
+    html += '<div class="onsite-note" style="margin:0 0 10px;">本表按测评单元读取第三步「现场测评」结果：从 Word 导入的测评单元保留原风险内容，不再自动汇总测评对象；当前项目新增的问题单元使用风险模板生成，问题描述自动汇总相关测评对象。单元恢复为符合、不适用或被删除后自动移除。</div>';
     if (!rows.length) {
       html += '<div class="alert-box"><span class="icon">ℹ️</span><div>当前各适用测评单元均符合要求，暂未识别到风险点。</div></div>';
     } else {
@@ -5310,8 +6309,10 @@
 
   // 风险表字段编辑（select 变更后联动刷新统计与评估结论）
   function updateReportRisk(key, field, value) {
-    if (!reportRiskStore[key]) reportRiskStore[key] = { desc: '', threat: '', analysis: '', level: '' };
+    if (!reportRiskStore[key]) reportRiskStore[key] = { desc: '', threat: '', analysis: '', level: '', _manualFields: {} };
+    if (!reportRiskStore[key]._manualFields) reportRiskStore[key]._manualFields = {};
     reportRiskStore[key][field] = value;
+    reportRiskStore[key]._manualFields[field] = true;
     if (field === 'level') { renderReportRisk(); renderReportConclusion(); renderReportQuant(); }
   }
 
@@ -5327,15 +6328,10 @@
       '<div class="report-hero-card"><div class="label">管理部分（满分30）</div><div class="value">' + (totals.mgmt != null ? totals.mgmt : '--') + '</div></div>' +
       '<div class="report-hero-card"><div class="label">评估结论</div><div class="value' + (conclusion !== '不符合' ? ' pass' : ' fail') + '">' + conclusion + '</div></div>' +
       '</div>';
-    const sysNameEl = document.getElementById('mi-sys-name');
-    const sys = sysNameEl && sysNameEl.value.trim() ? sysNameEl.value.trim() : '被测信息系统';
-    // 风险表述：结论为不符合 → 高风险；其他 → 中风险
-    const riskWord = conclusion === '不符合' ? '高风险' : '中风险';
-    const autoText = '通过对' + sys + '的物理和环境安全、网络和通信安全、设备和计算安全、应用和数据安全、管理制度、人员管理、建设运行和应急处置等方面的测评，' +
-      '该系统综合得分为' + (totals.total != null ? totals.total : '--') + '分，系统密码应用面临' + riskWord +
-      '，' + conclusion + 'GB/T 39786—2021《信息安全技术 信息系统密码应用基本要求》的第' + assessmentLevelLabel() + '级别要求。';
+    const autoText = buildConclusionSentence();
     html += '<div class="report-section-title">评估结论（自动生成，可编辑）</div>';
     html += reportTextarea('report-conclusion-text', autoText, 160);
+    html += '<div class="onsite-note">综合得分由上方量化评估结果自动读取，不允许手动修改；其余文字仍可编辑。</div>';
     html += '<div class="onsite-note">评估结论判定规则如下：' +
       '综合得分100分，结论为符合；' +
       '综合得分小于100分、不低于60分，且系统密码应用无高风险，结论为基本符合；' +
@@ -5346,7 +6342,8 @@
   // ----- Tab 4：总体评价 -----
   // 报告文本取值：用户编辑过用编辑值，否则用自动值
   function getReportTextVal(id, autoText) {
-    return reportTexts.hasOwnProperty(id) ? reportTexts[id] : autoText;
+    const value = reportTexts.hasOwnProperty(id) ? reportTexts[id] : autoText;
+    return id === 'report-conclusion-text' ? lockConclusionScore(value) : value;
   }
 
   // 总体评价与量化评估统一使用包含分值修正的单元结果。
@@ -5393,10 +6390,11 @@
     const conclusion = getReportConclusion(totals.total);
     const sysNameEl = document.getElementById('mi-sys-name');
     const sys = sysNameEl && sysNameEl.value.trim() ? sysNameEl.value.trim() : '被测信息系统';
-    const riskWord = conclusion === '不符合' ? '高风险' : '中风险';
+    const systemLevel = assessmentLevel() === 2 ? '二级' : '三级';
+    const riskLevel = conclusion === '不符合' ? '高风险' : '中风险';
     return '通过对' + sys + '的物理和环境安全、网络和通信安全、设备和计算安全、应用和数据安全、管理制度、人员管理、建设运行和应急处置等方面的测评，' +
-      '该系统综合得分为' + (totals.total != null ? totals.total : '--') + '分，系统密码应用面临' + riskWord +
-      '，' + conclusion + 'GB/T 39786—2021《信息安全技术 信息系统密码应用基本要求》的第' + assessmentLevelLabel() + '级别要求。';
+      '该系统综合得分为' + (totals.total != null ? totals.total : '--') + '分，系统密码应用面临' + riskLevel + '，' +
+      conclusion + 'GB/T 39786—2021《信息安全技术 信息系统密码应用基本要求》的第' + systemLevel + '别要求。';
   }
 
   // Word导出功能已按需求移除（原总体评价、安全问题及改进建议导出）
@@ -5436,13 +6434,14 @@
   }
 
   // ----- Tab 5：安全问题及改进建议 -----
-  // 层面问题单元（现场测评原始得分<1）
+  // 层面问题单元：与总体评价、风险分析使用同一单元结果口径。
   function getLayerProblemUnits(t) {
     const out = [];
     evaluationIndicatorLevels[t].items.forEach((item, itemIdx) => {
-      const s = getRawUnitScore(t, itemIdx);
-      if (typeof s !== 'number' || s >= 1) return;
-      out.push({ itemIdx: itemIdx, name: item.name, desc: item.desc || '', s: s, cls: reportClassify(s) });
+      const s = getReportUnitScore(t, itemIdx);
+      const cls = reportClassify(s);
+      if (cls !== '部分符合' && cls !== '不符合') return;
+      out.push({ itemIdx: itemIdx, name: item.name, desc: item.desc || '', s: s, cls: cls });
     });
     return out;
   }
@@ -5453,8 +6452,8 @@
     if (!probs.length) return '无。';
     return probs.map((p, i) => {
       const issues = getReportUnitIssues(t, p.itemIdx);
-      const k = t + '|' + p.itemIdx;
-      const riskDesc = (reportRiskStore[k] || {}).desc;
+      const riskDesc = getRiskRows().filter(function(row) { return row.t === t && row.itemIdx === p.itemIdx; })
+        .map(function(row) { return row.desc || ''; }).filter(Boolean).join('；');
       let detail;
       if (riskDesc && riskDesc.trim()) {
         detail = riskDesc.trim();
@@ -5471,9 +6470,13 @@
   function buildSugAdviceText(t) {
     const probs = getLayerProblemUnits(t);
     if (!probs.length) return '无。';
-    return probs.map((p, i) => (i + 1) + '）针对「' + p.name + '」：' +
-      '建议按照 GB/T 39786—2021 相关要求' + (p.desc ? '（' + p.desc + '）' : '') +
-      '，采用符合国家密码管理要求的密码技术、密码产品与密码服务进行整改，确保相应安全需求得到有效保障。').join('\n');
+    return probs.map((p, i) => {
+      const template = findRiskTemplate(t, p.name, p.cls);
+      const templateAdvice = fillRiskTemplateText(template?.advice, t, p.name);
+      return (i + 1) + '）针对「' + p.name + '」：' + (templateAdvice ||
+        ('建议按照 GB/T 39786—2021 相关要求' + (p.desc ? '（' + p.desc + '）' : '') +
+        '，采用符合国家密码管理要求的密码技术、密码产品与密码服务进行整改，确保相应安全需求得到有效保障。'));
+    }).join('\n');
   }
 
   function renderReportSuggestions() {
@@ -5506,6 +6509,39 @@
   let appendixBImages = {};
   let appendixBImageTarget = null;
   const APB_MULTI_IMAGE_KEYS = new Set(['b1-file', 'b2-travel', 'b2-bill', 'b2-invoice', 'b3-photo', 'b4-auth', 'b6']);
+  let activeAppendixBSection = 0;
+  const APPENDIX_B_SECTIONS = [
+    'B.1 密评委托证明',
+    'B.2 密评活动证明',
+    'B.3 密评活动质量文件',
+    'B.4 密评人员资格证明',
+    'B.5 系统定级匹配证明'
+  ];
+
+  function switchAppendixBSection(index) {
+    const parsed = Number(index);
+    activeAppendixBSection = Math.max(0, Math.min(APPENDIX_B_SECTIONS.length - 1, Number.isFinite(parsed) ? parsed : 0));
+    appendixBImageTarget = null;
+    renderAppendixB();
+  }
+
+  function apbTabsHtml() {
+    return '<div class="apb-tabs" role="tablist" aria-label="附录B章节">' + APPENDIX_B_SECTIONS.map(function(title, index) {
+      return '<button type="button" role="tab" aria-selected="' + (index === activeAppendixBSection ? 'true' : 'false') + '" class="apb-tab' + (index === activeAppendixBSection ? ' active' : '') + '" onclick="switchAppendixBSection(' + index + ')">' + onsiteEsc(title) + '</button>';
+    }).join('') + '</div>';
+  }
+
+  function apbSectionOpen(index) {
+    return '<section class="apb-section" data-apb-section="' + index + '"><div class="apb-sec-title">' + onsiteEsc(APPENDIX_B_SECTIONS[index]) + '</div>';
+  }
+
+  function apbSectionClose(index) {
+    const last = APPENDIX_B_SECTIONS.length - 1;
+    return '<div class="apb-section-nav">' +
+      '<button type="button" onclick="switchAppendixBSection(' + (index - 1) + ')"' + (index === 0 ? ' disabled' : '') + '>上一步</button>' +
+      '<button type="button" class="primary" onclick="switchAppendixBSection(' + (index + 1) + ')"' + (index === last ? ' disabled' : '') + '>' + (index === last ? '已到最后一项' : '下一步') + '</button>' +
+      '</div></section>';
+  }
 
   function apbImageList(key) {
     const saved = appendixBImages[key];
@@ -5665,8 +6701,12 @@
   // B-8 证书格：人员姓名 + 密评证书（优先手动粘贴图，其次用户管理中的证书）
   function apbCertCell(name) {
     const u = getUserInfoByName(name);
-    return '<div style="font-size:12px; font-weight:600; color:#1a3a6c; margin-bottom:6px;">' + onsiteEsc(name) + ' · 密评证书</div>' +
-      apbImgSlot('b8|' + name, '用户管理中暂无该人员证书，可点击后粘贴或导入', (u && u.certDataUrl) || '');
+    const key = 'b8|' + name;
+    const fallback = (u && u.certDataUrl) || '';
+    const hasImage = !!(appendixBImages[key] || fallback);
+    return '<div class="apb-cert-cell' + (hasImage ? ' has-image' : ' is-empty') + '">' +
+      '<div class="apb-cert-head"><span>' + onsiteEsc(name) + ' · 密评证书</span><small>证书证明</small></div>' +
+      apbImgSlot(key, '用户管理中暂无该人员证书，可点击后粘贴或导入', fallback) + '</div>';
   }
 
   function selectApbImage(key) { appendixBImageTarget = key; renderAppendixB(); }
@@ -5720,22 +6760,26 @@
     const leave = document.getElementById('plan-phase-3-end') ? document.getElementById('plan-phase-3-end').value : '';
     const plan2end = document.getElementById('plan-phase-2-end') ? document.getElementById('plan-phase-2-end').value : '';
     const plan4end = document.getElementById('plan-phase-4-end') ? document.getElementById('plan-phase-4-end').value : '';
-    let html = '<div class="onsite-table-caption">附录B 密评活动有效性证明记录</div>';
+    let html = '<div class="apb-page"><div class="apb-page-title">附录B 密评活动有效性证明记录</div>' + apbTabsHtml();
 
     // ===== B.1 密评委托证明 =====
-    html += '<div class="apb-sec-title">B.1 密评委托证明</div>';
+    if (activeAppendixBSection === 0) {
+    html += apbSectionOpen(0);
     html += '<div class="ua-caption">表B-1 委托证明文件</div>';
-    html += '<table class="onsite-table"><tbody>' +
+    html += '<table class="onsite-table apb-form-table"><tbody>' +
       '<tr><th style="width:130px;">文件类型</th><td>' + apbInput('b1-type', '政府采购合同', '如：政府采购合同') + '</td><th style="width:110px;">签订时间</th><td>' + apbInput('b1-date', '', '如：2025年9月16日') + '</td></tr>' +
       '<tr><th>委托单位</th><td colspan="3">' + apbInput('b1-org', org, '被测单位全称', 420) + '</td></tr>' +
       '<tr><th>委托金额</th><td>' + apbInput('b1-amount', '', '如：912000元') + '</td><th>系统密评单价</th><td>' + apbInput('b1-price', '', '如：40000元') + '</td></tr>' +
       '<tr><th>委托证明文件</th><td colspan="3">' + apbImgSlot('b1-file', '政府采购合同/委托协议扫描件') + '</td></tr>' +
       '</tbody></table>';
+    html += apbSectionClose(0);
+    }
 
     // ===== B.2 密评活动证明 =====
-    html += '<div class="apb-sec-title">B.2 密评活动证明</div>';
+    if (activeAppendixBSection === 1) {
+    html += apbSectionOpen(1);
     html += '<div class="ua-caption">表B-2 差旅住宿等票证</div>';
-    html += '<table class="onsite-table"><tbody>' +
+    html += '<table class="onsite-table apb-form-table"><tbody>' +
       '<tr><th style="width:130px;">入场时间</th><td>' + apbAutoEl(apbCnDate(enter)) + '</td>' +
       '<th style="width:110px;">离场时间</th><td>' + apbAutoEl(apbCnDate(leave)) + '</td></tr>' +
       '<tr><th>责任单位</th><td>' + apbAutoEl(org) + '</td><th>现场测评人员</th><td>' + apbAutoEl(memberNames) + '</td></tr>' +
@@ -5745,7 +6789,7 @@
       '</tbody></table>';
 
     html += '<div class="ua-caption">表B-3 进场记录</div>';
-    html += '<table class="onsite-table"><tbody>' +
+    html += '<table class="onsite-table apb-form-table"><tbody>' +
       '<tr><th style="width:130px;">入场时间</th><td>' + apbAutoEl(apbCnDate(enter)) + '</td>' +
       '<th style="width:110px;">离场时间</th><td>' + apbAutoEl(apbCnDate(leave)) + '</td></tr>' +
       '<tr><th>信息系统责任单位</th><td>' + apbAutoEl(org) + '</td><th>现场测评实施地点</th><td>' + apbInput('b3-loc', '', '如：杭州市西湖区天目山路50号') + '</td></tr>' +
@@ -5753,17 +6797,20 @@
       '<tr><th>现场测评签到表</th><td colspan="3">' + apbImgSlot('b3-sign', '现场测评签到表扫描件/照片') + '</td></tr>' +
       '<tr><th>现场照片</th><td colspan="3">' + apbImgSlot('b3-photo', '现场测评照片') + '</td></tr>' +
       '</tbody></table>';
+    html += apbSectionClose(1);
+    }
 
     // ===== B.3 密评活动质量文件 =====
-    html += '<div class="apb-sec-title">B.3 密评活动质量文件</div>';
+    if (activeAppendixBSection === 2) {
+    html += apbSectionOpen(2);
     html += '<div class="ua-caption">表B-4 现场测评授权及风险告知</div>';
-    html += '<table class="onsite-table"><tbody>' +
+    html += '<table class="onsite-table apb-form-table"><tbody>' +
       '<tr><th style="width:130px;">现场测评授权书</th><td>' + apbImgSlot('b4-auth', '现场测评授权书扫描件') + '</td>' +
       '<th style="width:110px;">风险告知书</th><td>' + apbImgSlot('b4-risk', '风险告知书扫描件') + '</td></tr>' +
       '</tbody></table>';
 
     html += '<div class="ua-caption">表B-5 测评方案评审</div>';
-    html += '<table class="onsite-table"><tbody>' +
+    html += '<table class="onsite-table apb-form-table"><tbody>' +
       '<tr><th style="width:130px;">方案名称</th><td>' + apbAutoEl((sys || '被测信息系统') + '密码应用方案') + '</td>' +
       '<th style="width:110px;">评审时间</th><td>' + apbAutoEl(apbCnDate(plan2end)) + '</td></tr>' +
       '<tr><th>测评方案评审记录</th><td colspan="3">' + apbImgSlot('b5-review', '测评方案评审记录扫描件/照片') + '</td></tr>' +
@@ -5771,13 +6818,16 @@
       '</tbody></table>';
 
     html += '<div class="ua-caption">表B-6 密评报告评审</div>';
-    html += '<table class="onsite-table"><tbody>' +
+    html += '<table class="onsite-table apb-form-table"><tbody>' +
       '<tr><th style="width:130px;">评审时间</th><td>' + apbAutoEl(apbCnDate(plan4end)) + '</td></tr>' +
       '<tr><td colspan="2">' + apbImgSlot('b6', '密评报告评审记录扫描件/照片') + '</td></tr>' +
       '</tbody></table>';
+    html += apbSectionClose(2);
+    }
 
     // ===== B.4 密评人员资格证明 =====
-    html += '<div class="apb-sec-title">B.4 密评人员资格证明</div>';
+    if (activeAppendixBSection === 3) {
+    html += apbSectionOpen(3);
     html += '<div class="ua-caption">表B-7 密评人员资格情况</div>';
     // 固定顺序：项目负责人、逐人展开的测评人员、报告审核人、报告批准人。
     const b7Rows = getAppendixBPersonnel();
@@ -5798,26 +6848,32 @@
     html += '<div class="ua-caption">表B-8 密评人员考核成绩证明</div>';
     const b8Persons = [];
     b7Rows.forEach(m => { if (m.name && b8Persons.indexOf(m.name) < 0) b8Persons.push(m.name); });
-    html += '<table class="onsite-table"><tbody>';
+    html += '<table class="onsite-table apb-cert-grid-table"><tbody>';
     for (let r = 0; r < Math.max(2, Math.ceil(b8Persons.length / 2)); r++) {
       html += '<tr>';
       for (let col = 0; col < 2; col++) {
         const p = b8Persons[r * 2 + col];
-        html += '<td style="width:50%; vertical-align:top;">' + (p ? apbImgSlot('b8|' + p, '密评证书扫描件/照片', (getUserInfoByName(p) && getUserInfoByName(p).certDataUrl) || '') : '') + '</td>';
+        html += '<td style="width:50%; vertical-align:top;">' + (p ? apbCertCell(p) : '') + '</td>';
       }
       html += '</tr>';
     }
     html += '</tbody></table>';
+    html += apbSectionClose(3);
+    }
 
     // ===== B.5 系统定级匹配证明 =====
-    html += '<div class="apb-sec-title">B.5 系统定级匹配证明</div>';
+    if (activeAppendixBSection === 4) {
+    html += apbSectionOpen(4);
     html += '<div class="ua-caption">表B-9 系统定级备案证明</div>';
-    html += '<table class="onsite-table"><tbody>' +
+    html += '<table class="onsite-table apb-form-table"><tbody>' +
       '<tr><th style="width:130px;">系统等保定级备案名称</th><td>' + apbInput('b9-name', sys, '请输入备案系统名称') + '</td></tr>' +
       '<tr><th>系统等保定级备案时间</th><td>' + apbInput('b9-date', '', '如：2023年2月23日') + '</td></tr>' +
       '<tr><th>定级备案证明</th><td>' + apbImgSlot('b9', '系统定级备案证明扫描件') + '</td></tr>' +
       '</tbody></table>';
+    html += apbSectionClose(4);
+    }
 
+    html += '<div class="apb-footnote">附录B内容将自动保存，并用于正式报告导出</div></div>';
     panel.innerHTML = html;
   }
 
@@ -5920,6 +6976,42 @@
   };
   let objData = JSON.parse(JSON.stringify(DEFAULT_OBJ_DATA));
 
+  function newObjectId() {
+    if (window.crypto && typeof window.crypto.randomUUID === 'function') return 'obj-' + window.crypto.randomUUID();
+    return 'obj-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 10);
+  }
+
+  function ensureObjDataIds() {
+    Object.keys(objData || {}).forEach(function(layer) {
+      (objData[layer] || []).forEach(function(row) {
+        if (!row.objectId) row.objectId = newObjectId();
+        if (!Array.isArray(row.aliases)) row.aliases = [];
+      });
+    });
+  }
+  ensureObjDataIds();
+
+  function replaceObjectNameReferences(previous, next) {
+    previous = String(previous || '').trim();
+    next = String(next || '').trim();
+    if (!previous || !next || previous === next) return;
+    const replace = function(value) { return typeof value === 'string' ? value.split(previous).join(next) : value; };
+    Object.keys(onsiteRecords).forEach(function(key) {
+      if (onsiteRecords[key]) onsiteRecords[key].record = replace(onsiteRecords[key].record);
+    });
+    reportImportedRiskRows.forEach(function(row) {
+      row.desc = replace(row.desc);
+      row.analysis = replace(row.analysis);
+    });
+    Object.keys(reportRiskStore).forEach(function(key) {
+      const row = reportRiskStore[key];
+      if (!row) return;
+      row.desc = replace(row.desc);
+      row.analysis = replace(row.analysis);
+    });
+    Object.keys(reportTexts).forEach(function(key) { reportTexts[key] = replace(reportTexts[key]); });
+  }
+
   function switchObjLayer(n) {
     const tabs = document.querySelectorAll('#obj-layer-tabs .obj-layer-tab');
     for (let i = 1; i <= 5; i++) {
@@ -5981,13 +7073,27 @@
 
   function updateObjField(layer, idx, field, value) {
     if (!objData[layer] || !objData[layer][idx]) return;
+    ensureObjDataIds();
+    if (field === 'object') {
+      reconcileObjLayerObjects(layer);
+      const previous = String(objData[layer][idx].object || '').trim();
+      if (previous && previous !== String(value || '').trim() && objData[layer][idx].aliases.indexOf(previous) < 0) {
+        objData[layer][idx].aliases.push(previous);
+      }
+      objData[layer][idx][field] = value;
+      replaceObjectNameReferences(previous, value);
+      reconcileObjLayerObjects(layer);
+      return;
+    }
     objData[layer][idx][field] = value;
   }
 
   // 安全管理层：测评单元修改后重新渲染以更新合并结构
   function updateObjUnit(layer, idx, value) {
     if (!objData[layer] || !objData[layer][idx]) return;
+    reconcileObjLayerObjects(layer);
     objData[layer][idx].unit = value;
+    reconcileObjLayerObjects(layer);
     renderObjLayer(layer);
   }
 
@@ -6008,7 +7114,9 @@
 
   function addObjRow(layer) {
     if (!objData[layer]) objData[layer] = [];
-    objData[layer].push({ unit: '', object: '', methods: (LAYER_DEFAULT_METHODS[layer] || [false,false,false,false,false]).slice(), desc: getObjLayerDefaultDesc(layer) });
+    reconcileObjLayerObjects(layer);
+    objData[layer].push({ objectId: newObjectId(), aliases: [], unit: '', object: '', methods: (LAYER_DEFAULT_METHODS[layer] || [false,false,false,false,false]).slice(), desc: getObjLayerDefaultDesc(layer) });
+    reconcileObjLayerObjects(layer);
     renderObjLayer(layer);
   }
 
@@ -6030,12 +7138,17 @@
 
   function delObjRow(layer, idx) {
     if (!objData[layer]) return;
+    reconcileObjLayerObjects(layer);
     objData[layer].splice(idx, 1);
+    reconcileObjLayerObjects(layer);
     renderObjLayer(layer);
   }
 
   function resetObjData() {
+    for (let layer = 1; layer <= 5; layer++) reconcileObjLayerObjects(layer);
     objData = JSON.parse(JSON.stringify(DEFAULT_OBJ_DATA));
+    ensureObjDataIds();
+    for (let layer = 1; layer <= 5; layer++) reconcileObjLayerObjects(layer);
     document.getElementById('obj-method-text').value =
       '依据《信息系统密码应用测评过程指南》的测评对象确定方法，根据被测信息系统的重要程度及其相关资产等的价值认定结果，明确核心资产在信息系统内的流转，从而确定与密码相关的测评对象。';
     renderAllObjLayers();
@@ -6044,6 +7157,7 @@
 
   // ===== 测评对象 · 一键同步系统资产 =====
   function syncAssetsToObjects() {
+    [1, 2, 3, 4].forEach(function(layer) { reconcileObjLayerObjects(layer); });
     // 资产类型 → 测评对象层面映射（名称列为第2列，是否测评为最后一列）
     // 说明文案复用 LAYER_DEFAULT_DESCS；数据库资产使用 DB_DEFAULT_DESC
     const syncMap = [
@@ -6080,6 +7194,8 @@
           // 同名对象去重
           if (objData[layer].some(r => (r.object || '').trim() === name)) { skipped++; return; }
           objData[layer].push({
+            objectId: newObjectId(),
+            aliases: [],
             unit: '',
             object: name,
             methods: defaultMethods[layer].slice(),
@@ -6090,6 +7206,7 @@
       });
     });
     // 重新渲染涉及的层面
+    [1, 2, 3, 4].forEach(function(layer) { reconcileObjLayerObjects(layer); });
     [1, 2, 3, 4].forEach(l => renderObjLayer(l));
     if (added === 0 && skipped === 0) {
       showToast('系统资产中暂无勾选测评的可同步对象', true);
@@ -6430,6 +7547,22 @@
     return match ? /[☑✓✔]/.test(match[1]) : null;
   }
 
+  function _impOtherOptions(text) {
+    const options = [];
+    const source = String(text || '').replace(/\r/g, '');
+    const re = /([□☐☑✓✔])\s*其他\s*[：:]?\s*([^□☐☑✓✔\n]*)/g;
+    let match;
+    while ((match = re.exec(source)) !== null) {
+      const value = String(match[2] || '')
+        .replace(/^[\s\u3000_＿.．·…—－-]+/, '')
+        .replace(/[\s\u3000_＿.．·…—－-]+$/, '')
+        .replace(/^互联系统名称\s*[：:]\s*/, '')
+        .trim();
+      options.push({ checked: /[☑✓✔]/.test(match[1]), value: value });
+    }
+    return options;
+  }
+
   function _impParaStyle(pXml) {
     const m = /<w:pStyle w:val="([^"]+)"/.exec(pXml);
     return m ? m[1] : '';
@@ -6733,6 +7866,8 @@
           });
           if (!W) { cbSkip += cbs.length; return; }
           const Wn = W.replace(/[\s\u3000]/g, '');
+          const otherOptions = _impOtherOptions(W);
+          let otherOptionIndex = 0;
           Array.from(cbs).forEach(function (lb) {
             const cb = lb.querySelector('input[type="checkbox"]');
             if (!cb) return;
@@ -6748,8 +7883,13 @@
             Array.from(lb.childNodes).forEach(walk);
             key = key.replace(/[\s\u3000]/g, '').replace(/[（(:：,，]$/, '');
             if (!key) { cbSkip++; return; }
-            const state = _impCheckboxState(Wn, key);
+            const otherOption = key === '其他' ? otherOptions[otherOptionIndex++] : null;
+            const state = otherOption ? otherOption.checked : _impCheckboxState(Wn, key);
             cb.checked = state === true;
+            if (otherOption && otherOption.checked) {
+              const otherInput = lb.querySelector('input[type="text"]');
+              if (otherInput) otherInput.value = otherOption.value;
+            }
             if (state === null) cbSkip++;
             else cbOk++;
           });
@@ -6778,6 +7918,7 @@
         fillLineFirst(/测评时间/, (/测评时间：([^\n\s，]+)/.exec(biAll) || [])[1]);
         fillLineFirst(/测评结论/, (/测评结论：([^\n\s，。]+)/.exec(biAll) || [])[1]);
         fillLineFirst(/通过密评，通过时间/, (/通过密评，通过时间：([^\n\s，]+)/.exec(biAll) || [])[1]);
+        fillLineFirst(/投入运行时间/, (/投入运行时间[：:]\s*([^☑□\n]+)/.exec(biAll) || [])[1]);
         const trUser = trs.find(function (t) { return t.textContent.indexOf('系统服务用户数量') >= 0 && t.querySelector('input[type="text"]'); });
         if (trUser) setVal(trUser.querySelector('input[type="text"]'), (/系统服务用户数量\s*\n\s*(\S+)/.exec(biAll) || [])[1]);
         const pTr = trs.find(function (t) { return t.textContent.indexOf('系统使用的密码产品（') >= 0; });
@@ -6865,10 +8006,15 @@
       return -1;
     }
     const dataRows210 = [];
+    let dataTableFound = false;
+    const dataTbody = document.getElementById('asset-tbody-data');
+    // Word 导入不沿用页面初始行的四项默认值；默认值只用于用户点击“增加”。
+    if (dataTbody) dataTbody.innerHTML = '';
     ASSET_MAP.forEach(function (am) {
       const t = findTN(am.name);
-      if (!t) { add(s2, assetTypeNames[am.type] + '：未找到对应表格，保持默认', true); return; }
+      if (!t) { add(s2, assetTypeNames[am.type] + '：未找到对应表格，' + (am.type === 'data' ? '保持为空' : '保持默认'), true); return; }
       if (am.type === 'data') {
+        dataTableFound = true;
         // 表2-10：先记录内容，是否渲染取决于附录A是否存在重要数据单元
         t.rows.slice(1).forEach(function (r) {
           const v = r.map(function (c) { return String(c || '').trim(); });
@@ -6882,6 +8028,7 @@
       const tbody = document.getElementById('asset-tbody-' + am.type);
       if (!tbody) return;
       tbody.innerHTML = '';
+      if (am.type === 'person') tbody.dataset.imported = '1';
       const schema = ASSET_SCHEMAS[am.type] || [];
       const header = (t.rows[0] || []).map(function (c) { return String(c || '').trim(); });
       const sourceIndexes = schema.map(function (aliases) { return impHeaderIndex(header, aliases); });
@@ -6898,8 +8045,7 @@
         tbody.insertAdjacentHTML('beforeend',
           '<tr><td>' + (++n) + '</td>' + cells + (am.type === 'person' || am.type === 'doc' ? '' : '<td class="check-cell"><input type="checkbox" /></td>') + '</tr>');
       });
-      if (!n) tbody.insertAdjacentHTML('beforeend', getAssetRowHtml(am.type, 1));
-      if (am.type === 'person') normalizePersonAssetRows();
+      if (!n && am.type !== 'person') tbody.insertAdjacentHTML('beforeend', getAssetRowHtml(am.type, 1));
       add(s2, assetTypeNames[am.type] + '：导入 ' + n + ' 行' + (headerMapped ? '（按表头匹配列）' : '（表头不完整，已按兼容位置导入，请核对）'), !headerMapped);
     });
 
@@ -6938,11 +8084,14 @@
         if (om.layer === 5 && v[1]) unit = v[1];
         if (!obj || obj === '测评对象' || obj === '测评单元') return;
         const methodCell = om.layer === 5 ? v[3] : v[2];
-        const methods = METHOD_LABELS.map(function (lb, i) {
-          if (!methodCell) return (LAYER_DEFAULT_METHODS[om.layer] || [])[i] || false;
-          return methodCell.indexOf(lb) >= 0;
-        });
+        const methods = om.layer === 1
+          ? LAYER_DEFAULT_METHODS[1].slice()
+          : METHOD_LABELS.map(function (lb, i) {
+              if (!methodCell) return (LAYER_DEFAULT_METHODS[om.layer] || [])[i] || false;
+              return methodCell.indexOf(lb) >= 0;
+            });
         rows.push({
+          objectId: newObjectId(), aliases: [],
           unit: om.layer === 5 ? unit : '', object: obj, methods: methods,
           desc: (om.layer === 5 ? v[4] : v[3]) || getObjLayerDefaultDesc(om.layer)
         });
@@ -7008,6 +8157,10 @@
         return !/^图\s*2\s*[-－—.]\s*1\s*.*网络拓扑图\s*$/.test(p.trim());
       }) : paragraphs).join('\n');
       const ok = setEl(entry[1], text);
+      if (entry[1] === 'plan-topology-desc' && ok) {
+        topologyBlocks = [newTopologyBlock('text', { content: text })];
+        renderTopologyBlocks();
+      }
       add(s2, entry[0] + (ok ? '：已按报告对应章节导入' : '：未找到对应章节，请核对'), !ok);
     });
     // 密码应用情况：按第2.3节四个层面标题导入描述，并回填表2-1/表2-2密钥列表。
@@ -7051,7 +8204,10 @@
         { kind: 'symmetric', caption: '对称密钥列表', label: '表2-2 对称密钥列表' }
       ].forEach(function (config) {
         const table = wt.find(function (item) {
-          return item.caption.replace(/\s/g, '').indexOf(config.caption) >= 0;
+          const caption = item.caption.replace(/\s/g, '');
+          return config.kind === 'asymmetric'
+            ? caption.indexOf('非对称密钥列表') >= 0
+            : caption.indexOf('对称密钥列表') >= 0 && caption.indexOf('非对称密钥列表') < 0;
         });
         if (!table) {
           add(s2, config.label + '：未找到，保持现有列表', true);
@@ -7074,31 +8230,44 @@
         keyTableCount++;
         add(s2, config.label + '：导入 ' + rows.length + ' 行');
       });
+      const serviceTable = findTN('密码服务');
+      if (serviceTable) {
+        const header = (serviceTable.rows[0] || []).map(function (cell) { return String(cell || '').replace(/\s+/g, ''); });
+        const nameIndex = header.findIndex(function (cell) { return cell.indexOf('密码服务名称') >= 0; });
+        const providerIndex = header.findIndex(function (cell) { return cell.indexOf('密码服务提供商') >= 0; });
+        const rows = serviceTable.rows.slice(1).map(function (row) {
+          return {
+            name: String(row[nameIndex >= 0 ? nameIndex : 1] || '').trim(),
+            provider: String(row[providerIndex >= 0 ? providerIndex : 2] || '').trim()
+          };
+        }).filter(function (row) { return row.name || row.provider; });
+        cryptoServices = rows.length ? rows : [{ name: '', provider: '' }];
+        renderCryptoServices();
+        add(s2, '密码服务：按表2-13导入 ' + rows.length + ' 行');
+      } else {
+        add(s2, '密码服务：未找到表2-13，保持现有内容', true);
+      }
       if (keyTableCount) renderCryptoKeyTables();
       if (descriptionCount && typeof updateCryptoLayerUi === 'function') updateCryptoLayerUi();
     })();
-    // 系统简介 / 测评情况简介（评估结论表：系统名称|…、系统简介|…、测评情况简介|…）
+    // 仅导入系统简介；测评情况简介由系统内填写，不从 Word 回填。
     (function () {
       const evalT = wt.find(function (x) {
         return x.rows.some(function (r) { return String(r[0] || '').trim() === '系统简介'; });
       });
       if (!evalT) { add(s2, '简介：未找到评估结论表（含系统简介/测评情况简介），保持默认', true); return; }
-      let si = '', ei = '';
+      let si = '';
       evalT.rows.forEach(function (r) {
         const k = String(r[0] || '').replace(/[\s\n]/g, ''), v = String(r[1] || '').trim();
         if (k === '系统简介') si = v;
-        else if (k === '测评情况简介') ei = v;
       });
       let n = 0;
       if (setEl('plan-sys-intro', si)) n++;
-      if (setEl('plan-eval-intro', ei)) n++;
-      add(s2, '简介：回填系统简介、测评情况简介 ' + n + ' 项' + (n < 2 ? '（部分未找到）' : ''), n < 2);
+      add(s2, '简介：回填系统简介 ' + n + ' 项；测评情况简介不从Word导入', n < 1);
     })();
-    // 测评目的
+    // 测评目的由系统内填写，不从 Word 回填。
     (function () {
-      const ps = grabZone('测评目的');
-      if (setEl('plan-eval-purpose', ps.join('\n'))) add(s2, '测评目的：导入 ' + ps.length + ' 段');
-      else add(s2, '测评目的：未找到对应内容，保持默认', true);
+      add(s2, '测评目的：不从Word导入，保留系统内填写值');
     })();
     // 测评依据：依据标准和规范（textarea）+ 参考标准和规范（动态列表）
     (function () {
@@ -7141,11 +8310,8 @@
       if (typeof updatePrevEvalOutput === 'function') updatePrevEvalOutput();
       add(s2, '前次测评情况：第 ' + cnt + ' 次评估' + (cnt > 1 ? '，上次信息回填 ' + (n - 1) + ' 项' : ''), false);
     })();
-    // 测评方法及工具：现场测评方法 + 测评工具表 + 接入点描述
+    // 测评方法及工具：只导入测评工具表和接入点描述；现场测评方法使用 Word 模板固定内容。
     (function () {
-      const ms = grabZone('现场测评方法');
-      if (setEl('plan-onsite-method', ms.join('\n'))) add(s2, '现场测评方法：导入 ' + ms.length + ' 段');
-      else add(s2, '现场测评方法：未找到对应内容，保持默认', true);
       const toolT = findTN('测评工具');
       if (toolT) {
         const arr = [];
@@ -7181,7 +8347,12 @@
     const s3 = sec('步骤3 · 现场测评');
     onsiteRecords = {};
     onsiteImportedObjects = {};
-    onsiteEvidenceTarget = null;
+    onsiteObjectBindings = {};
+    onsiteUnmatchedObjects = {};
+    onsiteEvidenceGroups = [];
+    activeOnsiteEvidenceGroupId = '';
+    onsiteRecordEditorTarget = null;
+    onsiteExpandedRecordKeys.clear();
     // 解析A表数据行（单元列vMerge续行向下继承）
     function aUnitPairs(tbl) {
       const out = [];
@@ -7214,7 +8385,7 @@
     // 重要数据重建：附录A中4个重要数据单元的对象清单（含（国密）/（非国密）通道对象）
     let dataUnitObjs = null;
     // 系统资产以表2-10为准；现场对象已独立存储，不再为对齐附录清空所属应用。
-    if (a4 && !dataRows210.length) {
+    if (a4 && !dataTableFound) {
       dataUnitObjs = {};
       aUnitPairs(a4).forEach(function (p) {
         const req = ONSITE_UNIT_DATA_REQ[p.unit];
@@ -7229,9 +8400,7 @@
             const base = name.replace(/（[^）]*）$/, '');
             const src = dataRows210.find(function (x) { return impNormName(x.data) === impNormName(base); });
             const reqs = DATA_REQ_DEFAULTS.filter(function (r) { return dataUnitObjs[name].indexOf(r) >= 0; });
-            const chips = reqs.map(function (r) {
-              return '<span class="req-chip" data-req="' + r + '">' + r + '<i class="req-chip-x" title="删除该安全需求" onclick="removeDataReq(this)">×</i></span>';
-            }).join('') || '<span style="color:#999; font-size:12px;">--</span>';
+            const chips = getDataReqChips(reqs);
             tbody.insertAdjacentHTML('beforeend',
               '<tr><td>' + (++i) + '</td>' +
               '<td><input type="text" class="full-input" value="' + onsiteEsc(name) + '" /></td>' +
@@ -7243,16 +8412,13 @@
           add(s3, '重要数据：按附录A对象清单重建 ' + i + ' 行（含通道对象，所属应用列留空以保持对象名与报告一致，描述/存储位置已从表2-10带入）');
         }
       }
-    } else if (dataRows210.length) {
-      // 按表2-10原样导入数据名称、描述、所属应用及存储位置。
+    } else if (dataTableFound) {
+      // 按表2-10原样导入；安全需求为空、少于四项或使用自定义文字时均保持 Word 实际内容。
       const tbody = document.getElementById('asset-tbody-data');
       if (tbody) {
         tbody.innerHTML = '';
         dataRows210.forEach(function (d, i) {
-          const reqs = DATA_REQ_DEFAULTS.filter(function (r) { return (d.reqs || '').replace(/\s+/g, '').indexOf(r) >= 0; });
-          const chips = reqs.map(function (r) {
-            return '<span class="req-chip" data-req="' + r + '">' + r + '<i class="req-chip-x" title="删除该安全需求" onclick="removeDataReq(this)">×</i></span>';
-          }).join('');
+          const chips = getDataReqChips(parseImportedDataReqs(d.reqs));
           tbody.insertAdjacentHTML('beforeend',
             '<tr><td>' + (i + 1) + '</td>' +
             '<td><input type="text" class="full-input" value="' + onsiteEsc(d.data) + '" /></td>' +
@@ -7261,7 +8427,7 @@
             '<td><input type="text" class="full-input" value="' + onsiteEsc(d.pos) + '" /></td>' +
             '<td class="req-cell">' + chips + '</td></tr>');
         });
-        add(s3, '重要数据：按表2-10导入 ' + dataRows210.length + ' 行');
+        add(s3, '重要数据：按表2-10导入 ' + dataRows210.length + ' 行（安全需求按Word原值保留）');
       }
     }
     // 8个层面结果记录
@@ -7292,6 +8458,8 @@
         (missUnit ? '；未识别测评单元 ' + missUnit + ' 条' : '') +
         (missObj ? '；未匹配测评对象 ' + missObj + ' 条（如：' + missNames.join('、') + '）' : ''), missUnit + missObj > 0);
     }
+    ensureObjDataIds();
+    reconcileAllOnsiteObjectBindings();
     add(s3, '证据截图不导入：报告中截图为图片，请通过 Ctrl+V 粘贴或本机导入补充');
 
     // ============ 4. 报告编制 ============
@@ -7346,7 +8514,7 @@
     } else {
       add(s4, '未找到表5-1测评结果修正', true);
     }
-    // 风险分析（编号无关；安全层面列vMerge续行向下继承；每条源记录独立保留）
+    // 风险分析（编号无关；安全层面列vMerge续行向下继承；同一测评单元在展示时合并）
     const riskT = findTN('风险分析');
     if (riskT) {
       let cnt = 0, miss = 0, lastLayer = '';
@@ -7375,7 +8543,7 @@
         reportRiskStore[k] = { desc: desc, threat: v[3] || defaultThreatFor(t, unitName), analysis: v[4] || '', level: level };
         cnt++;
       });
-      add(s4, '风险分析：按源报告顺序导入 ' + cnt + ' 条独立风险记录' + (miss ? '（' + miss + ' 条未匹配）' : ''), miss > 0 || cnt === 0);
+      add(s4, '风险分析：导入 ' + cnt + ' 条风险记录，同一测评单元将合并展示' + (miss ? '（' + miss + ' 条未匹配）' : ''), miss > 0 || cnt === 0);
     } else {
       add(s4, '未找到表6-1风险分析', true);
     }
@@ -7478,7 +8646,7 @@
       });
       add(s4, '安全问题及改进建议：导入 ' + Object.keys(sugTexts).length + ' 个层面（其中 ' + cnt + ' 个层面存在问题）');
     })();
-    add(s4, '评估结论与「测评结果及量化评估」不导入：将根据以上现场测评数据自动重新计算');
+    add(s4, '评估结论正文与「测评结果及量化评估」不导入：评估结论正文使用系统名称、综合得分和系统等级自动生成');
 
     const importedText = blocks.map(function (block) {
       return block.type === 'p' ? block.text : block.rows.map(function (row) { return row.join(' '); }).join('\n');
@@ -7498,6 +8666,7 @@
 
   // 初始化测评对象表格
   renderAllObjLayers();
+  renderCryptoServices();
   // 初始化测评工具表格与接入点
   renderToolTable();
   renderAccessPoints();
@@ -7585,6 +8754,7 @@
     cursor:not-allowed;
     box-shadow:none;
   }
+  .report-export-estimate { display:block; margin-top:-3px; color:#8F959E; font-size:11px; line-height:1.55; }
   .report-export-task {
     display:flex;
     margin-top:12px;
@@ -7596,11 +8766,13 @@
     border-radius:8px;
     box-shadow:0 3px 12px rgba(27,65,108,.05);
   }
-  .report-export-task-name { flex:none; color:#1F2329; font-size:12px; font-weight:600; }
+  .report-export-task-info { min-width:220px; flex:none; display:flex; flex-direction:column; gap:2px; }
+  .report-export-task-name { color:#1F2329; font-size:12px; font-weight:600; }
+  .report-export-task-info small { color:#8F959E; font-size:11px; font-weight:400; }
   .report-export-progress { height:5px; flex:1; overflow:hidden; background:#EAF1FA; border-radius:3px; }
   .report-export-progress span { display:block; width:0; height:100%; background:#2456A6; border-radius:3px; transition:width .2s ease; }
   .report-export-progress-text { width:34px; flex:none; color:#646A73; font-size:11px; text-align:right; }
-  @media (max-width:900px) { .report-export-grid { grid-template-columns:1fr; } }
+  @media (max-width:900px) { .report-export-grid { grid-template-columns:1fr; } .report-export-task-info { min-width:150px; } }
 
   /* ===== 测评实施页 UI v2 ===== */
   body.bb-embedded {
@@ -7847,6 +9019,15 @@
   .crypto-key-undo { position:absolute; right:24px; bottom:52px; z-index:10; display:flex; padding:8px 10px; align-items:center; gap:12px; background:#1F2329; border-radius:6px; color:#fff; font-size:11px; }
   .crypto-key-undo button { padding:0; background:transparent; border:0; color:#8DB8FF; cursor:pointer; }
 
+  /* 现场测评：压缩层面导航，把横向空间优先留给测评对象和结果记录。 */
+  body.bb-embedded #page-implement #step-panel-3 .tab-sidebar {
+    width:140px; flex:0 0 140px; padding:6px;
+  }
+  body.bb-embedded #page-implement #step-panel-3 .tab-item {
+    min-height:32px; padding:0 8px; font-size:11.5px;
+  }
+  body.bb-embedded #page-implement #step-panel-3 .tab-content { padding:16px; }
+
   @media (max-width:1199px) {
     body.bb-embedded #page-implement .tab-sidebar,
     body.bb-embedded #page-implement #step-panel-2 .tab-sidebar { width:168px; flex-basis:168px; }
@@ -7860,6 +9041,10 @@
     body.bb-embedded #page-implement .tab-sidebar,
     body.bb-embedded #page-implement #step-panel-2 .tab-sidebar {
       position:static; display:flex; width:100%; height:auto; flex-basis:auto;
+      overflow-x:auto; border-right:0; border-bottom:1px solid var(--border);
+    }
+    body.bb-embedded #page-implement #step-panel-3 .tab-sidebar {
+      position:static; display:flex; width:100%; height:auto; flex-basis:auto; padding:6px;
       overflow-x:auto; border-right:0; border-bottom:1px solid var(--border);
     }
     body.bb-embedded #page-implement .tab-item,
@@ -8017,6 +9202,11 @@
 
   function api(path, options) {
     const opts = options || {};
+    const timeoutMs = Number(opts.timeoutMs || 120000);
+    delete opts.timeoutMs;
+    const controller = new AbortController();
+    const timeout = setTimeout(function () { controller.abort(); }, timeoutMs);
+    opts.signal = controller.signal;
     opts.headers = Object.assign({}, opts.headers || {}, {
       'Authorization': 'Bearer ' + token,
       'Content-Type': 'application/json'
@@ -8026,7 +9216,13 @@
       const data = await response.json().catch(function () { return {}; });
       if (!response.ok) throw new Error(data.message || '请求失败');
       return data;
-    });
+    }).catch(function (error) {
+      if (error && error.name === 'AbortError') throw new Error('请求超时，请检查项目服务是否正在运行后重试');
+      if (error instanceof TypeError && /fetch|network|failed/i.test(String(error.message || ''))) {
+        throw new Error('无法连接项目服务，请确认项目服务正在运行');
+      }
+      throw error;
+    }).finally(function () { clearTimeout(timeout); });
   }
 
   function fileToBase64(file) {
@@ -8039,6 +9235,31 @@
   }
 
   let reportExportTaskTimer = null;
+  let reportExportElapsedTimer = null;
+  let reportExportStartedAt = 0;
+  let reportExportEstimate = '';
+
+  function formatExportElapsed(milliseconds) {
+    const seconds = Math.max(0, Math.floor(milliseconds / 1000));
+    if (seconds < 60) return seconds + ' 秒';
+    return Math.floor(seconds / 60) + ' 分 ' + String(seconds % 60).padStart(2, '0') + ' 秒';
+  }
+
+  function renderReportExportTime(completed) {
+    const time = document.getElementById('report-export-task-time');
+    if (!time || !reportExportStartedAt) return;
+    const elapsed = formatExportElapsed(Date.now() - reportExportStartedAt);
+    time.textContent = completed ? '已用时 ' + elapsed : '已用时 ' + elapsed + (reportExportEstimate ? '，预计 ' + reportExportEstimate : '');
+  }
+
+  function beginReportExportTask(name, estimate) {
+    clearInterval(reportExportElapsedTimer);
+    reportExportStartedAt = Date.now();
+    reportExportEstimate = estimate || '';
+    updateReportExportTask(name, 8);
+    renderReportExportTime(false);
+    reportExportElapsedTimer = setInterval(function () { renderReportExportTime(false); }, 1000);
+  }
 
   function updateReportExportTask(name, percent) {
     const task = document.getElementById('report-export-task');
@@ -8055,7 +9276,9 @@
   }
 
   function finishReportExportTask(name) {
+    clearInterval(reportExportElapsedTimer);
     updateReportExportTask(name, 100);
+    renderReportExportTime(true);
     reportExportTaskTimer = setTimeout(function () {
       const task = document.getElementById('report-export-task');
       if (task) task.style.display = 'none';
@@ -8064,6 +9287,7 @@
 
   function hideReportExportTask() {
     clearTimeout(reportExportTaskTimer);
+    clearInterval(reportExportElapsedTimer);
     const task = document.getElementById('report-export-task');
     if (task) task.style.display = 'none';
   }
@@ -8078,7 +9302,7 @@
   window.exportProjectReport = async function (format, button) {
     const taskName = format === 'pdf' ? '正在生成 PDF 报告' : '正在生成 Word 报告';
     setReportExportButtonBusy(button, true);
-    updateReportExportTask(taskName, 8);
+    beginReportExportTask(taskName, format === 'pdf' ? '2～5 分钟（大报告）' : '1～3 分钟（大报告）');
     try {
       await persistAll(true);
       updateReportExportTask(taskName, 28);
@@ -8096,6 +9320,7 @@
       link.download = ((bbProject && (bbProject.report_code || bbProject.code)) || '密评报告') + '-' + ((bbProject && bbProject.system_name) || '') + (format === 'pdf' ? '.pdf' : '.docx');
       document.body.appendChild(link); link.click(); link.remove();
       setTimeout(function () { URL.revokeObjectURL(url); }, 60000);
+      await markReportExported(format);
       finishReportExportTask(format === 'pdf' ? 'PDF 报告生成完成' : 'Word 报告生成完成');
     } catch (error) {
       hideReportExportTask();
@@ -8105,18 +9330,24 @@
     }
   };
 
-  window.generateOriginalRecords = async function (button) {
+  window.generateOriginalRecords = async function (button, clickEvent) {
+    // 目录选择器必须由用户真实点击触发，避免页面恢复或脚本调用误启动导出。
+    if (!clickEvent || clickEvent.isTrusted !== true || !button || button.id !== 'export-records-btn') return;
     const taskName = '正在生成原始记录';
     setReportExportButtonBusy(button, true);
-    updateReportExportTask(taskName, 8);
+    beginReportExportTask(taskName, '数秒，证据图片较多时为几十秒');
     try {
       if (!window.showDirectoryPicker) throw new Error('当前浏览器不支持选择文件夹，请使用 Chrome 或 Edge');
+      // 文件夹选择器必须紧跟用户点击调用；先执行异步保存或生成会丢失浏览器的临时用户授权。
+      const root = await window.showDirectoryPicker({ id: 'bb-miping-raw-records', mode: 'readwrite', startIn: 'documents' });
+      updateReportExportTask(taskName, 12);
       await persistAll(true);
       updateReportExportTask(taskName, 20);
-      const response = await api('/projects/' + projectId + '/original-records', { method: 'POST', body: '{}' });
+      const response = await api('/projects/' + projectId + '/original-records', {
+        method: 'POST', body: '{}', timeoutMs: 600000
+      });
       if (!response.files || !response.files.length) throw new Error('没有生成可用的原始记录');
       updateReportExportTask(taskName, 42);
-      const root = await window.showDirectoryPicker({ id: 'bb-miping-raw-records', mode: 'readwrite', startIn: 'documents' });
       updateReportExportTask(taskName, 48);
       const folder = await root.getDirectoryHandle(response.folderName || '原始记录', { create: true });
       for (let itemIndex = 0; itemIndex < response.files.length; itemIndex += 1) {
@@ -8135,7 +9366,11 @@
     } catch (error) {
       hideReportExportTask();
       if (error && error.name === 'AbortError') return;
-      showToast(error.message || '原始记录生成失败', true);
+      if (error && (error.name === 'NotAllowedError' || error.name === 'SecurityError')) {
+        showToast('浏览器未允许选择保存文件夹，请直接点击“选择位置并生成”后重试', true);
+      } else {
+        showToast(error.message || '原始记录生成失败', true);
+      }
     } finally {
       setReportExportButtonBusy(button, false);
     }
@@ -8251,12 +9486,22 @@
 
   function captureAssets() {
     const result = {};
+    result.assetIds = {};
     assetTypes.forEach(function (type) {
-      result[type] = captureRowValues(document.getElementById('asset-tbody-' + type));
+      const body = document.getElementById('asset-tbody-' + type);
+      result[type] = captureRowValues(body);
+      result.assetIds[type] = Array.from(body?.rows || []).map(function(row) {
+        if (!row.dataset.assetId) row.dataset.assetId = newAssetRowId('asset');
+        return row.dataset.assetId;
+      });
     });
     result.dataRequirements = Array.from(document.getElementById('asset-tbody-data')?.rows || []).map(row =>
       Array.from(row.querySelectorAll('.req-chip')).map(chip => chip.getAttribute('data-req')));
     result.appUsers = captureRowValues(document.getElementById('app-user-tbody'));
+    result.appUserIds = Array.from(document.getElementById('app-user-tbody')?.rows || []).map(function(row) {
+      if (!row.dataset.appUserId) row.dataset.appUserId = newAssetRowId('appuser');
+      return row.dataset.appUserId;
+    });
     return result;
   }
 
@@ -8266,18 +9511,31 @@
       const rows = saved[type] || [];
       const tbody = document.getElementById('asset-tbody-' + type);
       if (!tbody) return;
+      if (type === 'person') {
+        tbody.innerHTML = '';
+        tbody.dataset.imported = '1';
+        rows.forEach(function (_row, index) {
+          tbody.insertAdjacentHTML('beforeend', getAssetRowHtml('person', index + 1, false));
+        });
+        fillRowValues(tbody, rows);
+        Array.from(tbody.rows).forEach(function(row, index) {
+          row.dataset.assetId = saved.assetIds?.person?.[index] || row.dataset.assetId || newAssetRowId('asset');
+        });
+        return;
+      }
       const targetCount = Math.max(type === 'person' ? PERSON_ASSET_DEFAULTS.length : 1, rows.length);
-      while (tbody.children.length < targetCount) addAssetRow(type);
+      while (tbody.children.length < targetCount) addAssetRow(type, type !== 'data');
       while (tbody.children.length > targetCount) deleteAssetRow(type);
       fillRowValues(tbody, rows);
-      if (type === 'person') normalizePersonAssetRows();
+      Array.from(tbody.rows).forEach(function(row, index) {
+        row.dataset.assetId = saved.assetIds?.[type]?.[index] || row.dataset.assetId || newAssetRowId('asset');
+      });
     });
     if (Array.isArray(saved.dataRequirements)) {
       Array.from(document.getElementById('asset-tbody-data')?.rows || []).forEach((row, index) => {
         const reqs = saved.dataRequirements[index];
         if (!Array.isArray(reqs) || !row.cells[5]) return;
-        row.cells[5].innerHTML = reqs.filter(req => DATA_REQ_DEFAULTS.includes(req)).map(req =>
-          '<span class="req-chip" data-req="' + req + '">' + req + '<i class="req-chip-x" title="删除该安全需求" onclick="removeDataReq(this)">×</i></span>').join('');
+        row.cells[5].innerHTML = getDataReqChips(reqs);
       });
     }
     const appRows = saved.appUsers || [];
@@ -8286,14 +9544,21 @@
       while (appBody.children.length < appRows.length) addAppUserRow();
       while (appBody.children.length > Math.max(1, appRows.length)) deleteAppUserRow();
       fillRowValues(appBody, appRows);
+      Array.from(appBody.rows).forEach(function(row, index) {
+        row.dataset.appUserId = saved.appUserIds?.[index] || row.dataset.appUserId || newAssetRowId('appuser');
+      });
     }
   }
 
   function snapshot(step) {
     const root = panelForStep(step);
     const data = {
-      prototypeVersion: 2,
+      prototypeVersion: 3,
       assessmentLevel: assessmentLevel(),
+      projectDates: {
+        startDate: String(bbProject?.start_date || '').slice(0, 10),
+        endDate: String(bbProject?.end_date || '').slice(0, 10)
+      },
       fields: captureFields(root),
       images: captureImages(root)
     };
@@ -8311,10 +9576,15 @@
       data.toolData = clone(toolData);
       data.accessPoints = clone(accessPoints);
       data.cryptoKeyTables = clone(cryptoKeyTables);
+      data.cryptoServices = clone(cryptoServices);
+      data.topologyBlocks = clone(topologyBlocks);
     }
     if (step === 3) {
       data.onsiteRecords = clone(onsiteRecords);
+      data.onsiteEvidenceGroups = clone(onsiteEvidenceGroups);
       data.onsiteImportedObjects = clone(onsiteImportedObjects);
+      data.onsiteObjectBindings = clone(onsiteObjectBindings);
+      data.onsiteUnmatchedObjects = clone(onsiteUnmatchedObjects);
     }
     if (step === 4) {
       data.exportContent = collectReportExportContent();
@@ -8323,7 +9593,6 @@
       data.reportTexts = clone(reportTexts);
       data.reportRiskStore = clone(reportRiskStore);
       data.reportImportedRiskRows = clone(reportImportedRiskRows);
-      data.reportCellOverrides = clone(reportCellOverrides);
       data.appendixBData = clone(appendixBData);
       data.appendixBImages = collectAppendixBExportImages();
       try {
@@ -8487,6 +9756,12 @@
       }).filter(function (row) { return row.some(function (cell) { return String(cell).trim(); }); });
       tables.push({ caption: caption, rows: rows, skip: 1, repeat: true, required: true });
     });
+    tables.push({
+      caption: '密码服务', skip: 1, repeat: true, required: true,
+      rows: (cryptoServices || []).map(function (row, index) {
+        return [String(index + 1), row.name || '', row.provider || ''];
+      })
+    });
     // 表5-2：沿用页面展示时的修正后单元得分、层面得分和分类口径。
     const quantCounts = { '符合': 0, '部分符合': 0, '不符合': 0, '不适用': 0 };
     const quantRows = [];
@@ -8547,10 +9822,9 @@
     const appUsers = getAppUsers();
     const identityLayer = 3;
     const identityItem = evaluationIndicatorLevels[identityLayer].items.findIndex(item => item.name === '身份鉴别');
-    const identityDefault = reportClassify(getRawUnitScore(identityLayer, identityItem));
     const appUserLabels = getAppUserDisplayNames();
     const appUserRows = appUsers.map(function (name, index) {
-      return [String(index + 1), appUserLabels[index] || name, reportCellOverrides['idn|' + name] || identityDefault];
+      return [String(index + 1), appUserLabels[index] || name, getObjectCls(identityLayer, identityItem, index)];
     });
     tables.push({
       caption: '应用和数据安全身份鉴别测评结果汇总',
@@ -8592,7 +9866,7 @@
         const pos = getOnsiteUnitObjects(3, unitName).indexOf(name);
         if (dataRequirementApplies(name, unitName) === false) { values.push('不适用'); return; }
         if (pos < 0) { values.push(getUaDataFinalResult(3, dataItems[column])); return; }
-        const result = reportCellOverrides['3|' + dataItems[column] + '|' + pos] || getObjectCls(3, dataItems[column], pos);
+        const result = getObjectCls(3, dataItems[column], pos);
         dataResults[column].push(result);
         values.push(result);
       });
@@ -8609,7 +9883,7 @@
     const nonRepObjects = getOnsiteUnitObjects(3, '不可否认性');
     const nonRepRows = getAssetAppNames().map(function (name, index) {
       const pos = nonRepObjects.findIndex(obj => obj === name || obj.includes(name) || name.includes(obj));
-      const result = reportCellOverrides['neg|' + name] || (pos >= 0 ? getObjectCls(3, nonRepItem, pos) : nonRepDefault);
+      const result = pos >= 0 ? getObjectCls(3, nonRepItem, pos) : nonRepDefault;
       return [String(index + 1), name, result];
     });
     tables.push({
@@ -8629,10 +9903,10 @@
         const after = typeof compScore === 'number' ? Math.max(0.5 * compScore, raw) : fix.after;
         let compLabel = '';
         if (fix.comp) {
-          const [layerIdx, unitIdx, objectIdx] = fix.comp.split('|').map(Number);
-          const compUnit = evaluationIndicatorLevels[layerIdx]?.items[unitIdx]?.name;
-          const compObject = compUnit ? getOnsiteUnitObjects(layerIdx, compUnit)[objectIdx] : '';
-          compLabel = compUnit && compObject ? '弥补指标（测评对象A）：' + ONSITE_LAYERS[layerIdx].name + '·' + compUnit + '·' + compObject : '';
+          const pos = locateOnsiteRecordKey(fix.comp);
+          const compUnit = pos ? evaluationIndicatorLevels[pos.t]?.items[pos.itemIdx]?.name : '';
+          const compObject = pos && pos.objIdx >= 0 ? getOnsiteUnitObjects(pos.t, compUnit)[pos.objIdx] : '';
+          compLabel = compUnit && compObject ? '弥补指标（测评对象A）：' + ONSITE_LAYERS[pos.t].name + '·' + compUnit + '·' + compObject : '';
         }
         const reason = [compLabel, fix.reason || ''].filter(Boolean).join('\n');
         fixRows.push([String(fixRows.length + 1), ONSITE_LAYERS[3].name, item.name, name,
@@ -8678,7 +9952,7 @@
       });
       tables.push({ caption: layer.name + '测评结果记录', rows: [], groups: groups, skip: t < 4 ? 2 : 1, required: true });
     });
-    const sections = [['承载的业务情况','plan-business-situation'], ['网络拓扑图及描述','plan-topology-desc'], ['测评目的','plan-eval-purpose'], ['依据标准和规范','plan-basis-standard'], ['现场测评方法','plan-onsite-method']].map(function (entry) {
+    const sections = [['承载的业务情况','plan-business-situation'], ['网络拓扑图及描述','plan-topology-desc'], ['测评目的','plan-eval-purpose'], ['依据标准和规范','plan-basis-standard']].map(function (entry) {
       const el = document.getElementById(entry[1]);
       return { heading: entry[0], text: el ? el.value : '' };
     });
@@ -8698,7 +9972,7 @@
       const next = indexFor(Number(match[1]), Number(match[2]));
       return next < 0 ? null : match[1] + '|' + next + match[3];
     };
-    ['onsiteRecords', 'onsiteImportedObjects', 'reportFixes', 'reportCellOverrides', 'reportRiskStore'].forEach(field => {
+    ['onsiteRecords', 'onsiteImportedObjects', 'reportFixes', 'reportRiskStore'].forEach(field => {
       if (!saved[field]) return;
       saved[field] = Object.fromEntries(Object.entries(saved[field]).flatMap(([key, value]) => {
         const next = keyFor(key);
@@ -8722,14 +9996,56 @@
     return saved;
   }
 
+  function migrateLegacyStableKeyMap(map, importedObjects, objectBindings, migrateFixTargets) {
+    if (!map) return {};
+    ensureIndicatorIds();
+    const result = {};
+    const keyCache = {};
+    function stableKeyFor(key) {
+      if (keyCache[key] !== undefined) return keyCache[key];
+      const match = /^(\d+)\|(\d+)\|(\d+)$/.exec(String(key || ''));
+      if (!match) return (keyCache[key] = key);
+      const t = Number(match[1]);
+      const itemIdx = Number(match[2]);
+      const objIdx = Number(match[3]);
+      const unitName = evaluationIndicatorLevels[t]?.items[itemIdx]?.name || '';
+      if (!unitName) return (keyCache[key] = null);
+      const bindingKey = t + '|' + unitName;
+      const entries = getOnsiteUnitObjectEntries(t, unitName);
+      let ids = objectBindings?.[bindingKey]?.slice() || [];
+      if (!ids.length) {
+        const names = importedObjects?.[bindingKey] || entries.map(function(entry) { return entry.name; });
+        const used = new Set();
+        ids = names.map(function(name, index) {
+          const found = matchImportedObjectEntry(t, unitName, name, entries, used);
+          if (found) { used.add(found.id); return found.id; }
+          return stableAssessmentId('legacy', t + '|' + unitName + '|' + index + '|' + onsiteNormObjectName(name));
+        });
+      }
+      const objectId = ids[objIdx] || entries[objIdx]?.id || stableAssessmentId('object-missing', t + '|' + unitName + '|' + objIdx);
+      return (keyCache[key] = indicatorIdFor(t, itemIdx) + '|' + objectId);
+    }
+    Object.entries(map).forEach(function(entry) {
+      const nextKey = stableKeyFor(entry[0]);
+      if (!nextKey) return;
+      const value = cloneOnsiteValue(entry[1]);
+      if (migrateFixTargets && value && value.comp) value.comp = stableKeyFor(value.comp) || '';
+      result[nextKey] = value;
+    });
+    return result;
+  }
+
   function hydrate(step, saved) {
     if (saved) saved = migrateAssessmentSnapshot(saved);
     if (!saved || !saved.prototypeVersion) return;
     if (step === 2) {
       if (saved.cryptoKeyTables) cryptoKeyTables = clone(saved.cryptoKeyTables);
       renderCryptoKeyTables();
+      if (saved.cryptoServices) cryptoServices = clone(saved.cryptoServices);
+      renderCryptoServices();
       if (saved.currentReferenceStandards) currentReferenceStandards = clone(saved.currentReferenceStandards);
       if (saved.objData) objData = clone(saved.objData);
+      ensureObjDataIds();
       if (saved.toolData) toolData = clone(saved.toolData);
       if (saved.accessPoints) accessPoints = clone(saved.accessPoints);
       renderReferenceStandards();
@@ -8740,16 +10056,28 @@
       renderAccessPoints();
     }
     if (step === 3 && saved.onsiteRecords) {
-      onsiteRecords = clone(saved.onsiteRecords);
       onsiteImportedObjects = clone(saved.onsiteImportedObjects || {});
+      onsiteObjectBindings = clone(saved.onsiteObjectBindings || {});
+      onsiteRecords = migrateLegacyStableKeyMap(saved.onsiteRecords, onsiteImportedObjects, onsiteObjectBindings, false);
+      onsiteEvidenceGroups = clone(saved.onsiteEvidenceGroups || []);
+      activeOnsiteEvidenceGroupId = '';
+      onsiteRecordEditorTarget = null;
+      onsiteExpandedRecordKeys.clear();
+      onsiteEvidenceGroups.forEach(function(group) {
+        if (!group.id) group.id = newOnsiteEvidenceId();
+        if (!Array.isArray(group.images)) group.images = group.dataUrl ? [{ id: newOnsiteEvidenceId(), dataUrl: group.dataUrl }] : [];
+        group.images.forEach(function(image) { if (!image.id) image.id = newOnsiteEvidenceId(); });
+      });
+      migrateLegacyOnsiteEvidence();
+      onsiteUnmatchedObjects = clone(saved.onsiteUnmatchedObjects || {});
+      reconcileAllOnsiteObjectBindings();
       renderOnsiteTables();
     }
     if (step === 4) {
-      if (saved.reportFixes) reportFixes = clone(saved.reportFixes);
+      if (saved.reportFixes) reportFixes = migrateLegacyStableKeyMap(saved.reportFixes, onsiteImportedObjects, onsiteObjectBindings, true);
       if (saved.reportTexts) reportTexts = clone(saved.reportTexts);
       if (saved.reportRiskStore) reportRiskStore = clone(saved.reportRiskStore);
       if (saved.reportImportedRiskRows) reportImportedRiskRows = clone(saved.reportImportedRiskRows);
-      if (saved.reportCellOverrides) reportCellOverrides = clone(saved.reportCellOverrides);
       if (saved.appendixBData) appendixBData = clone(saved.appendixBData);
       // 新版改为两个无默认值的自由选择框；清除旧版本曾强制写入的人员一次。
       if (appendixBData['b7-personnel-selection-version'] !== '3') {
@@ -8761,7 +10089,22 @@
       renderReport();
     }
     restoreFields(panelForStep(step), saved.fields, saved.prototypeVersion);
+    if (step === 2) {
+      const other = document.getElementById('mi-interconnect-other');
+      if (other) other.value = String(other.value || '').replace(/^互联系统名称\s*[：:]\s*/, '').trim();
+    }
     restoreImages(saved.images);
+    if (step === 2) {
+      if (Array.isArray(saved.topologyBlocks) && saved.topologyBlocks.length) topologyBlocks = clone(saved.topologyBlocks);
+      else {
+        const legacyDescription = document.getElementById('plan-topology-desc')?.value || '';
+        const legacyImage = document.getElementById('topology-image')?.src || '';
+        topologyBlocks = [];
+        if (/^data:image\//.test(legacyImage)) topologyBlocks.push(newTopologyBlock('image', { dataUrl: legacyImage, caption: '' }));
+        if (legacyDescription) topologyBlocks.push(newTopologyBlock('text', { content: legacyDescription }));
+      }
+      renderTopologyBlocks();
+    }
     normalizeParagraphTextareas(panelForStep(step));
     if (step === 2) {
       enhanceAssetEditors();
@@ -8788,7 +10131,7 @@
       if (!quiet) showToast('已保存到项目数据库');
     } catch (error) {
       setImplementationSaveState('error', '保存失败');
-      showToast(error.message || '保存失败', true);
+      if (!quiet || strict) showToast(error.message || '保存失败', true);
       if (strict) throw error;
     } finally {
       bbSaving = false;
@@ -8805,6 +10148,18 @@
     clearTimeout(bbSaveTimer);
     for (let step = 1; step <= 4; step += 1) await persist(step, true, strict === true);
     if (strict === true) showToast('最新编辑已保存，正在导出报告');
+  }
+
+  async function markReportExported(format) {
+    const stage = (bbProject?.stages || []).find(function(item) { return item.stage_key === 'review'; });
+    const data = clone(stage?.data || {});
+    data.lastExportAt = new Date().toISOString();
+    data.exportFormats = Array.from(new Set([].concat(data.exportFormats || [], format || 'docx')));
+    const updated = await api('/projects/' + projectId + '/stages/review', {
+      method: 'PUT',
+      body: JSON.stringify({ data: data, completion: 100 })
+    });
+    if (stage) Object.assign(stage, updated);
   }
 
   function ensureGlobalReplaceDialog() {
@@ -9110,11 +10465,11 @@
       const step = stageKeys.indexOf(stage.stage_key) + 1;
       if (step > 0) hydrate(step, stage.data);
     });
-    // 项目起止日期只作为测评计划的初始默认值；已保存的计划日期优先保留。
+    // 项目管理中的起止日期是整个报告的统一来源，编辑项目后必须覆盖旧快照日期。
     const phase1Start = document.getElementById('plan-phase-1-start');
     const phase4End = document.getElementById('plan-phase-4-end');
-    if (phase1Start && !phase1Start.value) phase1Start.value = project.start_date || '';
-    if (phase4End && !phase4End.value) phase4End.value = project.end_date || '';
+    if (phase1Start) phase1Start.value = project.start_date || '';
+    if (phase4End) phase4End.value = project.end_date || '';
     renderAppendixB();
     const authoritativeSystemName = document.getElementById('mi-sys-name');
     if (authoritativeSystemName) authoritativeSystemName.value = project.system_name || '';
@@ -9127,7 +10482,7 @@
     clearTimeout(bbSaveTimer);
 
     const meta = document.getElementById('implement-page-meta');
-    if (meta) meta.textContent = project.system_name + ' · 测评年度 ' + project.assessment_year + ' · 等级 ' + project.system_level + '级 · ' + project.code;
+    if (meta) meta.textContent = project.system_name + ' · 测评年度 ' + project.assessment_year + ' · 等级 ' + project.system_level + '级 · 报告编号 ' + (project.report_code || '未填写');
     initImplementationUi();
     setImplementationSaveState('saved', '已自动保存 ' + formatSaveTime(new Date()));
 
@@ -9142,6 +10497,11 @@
         else values[index].textContent = value || '';
       });
     }).catch(function () { /* 使用页面内置默认值 */ });
+
+    api('/settings/risk-templates').then(function (templates) {
+      riskTemplateLibrary = Array.isArray(templates) ? templates : [];
+      if (document.getElementById('step-panel-4')?.style.display !== 'none') renderReport();
+    }).catch(function () { riskTemplateLibrary = []; });
 
     const requestedStep = Number(params.get('step') || 0);
     const isImporting = params.get('import') === '1' || params.get('importStored') === '1';

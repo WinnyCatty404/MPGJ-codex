@@ -1,7 +1,8 @@
 <script setup lang="ts">
 import { computed, onMounted, reactive, ref } from 'vue';
 
-type Page = 'dashboard' | 'projects' | 'workspace' | 'users' | 'templates' | 'institution';
+type Page = 'dashboard' | 'projects' | 'workspace' | 'users' | 'templates' | 'risk-analysis' | 'institution';
+const restorablePages: Page[] = ['dashboard', 'projects', 'users', 'templates', 'risk-analysis', 'institution'];
 type User = { id: string; username: string; display_name: string; role: string; status: string; certificate_date?: string; certificate_file_name?: string; certificate_file_path?: string; must_change_password?: boolean; last_login_at?: string; created_at?: string };
 type Project = { id: string; code: string; report_code?: string; system_name: string; org_name: string; assessment_year: number; system_level: number; status: string; current_stage: number; progress: number; start_date?: string; end_date?: string; owner_name?: string; high_risk_count?: number; system_score?: number; stages?: Stage[]; risks?: Risk[]; assets?: Asset[] };
 type Stage = { id: string; stage_key: string; title: string; completion: number; data: Record<string, unknown> };
@@ -24,6 +25,7 @@ const selectedProject = ref<Project | null>(null);
 const activeStage = ref(0);
 const showProjectModal = ref(false);
 const editingProjectId = ref('');
+const copySourceProject = ref<Project | null>(null);
 const projectToDelete = ref<Project | null>(null);
 const showUserModal = ref(false);
 const editingUserId = ref('');
@@ -32,6 +34,64 @@ const showPasswordModal = ref(false);
 const passwordForm = reactive({ currentPassword: '', newPassword: '', confirmPassword: '' });
 const userFilters = reactive({ search: '', status: '' });
 const templateInfo = ref<any>({ report: null, rawRecords: [] });
+const riskTemplates = ref<any[]>([]);
+const showRiskTemplateModal = ref(false);
+const editingRiskTemplateId = ref('');
+const activeRiskLayer = ref('物理和环境安全');
+const riskTemplateForm = reactive<any>({ layer: '物理和环境安全', unit: '身份鉴别', threat: '', defaultLevel: '中', analysis: '', advice: '', enabled: true, version: 1 });
+const riskUnitsByLayer: Record<string, string[]> = {
+  '物理和环境安全': ['身份鉴别', '电子门禁记录数据存储完整性', '视频监控记录数据存储完整性'],
+  '网络和通信安全': ['身份鉴别', '通信数据完整性', '通信过程中重要数据的机密性', '网络边界访问控制信息的完整性', '安全接入认证'],
+  '设备和计算安全': ['身份鉴别', '远程管理通道安全', '系统资源访问控制信息完整性', '重要信息资源安全标记完整性', '日志记录完整性', '重要可执行程序完整性、重要可执行程序来源真实性'],
+  '应用和数据安全': ['身份鉴别', '访问控制信息完整性', '重要信息资源安全标记完整性', '重要数据传输机密性', '重要数据存储机密性', '重要数据传输完整性', '重要数据存储完整性', '不可否认性'],
+  '管理制度': ['具备密码应用安全管理制度', '密钥管理规则', '建立操作规程', '定期修订安全管理制度', '明确管理制度发布流程', '制度执行过程记录留存'],
+  '人员管理': ['了解并遵守密码相关法律法规和密码管理制度', '建立密码应用岗位责任制度', '建立上岗人员培训制度', '定期进行安全岗位人员考核', '建立关键岗位人员保密制度和调离制度'],
+  '建设运行': ['制定密码应用方案', '制定密钥安全管理策略', '制定实施方案', '投入运行前进行密码应用安全性评估', '定期开展密码应用安全性评估及攻防对抗演习'],
+  '应急处置': ['应急策略', '事件处置', '向有关主管部门上报处置情况'],
+};
+const riskUnitDefaults: Record<string, { threat: string; level: '高' | '中' | '低' }> = {
+  '物理和环境安全|身份鉴别': { threat: 'TP1', level: '中' },
+  '物理和环境安全|电子门禁记录数据存储完整性': { threat: 'TP2', level: '中' },
+  '物理和环境安全|视频监控记录数据存储完整性': { threat: 'TP2', level: '低' },
+  '网络和通信安全|身份鉴别': { threat: 'TN1', level: '中' },
+  '网络和通信安全|通信数据完整性': { threat: 'TN2', level: '中' },
+  '网络和通信安全|通信过程中重要数据的机密性': { threat: 'TN2', level: '中' },
+  '网络和通信安全|网络边界访问控制信息的完整性': { threat: 'TN3', level: '中' },
+  '网络和通信安全|安全接入认证': { threat: 'TN1', level: '中' },
+  '设备和计算安全|身份鉴别': { threat: 'TD1', level: '中' },
+  '设备和计算安全|远程管理通道安全': { threat: 'TD2', level: '中' },
+  '设备和计算安全|系统资源访问控制信息完整性': { threat: 'TD3', level: '中' },
+  '设备和计算安全|重要信息资源安全标记完整性': { threat: 'TD4', level: '中' },
+  '设备和计算安全|日志记录完整性': { threat: 'TD5', level: '中' },
+  '设备和计算安全|重要可执行程序完整性、重要可执行程序来源真实性': { threat: 'TD6', level: '中' },
+  '应用和数据安全|身份鉴别': { threat: 'TA1', level: '中' },
+  '应用和数据安全|访问控制信息完整性': { threat: 'TA2', level: '中' },
+  '应用和数据安全|重要信息资源安全标记完整性': { threat: 'TA3', level: '中' },
+  '应用和数据安全|重要数据传输机密性': { threat: 'TA4', level: '中' },
+  '应用和数据安全|重要数据存储机密性': { threat: 'TA4', level: '中' },
+  '应用和数据安全|重要数据传输完整性': { threat: 'TA4', level: '中' },
+  '应用和数据安全|重要数据存储完整性': { threat: 'TA4', level: '中' },
+  '应用和数据安全|不可否认性': { threat: 'TA6', level: '中' },
+  '管理制度|具备密码应用安全管理制度': { threat: 'TK7', level: '中' },
+  '管理制度|密钥管理规则': { threat: 'TK3', level: '中' },
+  '管理制度|建立操作规程': { threat: 'TK7', level: '低' },
+  '管理制度|定期修订安全管理制度': { threat: 'TK7', level: '低' },
+  '管理制度|明确管理制度发布流程': { threat: 'TK7', level: '低' },
+  '管理制度|制度执行过程记录留存': { threat: 'TK7', level: '低' },
+  '人员管理|了解并遵守密码相关法律法规和密码管理制度': { threat: 'TK7', level: '低' },
+  '人员管理|建立密码应用岗位责任制度': { threat: 'TK7', level: '低' },
+  '人员管理|建立上岗人员培训制度': { threat: 'TK7', level: '低' },
+  '人员管理|定期进行安全岗位人员考核': { threat: 'TK7', level: '低' },
+  '人员管理|建立关键岗位人员保密制度和调离制度': { threat: 'TK7', level: '低' },
+  '建设运行|制定密码应用方案': { threat: 'TK7', level: '低' },
+  '建设运行|制定密钥安全管理策略': { threat: 'TK7', level: '低' },
+  '建设运行|制定实施方案': { threat: 'TK7', level: '低' },
+  '建设运行|投入运行前进行密码应用安全性评估': { threat: 'TK7', level: '低' },
+  '建设运行|定期开展密码应用安全性评估及攻防对抗演习': { threat: 'TK7', level: '低' },
+  '应急处置|应急策略': { threat: 'TK7', level: '低' },
+  '应急处置|事件处置': { threat: 'TK7', level: '低' },
+  '应急处置|向有关主管部门上报处置情况': { threat: 'TK7', level: '低' },
+};
 const importTargetProject = ref<Project | null>(null);
 const institutionForm = reactive({ name: '', address: '', postalCode: '', contact: '', title: '', department: '', telephone: '', mobile: '', email: '' });
 const activePlanningModule = ref<PlanningModule | null>(null);
@@ -55,6 +115,7 @@ function normalizePlanningParagraph(key: string) {
 const filters = reactive({ search: '', year: '', level: '', status: '' });
 const dashboard = ref<any>({ summary: {}, stages: [], recent: [], risks: [] });
 const projectForm = reactive({ code: '', reportCode: '', systemName: '', orgName: '', assessmentYear: 2026, systemLevel: 3, startDate: '', endDate: '' });
+const copyForm = reactive({ systemName: '', reportCode: '', assessmentYear: new Date().getFullYear(), startDate: '', endDate: '' });
 const userForm = reactive({ username: '', displayName: '', role: 'evaluator', certificateDate: '', certificateFileName: '' });
 
 const stageMeta = [
@@ -130,6 +191,10 @@ const visibleUsers = computed(() => users.value.filter(user => {
   return (!search || user.username.toLowerCase().includes(search) || user.display_name.toLowerCase().includes(search))
     && (!userFilters.status || user.status === userFilters.status);
 }));
+const riskLayers = computed(() => Object.keys(riskUnitsByLayer));
+const visibleRiskTemplates = computed(() => riskTemplates.value.filter(item => item.layer === activeRiskLayer.value));
+const riskTemplateTotal = computed(() => Object.values(riskUnitsByLayer).reduce((sum, units) => sum + units.length, 0));
+const riskTemplateCompleteCount = computed(() => riskTemplates.value.filter(item => item.analysis?.trim() && item.advice?.trim()).length);
 const selectedStage = computed(() => selectedProject.value?.stages?.find(s => s.stage_key === stageMeta[activeStage.value].key));
 
 function getPlanningValues(): Record<string, Record<string, string>> {
@@ -203,10 +268,16 @@ function logout() {
 
 async function openPage(next: Page) {
   page.value = next;
+  if (restorablePages.includes(next)) {
+    const url = new URL(window.location.href);
+    url.searchParams.set('page', next);
+    window.history.replaceState(null, '', url);
+  }
   if (next === 'dashboard') dashboard.value = await api('/dashboard');
   if (next === 'projects') await loadProjects();
   if (next === 'users') users.value = await api('/users');
   if (next === 'templates') templateInfo.value = await api('/templates');
+  if (next === 'risk-analysis') riskTemplates.value = ensureRiskTemplateCoverage(await api('/settings/risk-templates'));
   if (next === 'institution') Object.assign(institutionForm, await api('/settings/institution'));
 }
 
@@ -256,9 +327,23 @@ async function handleProjectWordImport(event: Event) {
   }
 }
 
-async function copyProject(project: Project) {
+function openCopyProjectModal(project: Project) {
+  copySourceProject.value = project;
+  Object.assign(copyForm, {
+    systemName: project.system_name,
+    reportCode: project.report_code || '',
+    assessmentYear: project.assessment_year,
+    startDate: project.start_date ? String(project.start_date).slice(0, 10) : '',
+    endDate: project.end_date ? String(project.end_date).slice(0, 10) : '',
+  });
+}
+
+async function copyProject() {
+  const project = copySourceProject.value;
+  if (!project) return;
   try {
-    const copied = await api(`/projects/${project.id}/copy`, { method: 'POST' });
+    const copied = await api(`/projects/${project.id}/copy`, { method: 'POST', body: JSON.stringify(copyForm) });
+    copySourceProject.value = null;
     notify(`已复制为新项目 ${copied.code}`);
     await loadProjects();
   } catch (error) { notify((error as Error).message); }
@@ -392,6 +477,38 @@ async function uploadReportTemplate(event: Event, systemLevel = 3) {
   } catch (error) { notify((error as Error).message); }
 }
 
+async function downloadStoredTemplate(path: string, fallbackName: string) {
+  try {
+    const response = await fetch(`${apiBase}${path}`, {
+      headers: token.value ? { Authorization: `Bearer ${token.value}` } : {},
+    });
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({}));
+      throw new Error(error.message || '模板下载失败');
+    }
+    const disposition = response.headers.get('Content-Disposition') || '';
+    const encodedName = /filename\*=UTF-8''([^;]+)/i.exec(disposition)?.[1];
+    const fileName = encodedName ? decodeURIComponent(encodedName) : fallbackName;
+    const url = URL.createObjectURL(await response.blob());
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = fileName;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    window.setTimeout(() => URL.revokeObjectURL(url), 60000);
+    notify(`${fileName} 已下载`);
+  } catch (error) { notify((error as Error).message); }
+}
+
+function downloadReportTemplate(systemLevel: 2 | 3) {
+  return downloadStoredTemplate(`/templates/report/download?systemLevel=${systemLevel}`, systemLevel === 2 ? '二级报告模板.docx' : '三级报告模板.docx');
+}
+
+function downloadRawTemplate() {
+  return downloadStoredTemplate('/templates/records/download', '原始记录模板.zip');
+}
+
 async function uploadRawFolder(event: Event) {
   const files = [...((event.target as HTMLInputElement).files || [])];
   if (!files.length) return;
@@ -399,7 +516,145 @@ async function uploadRawFolder(event: Event) {
     const payload = await Promise.all(files.map(async file => ({ path: (file as File & { webkitRelativePath?: string }).webkitRelativePath || file.name, dataBase64: await fileAsBase64(file) })));
     await api('/templates/records', { method: 'POST', body: JSON.stringify({ files: payload }) });
     templateInfo.value = await api('/templates');
-    notify(`已导入 ${files.length} 个原始记录模板文件`);
+    notify(`已替换原始记录模板，共 ${files.length} 个文件`);
+  } catch (error) { notify((error as Error).message); }
+  finally { (event.target as HTMLInputElement).value = ''; }
+}
+
+function riskUnits(layer: string) {
+  return riskUnitsByLayer[layer] || [];
+}
+
+function riskTemplateId(layer: string, unit: string) {
+  let hash = 2166136261;
+  const value = `${layer}|${unit}`;
+  for (let index = 0; index < value.length; index++) {
+    hash ^= value.charCodeAt(index);
+    hash = Math.imul(hash, 16777619);
+  }
+  return `risk-unit-${(hash >>> 0).toString(36)}`;
+}
+
+function ensureRiskTemplateCoverage(source: any[]) {
+  const normalized = (Array.isArray(source) ? source : []).map(item => ({
+    ...item,
+    unit: item.unit === '重要程序和文件完整性' ? '重要可执行程序完整性、重要可执行程序来源真实性' : item.unit,
+  }));
+  return Object.entries(riskUnitsByLayer).flatMap(([layer, units]) => {
+    const layerFallback = normalized.find(item => item.layer === layer && item.unit === '*');
+    return units.map(unit => {
+      const found = normalized.find(item => item.layer === layer && item.unit === unit);
+      const base = found || layerFallback || {};
+      const defaults = riskUnitDefaults[`${layer}|${unit}`] || { threat: '', level: layer.includes('安全') ? '中' : '低' };
+      return {
+        id: found?.id || riskTemplateId(layer, unit), layer, unit, result: '*',
+        threat: found?.threat || defaults.threat,
+        analysis: found?.analysis || layerFallback?.analysis || `“${unit}”测评单元未完全满足密码应用要求，可能导致相关安全需求无法得到有效保障。`,
+        advice: found?.advice || layerFallback?.advice || `建议按照相关标准要求，对“${unit}”测评单元存在的问题进行整改，并留存实施和验证记录。`,
+        defaultLevel: found?.defaultLevel || defaults.level,
+        version: Number(base.version || 1), enabled: base.enabled !== false,
+      };
+    });
+  });
+}
+
+function changeRiskTemplateLayer() {
+  const units = riskUnits(riskTemplateForm.layer);
+  if (!units.includes(riskTemplateForm.unit)) riskTemplateForm.unit = units[0] || '';
+  const defaults = riskUnitDefaults[`${riskTemplateForm.layer}|${riskTemplateForm.unit}`];
+  if (defaults) {
+    riskTemplateForm.threat = defaults.threat;
+    riskTemplateForm.defaultLevel = defaults.level;
+  }
+  if (!editingRiskTemplateId.value) {
+    riskTemplateForm.analysis = '';
+    riskTemplateForm.advice = '';
+  }
+}
+
+function openAddRiskTemplate() {
+  const missing = riskLayers.value.flatMap(layer => riskUnits(layer).map(unit => ({ layer, unit })))
+    .find(candidate => !riskTemplates.value.some(item => item.layer === candidate.layer && item.unit === candidate.unit));
+  const candidate = missing || { layer: activeRiskLayer.value, unit: riskUnits(activeRiskLayer.value)[0] };
+  editingRiskTemplateId.value = '';
+  const defaults = riskUnitDefaults[`${candidate.layer}|${candidate.unit}`] || { threat: '', level: '中' };
+  Object.assign(riskTemplateForm, { layer: candidate.layer, unit: candidate.unit, threat: defaults.threat, defaultLevel: defaults.level, analysis: '', advice: '', enabled: true, version: 1 });
+  showRiskTemplateModal.value = true;
+}
+
+function editRiskTemplate(item: any) {
+  editingRiskTemplateId.value = item.id;
+  Object.assign(riskTemplateForm, JSON.parse(JSON.stringify(item)));
+  showRiskTemplateModal.value = true;
+}
+
+function saveRiskTemplateForm() {
+  if (!riskTemplateForm.layer || !riskTemplateForm.unit) return notify('请选择安全层面和测评单元');
+  if (!riskTemplateForm.analysis.trim() || !riskTemplateForm.advice.trim()) return notify('风险分析和整改建议均不能为空');
+  const duplicate = riskTemplates.value.find(item => item.layer === riskTemplateForm.layer && item.unit === riskTemplateForm.unit && item.id !== editingRiskTemplateId.value);
+  const targetId = editingRiskTemplateId.value || duplicate?.id || riskTemplateId(riskTemplateForm.layer, riskTemplateForm.unit);
+  const value = { ...JSON.parse(JSON.stringify(riskTemplateForm)), id: targetId, result: '*' };
+  const index = riskTemplates.value.findIndex(item => item.id === targetId);
+  if (index >= 0) riskTemplates.value.splice(index, 1, value);
+  else riskTemplates.value.push(value);
+  riskTemplates.value = ensureRiskTemplateCoverage(riskTemplates.value);
+  activeRiskLayer.value = value.layer;
+  showRiskTemplateModal.value = false;
+}
+
+async function importRiskTemplates(event: Event) {
+  const input = event.target as HTMLInputElement;
+  const file = input.files?.[0];
+  if (!file) return;
+  try {
+    const imported = await api('/settings/risk-templates/import', { method: 'POST', body: JSON.stringify({ name: file.name, dataBase64: await fileAsBase64(file) }) });
+    const unknown = imported.find((item: any) => !riskUnits(item.layer).includes(item.unit));
+    if (unknown) throw new Error(`Excel 中存在系统未定义的测评单元：${unknown.layer} / ${unknown.unit}`);
+    const merged = ensureRiskTemplateCoverage(riskTemplates.value);
+    imported.forEach((item: any) => {
+      const current = merged.find(template => template.layer === item.layer && template.unit === item.unit);
+      if (!current) return;
+      current.threat = item.threat || current.threat;
+      current.defaultLevel = item.defaultLevel || current.defaultLevel;
+      current.analysis = item.analysis || current.analysis;
+      current.advice = item.advice || current.advice;
+      current.enabled = true;
+      current.version = Math.max(Number(current.version || 1), Number(item.version || 1));
+    });
+    riskTemplates.value = ensureRiskTemplateCoverage(merged);
+    riskTemplates.value = await api('/settings/risk-templates', { method: 'PUT', body: JSON.stringify(riskTemplates.value) });
+    riskTemplates.value = ensureRiskTemplateCoverage(riskTemplates.value);
+    const analysisCount = imported.filter((item: any) => String(item.analysis || '').trim()).length;
+    const adviceCount = imported.filter((item: any) => String(item.advice || '').trim()).length;
+    const threatCount = imported.filter((item: any) => String(item.threat || '').trim()).length;
+    notify(`已导入${imported.length}条：威胁${threatCount}条、风险分析${analysisCount}条、整改建议${adviceCount}条${analysisCount || adviceCount ? '' : '；Excel后两列为空，已保留系统原内容'}`);
+  } catch (error) { notify((error as Error).message); }
+  finally { input.value = ''; }
+}
+
+async function exportRiskTemplates() {
+  try {
+    const rows = ensureRiskTemplateCoverage(riskTemplates.value);
+    const file = await api('/settings/risk-templates/export', { method: 'POST', body: JSON.stringify(rows) });
+    const link = document.createElement('a');
+    link.href = `data:application/vnd.openxmlformats-officedocument.spreadsheetml.sheet;base64,${file.dataBase64}`;
+    link.download = file.name || '风险模板导入模板.xlsx';
+    document.body.appendChild(link); link.click(); link.remove();
+    notify('风险模板 Excel 已导出');
+  } catch (error) { notify((error as Error).message); }
+}
+
+async function saveRiskTemplates() {
+  try {
+    const rows = ensureRiskTemplateCoverage(riskTemplates.value);
+    const incomplete = rows.find(item => !item.analysis.trim() || !item.advice.trim());
+    if (incomplete) {
+      activeRiskLayer.value = incomplete.layer;
+      return notify(`${incomplete.unit}缺少风险分析或整改建议`);
+    }
+    riskTemplates.value = await api('/settings/risk-templates', { method: 'PUT', body: JSON.stringify(rows) });
+    riskTemplates.value = ensureRiskTemplateCoverage(riskTemplates.value);
+    notify('风险模板库已保存');
   } catch (error) { notify((error as Error).message); }
 }
 
@@ -433,8 +688,11 @@ onMounted(async () => {
   if (!token.value) return;
   try {
     currentUser.value = await api('/auth/me');
-    const requestedPage = new URLSearchParams(window.location.search).get('page');
-    await openPage(requestedPage === 'projects' ? 'projects' : 'dashboard');
+    const requestedPage = new URLSearchParams(window.location.search).get('page') as Page | null;
+    const adminOnlyPages: Page[] = ['templates', 'risk-analysis', 'institution'];
+    const canRestore = requestedPage && restorablePages.includes(requestedPage)
+      && (!adminOnlyPages.includes(requestedPage) || currentUser.value?.role === 'admin');
+    await openPage(canRestore ? requestedPage : 'dashboard');
   }
   catch { logout(); }
 });
@@ -472,13 +730,14 @@ onMounted(async () => {
         <button :class="{active:page==='users'}" @click="openPage('users')"><i>◎</i><span>用户管理</span></button>
         <button v-if="currentUser?.role==='admin'" :class="{active:page==='institution'}" @click="openPage('institution')"><i>◆</i><span>测评机构</span></button>
         <button v-if="currentUser?.role==='admin'" :class="{active:page==='templates'}" @click="openPage('templates')"><i>▤</i><span>模板设置</span></button>
+        <button v-if="currentUser?.role==='admin'" :class="{active:page==='risk-analysis'}" @click="openPage('risk-analysis')"><i>⚠</i><span>风险分析</span></button>
       </nav>
       <div class="side-bottom"><button><i>?</i><span>使用帮助</span></button><button><i>⚙</i><span>系统设置</span></button></div>
     </aside>
 
     <main class="main">
       <header class="topbar">
-        <div><b>{{ page==='dashboard'?'工作台':page==='projects'?'项目管理':page==='users'?'用户管理':page==='templates'?'模板设置':page==='institution'?'测评机构管理':selectedProject?.system_name }}</b><span v-if="page==='workspace'" class="top-code">{{ selectedProject?.code }}</span></div>
+        <div><b>{{ page==='dashboard'?'工作台':page==='projects'?'项目管理':page==='users'?'用户管理':page==='templates'?'模板设置':page==='risk-analysis'?'风险分析':page==='institution'?'测评机构管理':selectedProject?.system_name }}</b><span v-if="page==='workspace'" class="top-code">{{ selectedProject?.code }}</span></div>
         <div class="top-actions"><button class="text-btn" @click="showPasswordModal=true">修改密码</button><button class="icon-btn" title="通知">◔<span class="dot"></span></button><div class="avatar">{{ currentUser?.display_name?.slice(0,1) }}</div><div class="user-block"><b>{{ currentUser?.display_name }}</b><small>{{ roleMap[currentUser?.role || ''] }}</small></div><button class="logout" @click="logout">退出</button></div>
       </header>
 
@@ -503,7 +762,7 @@ onMounted(async () => {
       <div v-else-if="page==='projects'" class="content list-page">
         <section class="page-title"><div><small>项目全生命周期管理</small><h1>项目管理</h1><p>集中管理项目档案、阶段进度、测评数据与报告成果。</p></div><button class="primary" @click="openAddProjectModal">＋ 新建项目</button></section>
         <section class="panel filter-panel"><div class="search"><span>⌕</span><input v-model="filters.search" @keyup.enter="loadProjects" placeholder="搜索项目编号、报告编号、系统或单位" /></div><select v-model="filters.year" @change="loadProjects"><option value="">全部年度</option><option>2026</option><option>2025</option></select><select v-model="filters.level" @change="loadProjects"><option value="">全部等级</option><option value="2">二级</option><option value="3">三级</option><option value="4">四级</option></select><select v-model="filters.status" @change="loadProjects"><option value="">全部状态</option><option value="draft">草稿</option><option value="in_progress">实施中</option><option value="reviewing">审核中</option><option value="completed">已完成</option></select><button class="secondary" @click="loadProjects">查询</button></section>
-        <section class="panel data-table project-table"><div class="table-head"><span>项目</span><span>年度</span><span>等级</span><span>当前阶段</span><span>系统评分</span><span>进度</span><span>操作</span></div><div v-for="p in visibleProjects" :key="p.id" class="table-row project-row"><span><b>{{ p.system_name }}</b><small>{{ p.code }}<template v-if="p.report_code"> · {{ p.report_code }}</template><br>{{ p.org_name }}</small></span><span><b>{{ p.assessment_year }}</b></span><span><b>{{ p.system_level }}级</b></span><span><i class="status-pill" :class="p.status">{{ statusMap[p.status] }}</i><small>{{ stageMeta[p.current_stage-1]?.short }}</small></span><span><b>{{ p.system_score ?? '—' }}</b><small>满分 100</small></span><span><div class="progress"><i :style="{width:p.progress+'%'}"></i></div><small>{{ p.progress }}%</small></span><span class="project-actions"><button @click="openProject(p)">实施</button><label class="project-action-label" for="project-word-import" @click.stop="importTargetProject=p">导入Word</label><button @click="copyProject(p)">复制</button><button @click="openEditProjectModal(p)">编辑</button><button class="danger" @click="projectToDelete=p">删除</button></span></div></section>
+        <section class="panel data-table project-table"><div class="table-head"><span>项目</span><span>年度</span><span>等级</span><span>当前阶段</span><span>系统评分</span><span>进度</span><span>操作</span></div><div v-for="p in visibleProjects" :key="p.id" class="table-row project-row"><span><b>{{ p.system_name }}</b><small>{{ p.code }}<template v-if="p.report_code"> · {{ p.report_code }}</template><br>{{ p.org_name }}</small></span><span><b>{{ p.assessment_year }}</b></span><span><b>{{ p.system_level }}级</b></span><span><i class="status-pill" :class="p.status">{{ statusMap[p.status] }}</i><small>{{ stageMeta[p.current_stage-1]?.short }}</small></span><span><b>{{ p.system_score ?? '—' }}</b><small>满分 100</small></span><span><div class="progress"><i :style="{width:p.progress+'%'}"></i></div><small>{{ p.progress }}%</small></span><span class="project-actions"><button @click="openProject(p)">实施</button><label class="project-action-label" for="project-word-import" @click.stop="importTargetProject=p">导入Word</label><button @click="openCopyProjectModal(p)">复制</button><button @click="openEditProjectModal(p)">编辑</button><button class="danger" @click="projectToDelete=p">删除</button></span></div></section>
       </div>
 
       <div v-else-if="page==='workspace' && selectedProject" class="workspace">
@@ -533,15 +792,46 @@ onMounted(async () => {
 
       <div v-else-if="page==='templates'" class="content settings-page">
         <section class="page-title"><div><small>TEMPLATE CENTER</small><h1>模板设置</h1><p>统一维护正式报告模板与原始记录文件夹模板。</p></div></section>
-        <section class="template-grid"><article class="panel template-card"><div class="template-icon">W</div><div><small>WORD REPORT</small><h2>三级报告模板</h2><p>导出时保留模板原有目录、分页、页眉页脚和表格，只替换模板中已有字段。</p><div class="template-meta"><b>{{ templateInfo.report?.name || '尚未配置' }}</b><span v-if="templateInfo.report">{{ Math.round(templateInfo.report.size/1024/1024*10)/10 }} MB · 已配置默认模板</span></div></div><label class="primary upload-button">导入三级报告模板<input type="file" accept=".docx" @change="uploadReportTemplate($event, 3)" /></label></article><article class="panel template-card"><div class="template-icon">W</div><div><small>WORD REPORT</small><h2>二级报告模板</h2><p>导出时保留模板原有目录、分页、页眉页脚和表格，只替换模板中已有字段。</p><div class="template-meta"><b>{{ templateInfo.report2?.name || '尚未配置' }}</b><span v-if="templateInfo.report2">{{ Math.round(templateInfo.report2.size/1024/1024*10)/10 }} MB · 已配置默认模板</span></div></div><label class="primary upload-button">导入二级报告模板<input type="file" accept=".docx" @change="uploadReportTemplate($event, 2)" /></label></article>
-          <article class="panel template-card"><div class="template-icon folder">▰</div><div><small>RAW RECORDS</small><h2>原始记录模板</h2><p>生成时自动写入当前项目的基础信息、人员、日期、资产、工具和风险，并输出到“报告编号+原始记录”文件夹。</p><div class="template-meta"><b>{{ templateInfo.rawRecords?.length || 0 }} 个文件</b><span>{{ templateInfo.rawRecords?.slice(0,3).map((f:any)=>f.path).join('、') || '尚未导入文件夹' }}</span></div></div><label class="primary upload-button">导入模板文件夹<input type="file" webkitdirectory multiple @change="uploadRawFolder" /></label></article></section>
-        <section class="panel template-rules"><h3>报告模板字段规则</h3><p>可在需要系统写入的位置使用 <code>{报告编号}</code>、<code>{项目编号}</code>、<code>{系统名称}</code>、<code>{责任单位}</code>、<code>{测评年度}</code>、<code>{系统等级}</code>。系统只替换模板中真实存在的字段。</p><p>表 A-1 至表 A-8 请保留各测评单元名称和一行数据样板；导出时会按测评对象扩行、合并同一单元的名称与得分，并将该层面的证据截图放在表后。</p></section>
+        <section class="template-grid">
+          <article class="panel template-card">
+            <div class="template-icon">W</div>
+            <div><small>WORD REPORT</small><h2>三级报告模板</h2><p>导出时保留模板原有目录、分页、页眉页脚和表格，只替换模板中已有字段。</p><div class="template-meta"><b>{{ templateInfo.report?.name || '尚未配置' }}</b><span v-if="templateInfo.report">{{ Math.round(templateInfo.report.size/1024/1024*10)/10 }} MB · 已配置默认模板</span></div></div>
+            <div class="template-actions"><label class="primary upload-button">导入三级报告模板<input type="file" accept=".docx" @change="uploadReportTemplate($event, 3)" /></label><button class="secondary" :disabled="!templateInfo.report" @click="downloadReportTemplate(3)">下载当前模板</button></div>
+          </article>
+          <article class="panel template-card">
+            <div class="template-icon">W</div>
+            <div><small>WORD REPORT</small><h2>二级报告模板</h2><p>导出时保留模板原有目录、分页、页眉页脚和表格，只替换模板中已有字段。</p><div class="template-meta"><b>{{ templateInfo.report2?.name || '尚未配置' }}</b><span v-if="templateInfo.report2">{{ Math.round(templateInfo.report2.size/1024/1024*10)/10 }} MB · 已配置默认模板</span></div></div>
+            <div class="template-actions"><label class="primary upload-button">导入二级报告模板<input type="file" accept=".docx" @change="uploadReportTemplate($event, 2)" /></label><button class="secondary" :disabled="!templateInfo.report2" @click="downloadReportTemplate(2)">下载当前模板</button></div>
+          </article>
+          <article class="panel template-card">
+            <div class="template-icon folder">▰</div>
+            <div><small>RAW RECORDS</small><h2>原始记录模板</h2><p>生成时自动写入当前项目的基础信息、人员、日期、资产、工具和风险，并输出到“报告编号+系统名称+原始记录”文件夹。</p><div class="template-meta"><b>{{ templateInfo.rawRecords?.length || 0 }} 个文件</b><span>{{ templateInfo.rawRecords?.slice(0,3).map((f:any)=>f.path).join('、') || '尚未导入文件夹' }}</span></div></div>
+            <div class="template-actions"><label class="primary upload-button">导入模板文件夹<input type="file" webkitdirectory multiple @change="uploadRawFolder" /></label><button class="secondary" :disabled="!templateInfo.rawRecords?.length" @click="downloadRawTemplate">下载模板压缩包</button></div>
+          </article>
+        </section>
+        <section class="template-tip"><strong>提示</strong><span>模板支持修改字体、段落、分页、页眉页脚、表格边框等样式；如需新增字段映射，需要通过代码实现。</span></section>
+      </div>
+
+      <div v-else-if="page==='risk-analysis'" class="content settings-page risk-analysis-page">
+        <section class="page-title"><div><small>RISK ANALYSIS</small><h1>风险分析</h1><p>按安全层面和测评单元维护关联威胁、风险等级、风险分析和整改建议。</p></div></section>
+        <section class="panel risk-template-panel">
+          <div class="risk-template-head"><div><small>RISK TEMPLATE LIBRARY</small><h2>风险分析与整改建议模板库</h2><p>Excel 列结构：安全层面、测评单元、威胁、风险等级、风险分析、整改建议。</p></div><div class="risk-template-actions"><label class="primary upload-button">导入风险模板<input type="file" accept=".xlsx" @change="importRiskTemplates" /></label><button class="secondary" @click="exportRiskTemplates">导出 Excel</button><button class="secondary" @click="openAddRiskTemplate">＋ 新增模板</button><button class="secondary" @click="saveRiskTemplates">保存模板库</button></div></div>
+          <div class="risk-template-summary"><div><strong>{{ riskTemplateTotal }}</strong><span>测评单元</span></div><div><strong>{{ riskTemplateCompleteCount }}</strong><span>已填写分析与建议</span></div><div><strong>{{ riskTemplateTotal-riskTemplateCompleteCount }}</strong><span>待完善</span></div></div>
+          <div class="risk-layer-tabs"><button v-for="layer in riskLayers" :key="layer" :class="{active:activeRiskLayer===layer}" @click="activeRiskLayer=layer"><span>{{ layer }}</span><em>{{ riskTemplates.filter(item=>item.layer===layer).length }}/{{ riskUnits(layer).length }}</em></button></div>
+          <div class="risk-template-table"><div class="risk-template-list-head"><span>测评单元</span><span>威胁</span><span>风险等级</span><span>风险分析</span><span>整改建议</span><span>状态</span><span>操作</span></div>
+            <article v-for="item in visibleRiskTemplates" :key="item.id" class="risk-template-list-row">
+              <strong>{{ item.unit }}</strong><code>{{ item.threat || '未填写' }}</code><span :class="['risk-level-badge',`level-${item.defaultLevel}`]">{{ item.defaultLevel }}风险</span><p>{{ item.analysis || '未填写风险分析' }}</p><p>{{ item.advice || '未填写整改建议' }}</p><span :class="['risk-status',item.analysis&&item.advice?'complete':'pending']">{{ item.analysis&&item.advice?'完整':'待完善' }}</span><span class="risk-row-actions"><button class="secondary" @click="editRiskTemplate(item)">编辑</button></span>
+            </article>
+          </div>
+        </section>
       </div>
     </main>
   </div>
 
+  <div v-if="showRiskTemplateModal" class="modal-mask" @click.self="showRiskTemplateModal=false"><form class="modal risk-template-modal" @submit.prevent="saveRiskTemplateForm"><div class="modal-head"><div><small>RISK TEMPLATE</small><h2>{{ editingRiskTemplateId ? '编辑风险模板' : '新增风险模板' }}</h2><p>每个安全层面下的每个测评单元保留一条模板。</p></div><button type="button" @click="showRiskTemplateModal=false">×</button></div><div class="risk-template-modal-grid"><label>安全层面<select v-model="riskTemplateForm.layer" :disabled="!!editingRiskTemplateId" @change="changeRiskTemplateLayer"><option v-for="layer in riskLayers" :key="layer" :value="layer">{{ layer }}</option></select></label><label>测评单元<select v-model="riskTemplateForm.unit" :disabled="!!editingRiskTemplateId" @change="changeRiskTemplateLayer"><option v-for="unit in riskUnits(riskTemplateForm.layer)" :key="unit" :value="unit">{{ unit }}</option></select></label><label>关联威胁<input v-model="riskTemplateForm.threat" placeholder="如 TP1、TN2" /></label><label>默认风险等级<select v-model="riskTemplateForm.defaultLevel"><option>高</option><option>中</option><option>低</option></select></label><label class="span-2">风险分析<textarea v-model="riskTemplateForm.analysis" rows="6" required placeholder="支持 {系统名称}、{安全层面}、{测评单元} 占位符"></textarea></label><label class="span-2">整改建议<textarea v-model="riskTemplateForm.advice" rows="6" required placeholder="请输入该测评单元对应的整改建议"></textarea></label><label class="risk-enabled"><input v-model="riskTemplateForm.enabled" type="checkbox" />启用此模板</label></div><div class="modal-foot"><button type="button" class="secondary" @click="showRiskTemplateModal=false">取消</button><button class="primary">保存模板</button></div></form></div>
   <div v-if="activePlanningModule" class="modal-mask" @click.self="activePlanningModule=null"><form class="modal planning-modal" @submit.prevent="savePlanningModule"><div class="modal-head"><div><small>方案编制</small><h2>{{ activePlanningModule.title }}</h2><p>{{ activePlanningModule.note }}</p></div><button type="button" @click="activePlanningModule=null">×</button></div><div class="planning-form"><label v-for="field in activePlanningModule.fields" v-show="activePlanningModule.key !== 'previousAssessment' || field.key === 'assessmentCount' || field.key === 'assessmentContent' || Number(planningForm.assessmentCount || 1) > 1" :key="field.key">{{ field.label }}<textarea v-if="field.multiline" v-model="planningForm[field.key]" :placeholder="field.placeholder" rows="4" @keydown.enter="handleParagraphEnter" @blur="normalizePlanningParagraph(field.key)"></textarea><input v-else v-model="planningForm[field.key]" :type="field.key === 'assessmentCount' ? 'number' : 'text'" :min="field.key === 'assessmentCount' ? 1 : undefined" :step="field.key === 'assessmentCount' ? 1 : undefined" :placeholder="field.placeholder" /></label></div><div class="modal-foot"><button type="button" class="secondary" @click="activePlanningModule=null">取消</button><button class="primary">保存模块内容</button></div></form></div>
   <div v-if="showProjectModal" class="modal-mask" @click.self="showProjectModal=false"><form class="modal" @submit.prevent="createProject"><div class="modal-head"><div><small>PROJECT</small><h2>{{ editingProjectId ? '编辑密评项目' : '新建密评项目' }}</h2></div><button type="button" @click="showProjectModal=false">×</button></div><div class="form-grid"><label>项目编号<input :value="editingProjectId ? projectForm.code : `MP-${projectForm.assessmentYear}-自动编号`" readonly class="readonly-input" /></label><label>报告编号<input v-model="projectForm.reportCode" placeholder="可稍后补充或从Word导入" /></label><label class="span-2">系统名称<input v-model="projectForm.systemName" required placeholder="请输入被测系统全称" /></label><label class="span-2">责任单位<input v-model="projectForm.orgName" required placeholder="请输入责任单位全称" /></label><label>测评年度<input v-model.number="projectForm.assessmentYear" type="number" /></label><label>系统等级<select v-model.number="projectForm.systemLevel"><option :value="2">二级</option><option :value="3">三级</option></select></label><label>开始日期<input v-model="projectForm.startDate" type="date" /></label><label>结束日期<input v-model="projectForm.endDate" type="date" /></label></div><div class="modal-foot"><button type="button" class="secondary" @click="showProjectModal=false">取消</button><button class="primary">{{ editingProjectId ? '保存修改' : '创建并进入项目' }}</button></div></form></div>
+  <div v-if="copySourceProject" class="modal-mask" @click.self="copySourceProject=null"><form class="modal small" @submit.prevent="copyProject"><div class="modal-head"><div><small>RETEST COPY</small><h2>复制为复测项目</h2><p>保留现场测评记录和证据，附录 B 的独立材料将清空。</p></div><button type="button" @click="copySourceProject=null">×</button></div><div class="form-grid"><label class="span-2">系统名称<input v-model="copyForm.systemName" required placeholder="请输入被测系统全称" /></label><label>报告编号<input v-model="copyForm.reportCode" placeholder="请输入新报告编号" /></label><label>测评年度<input v-model.number="copyForm.assessmentYear" type="number" min="2000" max="2100" required /></label><label>开始时间<input v-model="copyForm.startDate" type="date" required /></label><label>结束时间<input v-model="copyForm.endDate" type="date" required /></label></div><div class="modal-foot"><button type="button" class="secondary" @click="copySourceProject=null">取消</button><button class="primary">确认复制</button></div></form></div>
   <div v-if="projectToDelete" class="modal-mask" @click.self="projectToDelete=null"><div class="modal confirm-dialog"><div class="confirm-symbol">!</div><h2>确认删除该项目？</h2><p>将删除“{{ projectToDelete.system_name }}”及其阶段数据、资产、测评记录、风险和证据文件记录。此操作不可恢复。</p><div class="modal-foot"><button class="secondary" @click="projectToDelete=null">取消</button><button class="primary danger-button" @click="deleteProject">确认删除</button></div></div></div>
   <div v-if="showUserModal" class="modal-mask" @click.self="showUserModal=false"><form class="modal small" @submit.prevent="createUser"><div class="modal-head"><div><small>USER</small><h2>{{ editingUserId ? '编辑用户信息' : '添加系统用户' }}</h2></div><button type="button" @click="showUserModal=false">×</button></div><div class="form-grid"><label>用户名<input v-model="userForm.username" required :readonly="!!editingUserId" placeholder="英文、数字或下划线" /></label><label>姓名<input v-model="userForm.displayName" required placeholder="真实姓名" /></label><label>系统角色<select v-model="userForm.role"><option value="evaluator">测评人员</option><option value="manager">项目负责人</option><option value="reviewer">审核人员</option><option value="admin">系统管理员</option></select></label><label>密评考试通过时间<input v-model="userForm.certificateDate" type="date" /></label><label class="span-2">密评证书<input type="file" accept="image/*,.pdf" @change="chooseCertificate" /><small>{{ userForm.certificateFileName || '支持图片或 PDF' }}</small></label></div><div class="modal-foot"><button type="button" class="secondary" @click="showUserModal=false">取消</button><button class="primary">{{ editingUserId ? '保存修改' : '确认添加' }}</button></div></form></div>
   <div v-if="showPasswordModal" class="modal-mask" @click.self="showPasswordModal=false"><form class="modal small" @submit.prevent="changePassword"><div class="modal-head"><div><small>ACCOUNT SECURITY</small><h2>修改账户密码</h2></div><button type="button" @click="showPasswordModal=false">×</button></div><div class="form-grid password-grid"><label class="span-2">当前密码<input v-model="passwordForm.currentPassword" type="password" required autocomplete="current-password" /></label><label>新密码<input v-model="passwordForm.newPassword" type="password" minlength="8" required autocomplete="new-password" /></label><label>确认新密码<input v-model="passwordForm.confirmPassword" type="password" minlength="8" required autocomplete="new-password" /></label></div><div class="modal-foot"><button type="button" class="secondary" @click="showPasswordModal=false">取消</button><button class="primary">确认修改</button></div></form></div>

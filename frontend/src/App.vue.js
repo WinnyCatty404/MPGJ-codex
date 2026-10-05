@@ -1,4 +1,5 @@
 import { computed, onMounted, reactive, ref } from 'vue';
+const restorablePages = ['dashboard', 'projects', 'users', 'templates', 'risk-analysis', 'institution'];
 const apiBase = '/api';
 const token = ref(localStorage.getItem('bb-token') || '');
 const currentUser = ref(null);
@@ -13,6 +14,7 @@ const selectedProject = ref(null);
 const activeStage = ref(0);
 const showProjectModal = ref(false);
 const editingProjectId = ref('');
+const copySourceProject = ref(null);
 const projectToDelete = ref(null);
 const showUserModal = ref(false);
 const editingUserId = ref('');
@@ -21,6 +23,64 @@ const showPasswordModal = ref(false);
 const passwordForm = reactive({ currentPassword: '', newPassword: '', confirmPassword: '' });
 const userFilters = reactive({ search: '', status: '' });
 const templateInfo = ref({ report: null, rawRecords: [] });
+const riskTemplates = ref([]);
+const showRiskTemplateModal = ref(false);
+const editingRiskTemplateId = ref('');
+const activeRiskLayer = ref('物理和环境安全');
+const riskTemplateForm = reactive({ layer: '物理和环境安全', unit: '身份鉴别', threat: '', defaultLevel: '中', analysis: '', advice: '', enabled: true, version: 1 });
+const riskUnitsByLayer = {
+    '物理和环境安全': ['身份鉴别', '电子门禁记录数据存储完整性', '视频监控记录数据存储完整性'],
+    '网络和通信安全': ['身份鉴别', '通信数据完整性', '通信过程中重要数据的机密性', '网络边界访问控制信息的完整性', '安全接入认证'],
+    '设备和计算安全': ['身份鉴别', '远程管理通道安全', '系统资源访问控制信息完整性', '重要信息资源安全标记完整性', '日志记录完整性', '重要可执行程序完整性、重要可执行程序来源真实性'],
+    '应用和数据安全': ['身份鉴别', '访问控制信息完整性', '重要信息资源安全标记完整性', '重要数据传输机密性', '重要数据存储机密性', '重要数据传输完整性', '重要数据存储完整性', '不可否认性'],
+    '管理制度': ['具备密码应用安全管理制度', '密钥管理规则', '建立操作规程', '定期修订安全管理制度', '明确管理制度发布流程', '制度执行过程记录留存'],
+    '人员管理': ['了解并遵守密码相关法律法规和密码管理制度', '建立密码应用岗位责任制度', '建立上岗人员培训制度', '定期进行安全岗位人员考核', '建立关键岗位人员保密制度和调离制度'],
+    '建设运行': ['制定密码应用方案', '制定密钥安全管理策略', '制定实施方案', '投入运行前进行密码应用安全性评估', '定期开展密码应用安全性评估及攻防对抗演习'],
+    '应急处置': ['应急策略', '事件处置', '向有关主管部门上报处置情况'],
+};
+const riskUnitDefaults = {
+    '物理和环境安全|身份鉴别': { threat: 'TP1', level: '中' },
+    '物理和环境安全|电子门禁记录数据存储完整性': { threat: 'TP2', level: '中' },
+    '物理和环境安全|视频监控记录数据存储完整性': { threat: 'TP2', level: '低' },
+    '网络和通信安全|身份鉴别': { threat: 'TN1', level: '中' },
+    '网络和通信安全|通信数据完整性': { threat: 'TN2', level: '中' },
+    '网络和通信安全|通信过程中重要数据的机密性': { threat: 'TN2', level: '中' },
+    '网络和通信安全|网络边界访问控制信息的完整性': { threat: 'TN3', level: '中' },
+    '网络和通信安全|安全接入认证': { threat: 'TN1', level: '中' },
+    '设备和计算安全|身份鉴别': { threat: 'TD1', level: '中' },
+    '设备和计算安全|远程管理通道安全': { threat: 'TD2', level: '中' },
+    '设备和计算安全|系统资源访问控制信息完整性': { threat: 'TD3', level: '中' },
+    '设备和计算安全|重要信息资源安全标记完整性': { threat: 'TD4', level: '中' },
+    '设备和计算安全|日志记录完整性': { threat: 'TD5', level: '中' },
+    '设备和计算安全|重要可执行程序完整性、重要可执行程序来源真实性': { threat: 'TD6', level: '中' },
+    '应用和数据安全|身份鉴别': { threat: 'TA1', level: '中' },
+    '应用和数据安全|访问控制信息完整性': { threat: 'TA2', level: '中' },
+    '应用和数据安全|重要信息资源安全标记完整性': { threat: 'TA3', level: '中' },
+    '应用和数据安全|重要数据传输机密性': { threat: 'TA4', level: '中' },
+    '应用和数据安全|重要数据存储机密性': { threat: 'TA4', level: '中' },
+    '应用和数据安全|重要数据传输完整性': { threat: 'TA4', level: '中' },
+    '应用和数据安全|重要数据存储完整性': { threat: 'TA4', level: '中' },
+    '应用和数据安全|不可否认性': { threat: 'TA6', level: '中' },
+    '管理制度|具备密码应用安全管理制度': { threat: 'TK7', level: '中' },
+    '管理制度|密钥管理规则': { threat: 'TK3', level: '中' },
+    '管理制度|建立操作规程': { threat: 'TK7', level: '低' },
+    '管理制度|定期修订安全管理制度': { threat: 'TK7', level: '低' },
+    '管理制度|明确管理制度发布流程': { threat: 'TK7', level: '低' },
+    '管理制度|制度执行过程记录留存': { threat: 'TK7', level: '低' },
+    '人员管理|了解并遵守密码相关法律法规和密码管理制度': { threat: 'TK7', level: '低' },
+    '人员管理|建立密码应用岗位责任制度': { threat: 'TK7', level: '低' },
+    '人员管理|建立上岗人员培训制度': { threat: 'TK7', level: '低' },
+    '人员管理|定期进行安全岗位人员考核': { threat: 'TK7', level: '低' },
+    '人员管理|建立关键岗位人员保密制度和调离制度': { threat: 'TK7', level: '低' },
+    '建设运行|制定密码应用方案': { threat: 'TK7', level: '低' },
+    '建设运行|制定密钥安全管理策略': { threat: 'TK7', level: '低' },
+    '建设运行|制定实施方案': { threat: 'TK7', level: '低' },
+    '建设运行|投入运行前进行密码应用安全性评估': { threat: 'TK7', level: '低' },
+    '建设运行|定期开展密码应用安全性评估及攻防对抗演习': { threat: 'TK7', level: '低' },
+    '应急处置|应急策略': { threat: 'TK7', level: '低' },
+    '应急处置|事件处置': { threat: 'TK7', level: '低' },
+    '应急处置|向有关主管部门上报处置情况': { threat: 'TK7', level: '低' },
+};
 const importTargetProject = ref(null);
 const institutionForm = reactive({ name: '', address: '', postalCode: '', contact: '', title: '', department: '', telephone: '', mobile: '', email: '' });
 const activePlanningModule = ref(null);
@@ -42,6 +102,7 @@ function normalizePlanningParagraph(key) {
 const filters = reactive({ search: '', year: '', level: '', status: '' });
 const dashboard = ref({ summary: {}, stages: [], recent: [], risks: [] });
 const projectForm = reactive({ code: '', reportCode: '', systemName: '', orgName: '', assessmentYear: 2026, systemLevel: 3, startDate: '', endDate: '' });
+const copyForm = reactive({ systemName: '', reportCode: '', assessmentYear: new Date().getFullYear(), startDate: '', endDate: '' });
 const userForm = reactive({ username: '', displayName: '', role: 'evaluator', certificateDate: '', certificateFileName: '' });
 const stageMeta = [
     { key: 'preparation', short: '项目准备', icon: '01', hint: '单位与项目基础资料' },
@@ -113,6 +174,10 @@ const visibleUsers = computed(() => users.value.filter(user => {
     return (!search || user.username.toLowerCase().includes(search) || user.display_name.toLowerCase().includes(search))
         && (!userFilters.status || user.status === userFilters.status);
 }));
+const riskLayers = computed(() => Object.keys(riskUnitsByLayer));
+const visibleRiskTemplates = computed(() => riskTemplates.value.filter(item => item.layer === activeRiskLayer.value));
+const riskTemplateTotal = computed(() => Object.values(riskUnitsByLayer).reduce((sum, units) => sum + units.length, 0));
+const riskTemplateCompleteCount = computed(() => riskTemplates.value.filter(item => item.analysis?.trim() && item.advice?.trim()).length);
 const selectedStage = computed(() => selectedProject.value?.stages?.find(s => s.stage_key === stageMeta[activeStage.value].key));
 function getPlanningValues() {
     const value = selectedStage.value?.data?.planningModules;
@@ -188,6 +253,11 @@ function logout() {
 }
 async function openPage(next) {
     page.value = next;
+    if (restorablePages.includes(next)) {
+        const url = new URL(window.location.href);
+        url.searchParams.set('page', next);
+        window.history.replaceState(null, '', url);
+    }
     if (next === 'dashboard')
         dashboard.value = await api('/dashboard');
     if (next === 'projects')
@@ -196,6 +266,8 @@ async function openPage(next) {
         users.value = await api('/users');
     if (next === 'templates')
         templateInfo.value = await api('/templates');
+    if (next === 'risk-analysis')
+        riskTemplates.value = ensureRiskTemplateCoverage(await api('/settings/risk-templates'));
     if (next === 'institution')
         Object.assign(institutionForm, await api('/settings/institution'));
 }
@@ -250,9 +322,23 @@ async function handleProjectWordImport(event) {
         input.value = '';
     }
 }
-async function copyProject(project) {
+function openCopyProjectModal(project) {
+    copySourceProject.value = project;
+    Object.assign(copyForm, {
+        systemName: project.system_name,
+        reportCode: project.report_code || '',
+        assessmentYear: project.assessment_year,
+        startDate: project.start_date ? String(project.start_date).slice(0, 10) : '',
+        endDate: project.end_date ? String(project.end_date).slice(0, 10) : '',
+    });
+}
+async function copyProject() {
+    const project = copySourceProject.value;
+    if (!project)
+        return;
     try {
-        const copied = await api(`/projects/${project.id}/copy`, { method: 'POST' });
+        const copied = await api(`/projects/${project.id}/copy`, { method: 'POST', body: JSON.stringify(copyForm) });
+        copySourceProject.value = null;
         notify(`已复制为新项目 ${copied.code}`);
         await loadProjects();
     }
@@ -404,6 +490,38 @@ async function uploadReportTemplate(event, systemLevel = 3) {
         notify(error.message);
     }
 }
+async function downloadStoredTemplate(path, fallbackName) {
+    try {
+        const response = await fetch(`${apiBase}${path}`, {
+            headers: token.value ? { Authorization: `Bearer ${token.value}` } : {},
+        });
+        if (!response.ok) {
+            const error = await response.json().catch(() => ({}));
+            throw new Error(error.message || '模板下载失败');
+        }
+        const disposition = response.headers.get('Content-Disposition') || '';
+        const encodedName = /filename\*=UTF-8''([^;]+)/i.exec(disposition)?.[1];
+        const fileName = encodedName ? decodeURIComponent(encodedName) : fallbackName;
+        const url = URL.createObjectURL(await response.blob());
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = fileName;
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+        window.setTimeout(() => URL.revokeObjectURL(url), 60000);
+        notify(`${fileName} 已下载`);
+    }
+    catch (error) {
+        notify(error.message);
+    }
+}
+function downloadReportTemplate(systemLevel) {
+    return downloadStoredTemplate(`/templates/report/download?systemLevel=${systemLevel}`, systemLevel === 2 ? '二级报告模板.docx' : '三级报告模板.docx');
+}
+function downloadRawTemplate() {
+    return downloadStoredTemplate('/templates/records/download', '原始记录模板.zip');
+}
 async function uploadRawFolder(event) {
     const files = [...(event.target.files || [])];
     if (!files.length)
@@ -412,7 +530,158 @@ async function uploadRawFolder(event) {
         const payload = await Promise.all(files.map(async (file) => ({ path: file.webkitRelativePath || file.name, dataBase64: await fileAsBase64(file) })));
         await api('/templates/records', { method: 'POST', body: JSON.stringify({ files: payload }) });
         templateInfo.value = await api('/templates');
-        notify(`已导入 ${files.length} 个原始记录模板文件`);
+        notify(`已替换原始记录模板，共 ${files.length} 个文件`);
+    }
+    catch (error) {
+        notify(error.message);
+    }
+    finally {
+        event.target.value = '';
+    }
+}
+function riskUnits(layer) {
+    return riskUnitsByLayer[layer] || [];
+}
+function riskTemplateId(layer, unit) {
+    let hash = 2166136261;
+    const value = `${layer}|${unit}`;
+    for (let index = 0; index < value.length; index++) {
+        hash ^= value.charCodeAt(index);
+        hash = Math.imul(hash, 16777619);
+    }
+    return `risk-unit-${(hash >>> 0).toString(36)}`;
+}
+function ensureRiskTemplateCoverage(source) {
+    const normalized = (Array.isArray(source) ? source : []).map(item => ({
+        ...item,
+        unit: item.unit === '重要程序和文件完整性' ? '重要可执行程序完整性、重要可执行程序来源真实性' : item.unit,
+    }));
+    return Object.entries(riskUnitsByLayer).flatMap(([layer, units]) => {
+        const layerFallback = normalized.find(item => item.layer === layer && item.unit === '*');
+        return units.map(unit => {
+            const found = normalized.find(item => item.layer === layer && item.unit === unit);
+            const base = found || layerFallback || {};
+            const defaults = riskUnitDefaults[`${layer}|${unit}`] || { threat: '', level: layer.includes('安全') ? '中' : '低' };
+            return {
+                id: found?.id || riskTemplateId(layer, unit), layer, unit, result: '*',
+                threat: found?.threat || defaults.threat,
+                analysis: found?.analysis || layerFallback?.analysis || `“${unit}”测评单元未完全满足密码应用要求，可能导致相关安全需求无法得到有效保障。`,
+                advice: found?.advice || layerFallback?.advice || `建议按照相关标准要求，对“${unit}”测评单元存在的问题进行整改，并留存实施和验证记录。`,
+                defaultLevel: found?.defaultLevel || defaults.level,
+                version: Number(base.version || 1), enabled: base.enabled !== false,
+            };
+        });
+    });
+}
+function changeRiskTemplateLayer() {
+    const units = riskUnits(riskTemplateForm.layer);
+    if (!units.includes(riskTemplateForm.unit))
+        riskTemplateForm.unit = units[0] || '';
+    const defaults = riskUnitDefaults[`${riskTemplateForm.layer}|${riskTemplateForm.unit}`];
+    if (defaults) {
+        riskTemplateForm.threat = defaults.threat;
+        riskTemplateForm.defaultLevel = defaults.level;
+    }
+    if (!editingRiskTemplateId.value) {
+        riskTemplateForm.analysis = '';
+        riskTemplateForm.advice = '';
+    }
+}
+function openAddRiskTemplate() {
+    const missing = riskLayers.value.flatMap(layer => riskUnits(layer).map(unit => ({ layer, unit })))
+        .find(candidate => !riskTemplates.value.some(item => item.layer === candidate.layer && item.unit === candidate.unit));
+    const candidate = missing || { layer: activeRiskLayer.value, unit: riskUnits(activeRiskLayer.value)[0] };
+    editingRiskTemplateId.value = '';
+    const defaults = riskUnitDefaults[`${candidate.layer}|${candidate.unit}`] || { threat: '', level: '中' };
+    Object.assign(riskTemplateForm, { layer: candidate.layer, unit: candidate.unit, threat: defaults.threat, defaultLevel: defaults.level, analysis: '', advice: '', enabled: true, version: 1 });
+    showRiskTemplateModal.value = true;
+}
+function editRiskTemplate(item) {
+    editingRiskTemplateId.value = item.id;
+    Object.assign(riskTemplateForm, JSON.parse(JSON.stringify(item)));
+    showRiskTemplateModal.value = true;
+}
+function saveRiskTemplateForm() {
+    if (!riskTemplateForm.layer || !riskTemplateForm.unit)
+        return notify('请选择安全层面和测评单元');
+    if (!riskTemplateForm.analysis.trim() || !riskTemplateForm.advice.trim())
+        return notify('风险分析和整改建议均不能为空');
+    const duplicate = riskTemplates.value.find(item => item.layer === riskTemplateForm.layer && item.unit === riskTemplateForm.unit && item.id !== editingRiskTemplateId.value);
+    const targetId = editingRiskTemplateId.value || duplicate?.id || riskTemplateId(riskTemplateForm.layer, riskTemplateForm.unit);
+    const value = { ...JSON.parse(JSON.stringify(riskTemplateForm)), id: targetId, result: '*' };
+    const index = riskTemplates.value.findIndex(item => item.id === targetId);
+    if (index >= 0)
+        riskTemplates.value.splice(index, 1, value);
+    else
+        riskTemplates.value.push(value);
+    riskTemplates.value = ensureRiskTemplateCoverage(riskTemplates.value);
+    activeRiskLayer.value = value.layer;
+    showRiskTemplateModal.value = false;
+}
+async function importRiskTemplates(event) {
+    const input = event.target;
+    const file = input.files?.[0];
+    if (!file)
+        return;
+    try {
+        const imported = await api('/settings/risk-templates/import', { method: 'POST', body: JSON.stringify({ name: file.name, dataBase64: await fileAsBase64(file) }) });
+        const unknown = imported.find((item) => !riskUnits(item.layer).includes(item.unit));
+        if (unknown)
+            throw new Error(`Excel 中存在系统未定义的测评单元：${unknown.layer} / ${unknown.unit}`);
+        const merged = ensureRiskTemplateCoverage(riskTemplates.value);
+        imported.forEach((item) => {
+            const current = merged.find(template => template.layer === item.layer && template.unit === item.unit);
+            if (!current)
+                return;
+            current.threat = item.threat || current.threat;
+            current.defaultLevel = item.defaultLevel || current.defaultLevel;
+            current.analysis = item.analysis || current.analysis;
+            current.advice = item.advice || current.advice;
+            current.enabled = true;
+            current.version = Math.max(Number(current.version || 1), Number(item.version || 1));
+        });
+        riskTemplates.value = ensureRiskTemplateCoverage(merged);
+        riskTemplates.value = await api('/settings/risk-templates', { method: 'PUT', body: JSON.stringify(riskTemplates.value) });
+        riskTemplates.value = ensureRiskTemplateCoverage(riskTemplates.value);
+        const analysisCount = imported.filter((item) => String(item.analysis || '').trim()).length;
+        const adviceCount = imported.filter((item) => String(item.advice || '').trim()).length;
+        const threatCount = imported.filter((item) => String(item.threat || '').trim()).length;
+        notify(`已导入${imported.length}条：威胁${threatCount}条、风险分析${analysisCount}条、整改建议${adviceCount}条${analysisCount || adviceCount ? '' : '；Excel后两列为空，已保留系统原内容'}`);
+    }
+    catch (error) {
+        notify(error.message);
+    }
+    finally {
+        input.value = '';
+    }
+}
+async function exportRiskTemplates() {
+    try {
+        const rows = ensureRiskTemplateCoverage(riskTemplates.value);
+        const file = await api('/settings/risk-templates/export', { method: 'POST', body: JSON.stringify(rows) });
+        const link = document.createElement('a');
+        link.href = `data:application/vnd.openxmlformats-officedocument.spreadsheetml.sheet;base64,${file.dataBase64}`;
+        link.download = file.name || '风险模板导入模板.xlsx';
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+        notify('风险模板 Excel 已导出');
+    }
+    catch (error) {
+        notify(error.message);
+    }
+}
+async function saveRiskTemplates() {
+    try {
+        const rows = ensureRiskTemplateCoverage(riskTemplates.value);
+        const incomplete = rows.find(item => !item.analysis.trim() || !item.advice.trim());
+        if (incomplete) {
+            activeRiskLayer.value = incomplete.layer;
+            return notify(`${incomplete.unit}缺少风险分析或整改建议`);
+        }
+        riskTemplates.value = await api('/settings/risk-templates', { method: 'PUT', body: JSON.stringify(rows) });
+        riskTemplates.value = ensureRiskTemplateCoverage(riskTemplates.value);
+        notify('风险模板库已保存');
     }
     catch (error) {
         notify(error.message);
@@ -453,7 +722,10 @@ onMounted(async () => {
     try {
         currentUser.value = await api('/auth/me');
         const requestedPage = new URLSearchParams(window.location.search).get('page');
-        await openPage(requestedPage === 'projects' ? 'projects' : 'dashboard');
+        const adminOnlyPages = ['templates', 'risk-analysis', 'institution'];
+        const canRestore = requestedPage && restorablePages.includes(requestedPage)
+            && (!adminOnlyPages.includes(requestedPage) || currentUser.value?.role === 'admin');
+        await openPage(canRestore ? requestedPage : 'dashboard');
     }
     catch {
         logout();
@@ -651,6 +923,23 @@ else {
         __VLS_asFunctionalElement1(__VLS_intrinsics.i, __VLS_intrinsics.i)({});
         __VLS_asFunctionalElement1(__VLS_intrinsics.span, __VLS_intrinsics.span)({});
     }
+    if (__VLS_ctx.currentUser?.role === 'admin') {
+        __VLS_asFunctionalElement1(__VLS_intrinsics.button, __VLS_intrinsics.button)({
+            ...{ onClick: (...[$event]) => {
+                    if (!!(!__VLS_ctx.token))
+                        throw 0;
+                    if (!(__VLS_ctx.currentUser?.role === 'admin'))
+                        throw 0;
+                    return (__VLS_ctx.openPage('risk-analysis'));
+                    // @ts-ignore
+                    [openPage, page, currentUser,];
+                } },
+            ...{ class: ({ active: __VLS_ctx.page === 'risk-analysis' }) },
+        });
+        /** @type {__VLS_StyleScopedClasses['active']} */ ;
+        __VLS_asFunctionalElement1(__VLS_intrinsics.i, __VLS_intrinsics.i)({});
+        __VLS_asFunctionalElement1(__VLS_intrinsics.span, __VLS_intrinsics.span)({});
+    }
     __VLS_asFunctionalElement1(__VLS_intrinsics.div, __VLS_intrinsics.div)({
         ...{ class: "side-bottom" },
     });
@@ -671,7 +960,7 @@ else {
     /** @type {__VLS_StyleScopedClasses['topbar']} */ ;
     __VLS_asFunctionalElement1(__VLS_intrinsics.div, __VLS_intrinsics.div)({});
     __VLS_asFunctionalElement1(__VLS_intrinsics.b, __VLS_intrinsics.b)({});
-    (__VLS_ctx.page === 'dashboard' ? '工作台' : __VLS_ctx.page === 'projects' ? '项目管理' : __VLS_ctx.page === 'users' ? '用户管理' : __VLS_ctx.page === 'templates' ? '模板设置' : __VLS_ctx.page === 'institution' ? '测评机构管理' : __VLS_ctx.selectedProject?.system_name);
+    (__VLS_ctx.page === 'dashboard' ? '工作台' : __VLS_ctx.page === 'projects' ? '项目管理' : __VLS_ctx.page === 'users' ? '用户管理' : __VLS_ctx.page === 'templates' ? '模板设置' : __VLS_ctx.page === 'risk-analysis' ? '风险分析' : __VLS_ctx.page === 'institution' ? '测评机构管理' : __VLS_ctx.selectedProject?.system_name);
     if (__VLS_ctx.page === 'workspace') {
         __VLS_asFunctionalElement1(__VLS_intrinsics.span, __VLS_intrinsics.span)({
             ...{ class: "top-code" },
@@ -689,7 +978,7 @@ else {
                     throw 0;
                 return (__VLS_ctx.showPasswordModal = true);
                 // @ts-ignore
-                [page, page, page, page, page, page, page, selectedProject, selectedProject, showPasswordModal,];
+                [page, page, page, page, page, page, page, page, selectedProject, selectedProject, showPasswordModal,];
             } },
         ...{ class: "text-btn" },
     });
@@ -1102,9 +1391,9 @@ else {
                             throw 0;
                         if (!(__VLS_ctx.page === 'projects'))
                             throw 0;
-                        return (__VLS_ctx.copyProject(p));
+                        return (__VLS_ctx.openCopyProjectModal(p));
                         // @ts-ignore
-                        [copyProject,];
+                        [openCopyProjectModal,];
                     } },
             });
             __VLS_asFunctionalElement1(__VLS_intrinsics.button, __VLS_intrinsics.button)({
@@ -1906,6 +2195,10 @@ else {
             __VLS_asFunctionalElement1(__VLS_intrinsics.span, __VLS_intrinsics.span)({});
             (Math.round(__VLS_ctx.templateInfo.report.size / 1024 / 1024 * 10) / 10);
         }
+        __VLS_asFunctionalElement1(__VLS_intrinsics.div, __VLS_intrinsics.div)({
+            ...{ class: "template-actions" },
+        });
+        /** @type {__VLS_StyleScopedClasses['template-actions']} */ ;
         __VLS_asFunctionalElement1(__VLS_intrinsics.label, __VLS_intrinsics.label)({
             ...{ class: "primary upload-button" },
         });
@@ -1934,6 +2227,30 @@ else {
             type: "file",
             accept: ".docx",
         });
+        __VLS_asFunctionalElement1(__VLS_intrinsics.button, __VLS_intrinsics.button)({
+            ...{ onClick: (...[$event]) => {
+                    if (!!(!__VLS_ctx.token))
+                        throw 0;
+                    if (!!(__VLS_ctx.page === 'dashboard'))
+                        throw 0;
+                    if (!!(__VLS_ctx.page === 'projects'))
+                        throw 0;
+                    if (!!(__VLS_ctx.page === 'workspace' && __VLS_ctx.selectedProject))
+                        throw 0;
+                    if (!!(__VLS_ctx.page === 'users'))
+                        throw 0;
+                    if (!!(__VLS_ctx.page === 'institution'))
+                        throw 0;
+                    if (!(__VLS_ctx.page === 'templates'))
+                        throw 0;
+                    return (__VLS_ctx.downloadReportTemplate(3));
+                    // @ts-ignore
+                    [downloadReportTemplate,];
+                } },
+            ...{ class: "secondary" },
+            disabled: (!__VLS_ctx.templateInfo.report),
+        });
+        /** @type {__VLS_StyleScopedClasses['secondary']} */ ;
         __VLS_asFunctionalElement1(__VLS_intrinsics.article, __VLS_intrinsics.article)({
             ...{ class: "panel template-card" },
         });
@@ -1957,6 +2274,10 @@ else {
             __VLS_asFunctionalElement1(__VLS_intrinsics.span, __VLS_intrinsics.span)({});
             (Math.round(__VLS_ctx.templateInfo.report2.size / 1024 / 1024 * 10) / 10);
         }
+        __VLS_asFunctionalElement1(__VLS_intrinsics.div, __VLS_intrinsics.div)({
+            ...{ class: "template-actions" },
+        });
+        /** @type {__VLS_StyleScopedClasses['template-actions']} */ ;
         __VLS_asFunctionalElement1(__VLS_intrinsics.label, __VLS_intrinsics.label)({
             ...{ class: "primary upload-button" },
         });
@@ -1980,11 +2301,35 @@ else {
                         throw 0;
                     return (__VLS_ctx.uploadReportTemplate($event, 2));
                     // @ts-ignore
-                    [templateInfo, templateInfo, templateInfo, uploadReportTemplate,];
+                    [templateInfo, templateInfo, templateInfo, templateInfo, uploadReportTemplate,];
                 } },
             type: "file",
             accept: ".docx",
         });
+        __VLS_asFunctionalElement1(__VLS_intrinsics.button, __VLS_intrinsics.button)({
+            ...{ onClick: (...[$event]) => {
+                    if (!!(!__VLS_ctx.token))
+                        throw 0;
+                    if (!!(__VLS_ctx.page === 'dashboard'))
+                        throw 0;
+                    if (!!(__VLS_ctx.page === 'projects'))
+                        throw 0;
+                    if (!!(__VLS_ctx.page === 'workspace' && __VLS_ctx.selectedProject))
+                        throw 0;
+                    if (!!(__VLS_ctx.page === 'users'))
+                        throw 0;
+                    if (!!(__VLS_ctx.page === 'institution'))
+                        throw 0;
+                    if (!(__VLS_ctx.page === 'templates'))
+                        throw 0;
+                    return (__VLS_ctx.downloadReportTemplate(2));
+                    // @ts-ignore
+                    [downloadReportTemplate,];
+                } },
+            ...{ class: "secondary" },
+            disabled: (!__VLS_ctx.templateInfo.report2),
+        });
+        /** @type {__VLS_StyleScopedClasses['secondary']} */ ;
         __VLS_asFunctionalElement1(__VLS_intrinsics.article, __VLS_intrinsics.article)({
             ...{ class: "panel template-card" },
         });
@@ -2007,6 +2352,10 @@ else {
         (__VLS_ctx.templateInfo.rawRecords?.length || 0);
         __VLS_asFunctionalElement1(__VLS_intrinsics.span, __VLS_intrinsics.span)({});
         (__VLS_ctx.templateInfo.rawRecords?.slice(0, 3).map((f) => f.path).join('、') || '尚未导入文件夹');
+        __VLS_asFunctionalElement1(__VLS_intrinsics.div, __VLS_intrinsics.div)({
+            ...{ class: "template-actions" },
+        });
+        /** @type {__VLS_StyleScopedClasses['template-actions']} */ ;
         __VLS_asFunctionalElement1(__VLS_intrinsics.label, __VLS_intrinsics.label)({
             ...{ class: "primary upload-button" },
         });
@@ -2018,21 +2367,335 @@ else {
             webkitdirectory: true,
             multiple: true,
         });
+        __VLS_asFunctionalElement1(__VLS_intrinsics.button, __VLS_intrinsics.button)({
+            ...{ onClick: (__VLS_ctx.downloadRawTemplate) },
+            ...{ class: "secondary" },
+            disabled: (!__VLS_ctx.templateInfo.rawRecords?.length),
+        });
+        /** @type {__VLS_StyleScopedClasses['secondary']} */ ;
         __VLS_asFunctionalElement1(__VLS_intrinsics.section, __VLS_intrinsics.section)({
-            ...{ class: "panel template-rules" },
+            ...{ class: "template-tip" },
+        });
+        /** @type {__VLS_StyleScopedClasses['template-tip']} */ ;
+        __VLS_asFunctionalElement1(__VLS_intrinsics.strong, __VLS_intrinsics.strong)({});
+        __VLS_asFunctionalElement1(__VLS_intrinsics.span, __VLS_intrinsics.span)({});
+    }
+    else if (__VLS_ctx.page === 'risk-analysis') {
+        __VLS_asFunctionalElement1(__VLS_intrinsics.div, __VLS_intrinsics.div)({
+            ...{ class: "content settings-page risk-analysis-page" },
+        });
+        /** @type {__VLS_StyleScopedClasses['content']} */ ;
+        /** @type {__VLS_StyleScopedClasses['settings-page']} */ ;
+        /** @type {__VLS_StyleScopedClasses['risk-analysis-page']} */ ;
+        __VLS_asFunctionalElement1(__VLS_intrinsics.section, __VLS_intrinsics.section)({
+            ...{ class: "page-title" },
+        });
+        /** @type {__VLS_StyleScopedClasses['page-title']} */ ;
+        __VLS_asFunctionalElement1(__VLS_intrinsics.div, __VLS_intrinsics.div)({});
+        __VLS_asFunctionalElement1(__VLS_intrinsics.small, __VLS_intrinsics.small)({});
+        __VLS_asFunctionalElement1(__VLS_intrinsics.h1, __VLS_intrinsics.h1)({});
+        __VLS_asFunctionalElement1(__VLS_intrinsics.p, __VLS_intrinsics.p)({});
+        __VLS_asFunctionalElement1(__VLS_intrinsics.section, __VLS_intrinsics.section)({
+            ...{ class: "panel risk-template-panel" },
         });
         /** @type {__VLS_StyleScopedClasses['panel']} */ ;
-        /** @type {__VLS_StyleScopedClasses['template-rules']} */ ;
-        __VLS_asFunctionalElement1(__VLS_intrinsics.h3, __VLS_intrinsics.h3)({});
+        /** @type {__VLS_StyleScopedClasses['risk-template-panel']} */ ;
+        __VLS_asFunctionalElement1(__VLS_intrinsics.div, __VLS_intrinsics.div)({
+            ...{ class: "risk-template-head" },
+        });
+        /** @type {__VLS_StyleScopedClasses['risk-template-head']} */ ;
+        __VLS_asFunctionalElement1(__VLS_intrinsics.div, __VLS_intrinsics.div)({});
+        __VLS_asFunctionalElement1(__VLS_intrinsics.small, __VLS_intrinsics.small)({});
+        __VLS_asFunctionalElement1(__VLS_intrinsics.h2, __VLS_intrinsics.h2)({});
         __VLS_asFunctionalElement1(__VLS_intrinsics.p, __VLS_intrinsics.p)({});
-        __VLS_asFunctionalElement1(__VLS_intrinsics.code, __VLS_intrinsics.code)({});
-        __VLS_asFunctionalElement1(__VLS_intrinsics.code, __VLS_intrinsics.code)({});
-        __VLS_asFunctionalElement1(__VLS_intrinsics.code, __VLS_intrinsics.code)({});
-        __VLS_asFunctionalElement1(__VLS_intrinsics.code, __VLS_intrinsics.code)({});
-        __VLS_asFunctionalElement1(__VLS_intrinsics.code, __VLS_intrinsics.code)({});
-        __VLS_asFunctionalElement1(__VLS_intrinsics.code, __VLS_intrinsics.code)({});
-        __VLS_asFunctionalElement1(__VLS_intrinsics.p, __VLS_intrinsics.p)({});
+        __VLS_asFunctionalElement1(__VLS_intrinsics.div, __VLS_intrinsics.div)({
+            ...{ class: "risk-template-actions" },
+        });
+        /** @type {__VLS_StyleScopedClasses['risk-template-actions']} */ ;
+        __VLS_asFunctionalElement1(__VLS_intrinsics.label, __VLS_intrinsics.label)({
+            ...{ class: "primary upload-button" },
+        });
+        /** @type {__VLS_StyleScopedClasses['primary']} */ ;
+        /** @type {__VLS_StyleScopedClasses['upload-button']} */ ;
+        __VLS_asFunctionalElement1(__VLS_intrinsics.input)({
+            ...{ onChange: (__VLS_ctx.importRiskTemplates) },
+            type: "file",
+            accept: ".xlsx",
+        });
+        __VLS_asFunctionalElement1(__VLS_intrinsics.button, __VLS_intrinsics.button)({
+            ...{ onClick: (__VLS_ctx.exportRiskTemplates) },
+            ...{ class: "secondary" },
+        });
+        /** @type {__VLS_StyleScopedClasses['secondary']} */ ;
+        __VLS_asFunctionalElement1(__VLS_intrinsics.button, __VLS_intrinsics.button)({
+            ...{ onClick: (__VLS_ctx.openAddRiskTemplate) },
+            ...{ class: "secondary" },
+        });
+        /** @type {__VLS_StyleScopedClasses['secondary']} */ ;
+        __VLS_asFunctionalElement1(__VLS_intrinsics.button, __VLS_intrinsics.button)({
+            ...{ onClick: (__VLS_ctx.saveRiskTemplates) },
+            ...{ class: "secondary" },
+        });
+        /** @type {__VLS_StyleScopedClasses['secondary']} */ ;
+        __VLS_asFunctionalElement1(__VLS_intrinsics.div, __VLS_intrinsics.div)({
+            ...{ class: "risk-template-summary" },
+        });
+        /** @type {__VLS_StyleScopedClasses['risk-template-summary']} */ ;
+        __VLS_asFunctionalElement1(__VLS_intrinsics.div, __VLS_intrinsics.div)({});
+        __VLS_asFunctionalElement1(__VLS_intrinsics.strong, __VLS_intrinsics.strong)({});
+        (__VLS_ctx.riskTemplateTotal);
+        __VLS_asFunctionalElement1(__VLS_intrinsics.span, __VLS_intrinsics.span)({});
+        __VLS_asFunctionalElement1(__VLS_intrinsics.div, __VLS_intrinsics.div)({});
+        __VLS_asFunctionalElement1(__VLS_intrinsics.strong, __VLS_intrinsics.strong)({});
+        (__VLS_ctx.riskTemplateCompleteCount);
+        __VLS_asFunctionalElement1(__VLS_intrinsics.span, __VLS_intrinsics.span)({});
+        __VLS_asFunctionalElement1(__VLS_intrinsics.div, __VLS_intrinsics.div)({});
+        __VLS_asFunctionalElement1(__VLS_intrinsics.strong, __VLS_intrinsics.strong)({});
+        (__VLS_ctx.riskTemplateTotal - __VLS_ctx.riskTemplateCompleteCount);
+        __VLS_asFunctionalElement1(__VLS_intrinsics.span, __VLS_intrinsics.span)({});
+        __VLS_asFunctionalElement1(__VLS_intrinsics.div, __VLS_intrinsics.div)({
+            ...{ class: "risk-layer-tabs" },
+        });
+        /** @type {__VLS_StyleScopedClasses['risk-layer-tabs']} */ ;
+        for (const [layer] of __VLS_vFor((__VLS_ctx.riskLayers))) {
+            __VLS_asFunctionalElement1(__VLS_intrinsics.button, __VLS_intrinsics.button)({
+                ...{ onClick: (...[$event]) => {
+                        if (!!(!__VLS_ctx.token))
+                            throw 0;
+                        if (!!(__VLS_ctx.page === 'dashboard'))
+                            throw 0;
+                        if (!!(__VLS_ctx.page === 'projects'))
+                            throw 0;
+                        if (!!(__VLS_ctx.page === 'workspace' && __VLS_ctx.selectedProject))
+                            throw 0;
+                        if (!!(__VLS_ctx.page === 'users'))
+                            throw 0;
+                        if (!!(__VLS_ctx.page === 'institution'))
+                            throw 0;
+                        if (!!(__VLS_ctx.page === 'templates'))
+                            throw 0;
+                        if (!(__VLS_ctx.page === 'risk-analysis'))
+                            throw 0;
+                        return (__VLS_ctx.activeRiskLayer = layer);
+                        // @ts-ignore
+                        [page, templateInfo, templateInfo, templateInfo, templateInfo, uploadRawFolder, downloadRawTemplate, importRiskTemplates, exportRiskTemplates, openAddRiskTemplate, saveRiskTemplates, riskTemplateTotal, riskTemplateTotal, riskTemplateCompleteCount, riskTemplateCompleteCount, riskLayers, activeRiskLayer,];
+                    } },
+                key: (layer),
+                ...{ class: ({ active: __VLS_ctx.activeRiskLayer === layer }) },
+            });
+            /** @type {__VLS_StyleScopedClasses['active']} */ ;
+            __VLS_asFunctionalElement1(__VLS_intrinsics.span, __VLS_intrinsics.span)({});
+            (layer);
+            __VLS_asFunctionalElement1(__VLS_intrinsics.em, __VLS_intrinsics.em)({});
+            (__VLS_ctx.riskTemplates.filter(item => item.layer === layer).length);
+            (__VLS_ctx.riskUnits(layer).length);
+            // @ts-ignore
+            [activeRiskLayer, riskTemplates, riskUnits,];
+        }
+        __VLS_asFunctionalElement1(__VLS_intrinsics.div, __VLS_intrinsics.div)({
+            ...{ class: "risk-template-table" },
+        });
+        /** @type {__VLS_StyleScopedClasses['risk-template-table']} */ ;
+        __VLS_asFunctionalElement1(__VLS_intrinsics.div, __VLS_intrinsics.div)({
+            ...{ class: "risk-template-list-head" },
+        });
+        /** @type {__VLS_StyleScopedClasses['risk-template-list-head']} */ ;
+        __VLS_asFunctionalElement1(__VLS_intrinsics.span, __VLS_intrinsics.span)({});
+        __VLS_asFunctionalElement1(__VLS_intrinsics.span, __VLS_intrinsics.span)({});
+        __VLS_asFunctionalElement1(__VLS_intrinsics.span, __VLS_intrinsics.span)({});
+        __VLS_asFunctionalElement1(__VLS_intrinsics.span, __VLS_intrinsics.span)({});
+        __VLS_asFunctionalElement1(__VLS_intrinsics.span, __VLS_intrinsics.span)({});
+        __VLS_asFunctionalElement1(__VLS_intrinsics.span, __VLS_intrinsics.span)({});
+        __VLS_asFunctionalElement1(__VLS_intrinsics.span, __VLS_intrinsics.span)({});
+        for (const [item] of __VLS_vFor((__VLS_ctx.visibleRiskTemplates))) {
+            __VLS_asFunctionalElement1(__VLS_intrinsics.article, __VLS_intrinsics.article)({
+                key: (item.id),
+                ...{ class: "risk-template-list-row" },
+            });
+            /** @type {__VLS_StyleScopedClasses['risk-template-list-row']} */ ;
+            __VLS_asFunctionalElement1(__VLS_intrinsics.strong, __VLS_intrinsics.strong)({});
+            (item.unit);
+            __VLS_asFunctionalElement1(__VLS_intrinsics.code, __VLS_intrinsics.code)({});
+            (item.threat || '未填写');
+            __VLS_asFunctionalElement1(__VLS_intrinsics.span, __VLS_intrinsics.span)({
+                ...{ class: (['risk-level-badge', `level-${item.defaultLevel}`]) },
+            });
+            /** @type {__VLS_StyleScopedClasses['risk-level-badge']} */ ;
+            (item.defaultLevel);
+            __VLS_asFunctionalElement1(__VLS_intrinsics.p, __VLS_intrinsics.p)({});
+            (item.analysis || '未填写风险分析');
+            __VLS_asFunctionalElement1(__VLS_intrinsics.p, __VLS_intrinsics.p)({});
+            (item.advice || '未填写整改建议');
+            __VLS_asFunctionalElement1(__VLS_intrinsics.span, __VLS_intrinsics.span)({
+                ...{ class: (['risk-status', item.analysis && item.advice ? 'complete' : 'pending']) },
+            });
+            /** @type {__VLS_StyleScopedClasses['risk-status']} */ ;
+            (item.analysis && item.advice ? '完整' : '待完善');
+            __VLS_asFunctionalElement1(__VLS_intrinsics.span, __VLS_intrinsics.span)({
+                ...{ class: "risk-row-actions" },
+            });
+            /** @type {__VLS_StyleScopedClasses['risk-row-actions']} */ ;
+            __VLS_asFunctionalElement1(__VLS_intrinsics.button, __VLS_intrinsics.button)({
+                ...{ onClick: (...[$event]) => {
+                        if (!!(!__VLS_ctx.token))
+                            throw 0;
+                        if (!!(__VLS_ctx.page === 'dashboard'))
+                            throw 0;
+                        if (!!(__VLS_ctx.page === 'projects'))
+                            throw 0;
+                        if (!!(__VLS_ctx.page === 'workspace' && __VLS_ctx.selectedProject))
+                            throw 0;
+                        if (!!(__VLS_ctx.page === 'users'))
+                            throw 0;
+                        if (!!(__VLS_ctx.page === 'institution'))
+                            throw 0;
+                        if (!!(__VLS_ctx.page === 'templates'))
+                            throw 0;
+                        if (!(__VLS_ctx.page === 'risk-analysis'))
+                            throw 0;
+                        return (__VLS_ctx.editRiskTemplate(item));
+                        // @ts-ignore
+                        [visibleRiskTemplates, editRiskTemplate,];
+                    } },
+                ...{ class: "secondary" },
+            });
+            /** @type {__VLS_StyleScopedClasses['secondary']} */ ;
+            // @ts-ignore
+            [];
+        }
     }
+}
+if (__VLS_ctx.showRiskTemplateModal) {
+    __VLS_asFunctionalElement1(__VLS_intrinsics.div, __VLS_intrinsics.div)({
+        ...{ onClick: (...[$event]) => {
+                if (!(__VLS_ctx.showRiskTemplateModal))
+                    throw 0;
+                return (__VLS_ctx.showRiskTemplateModal = false);
+                // @ts-ignore
+                [showRiskTemplateModal, showRiskTemplateModal,];
+            } },
+        ...{ class: "modal-mask" },
+    });
+    /** @type {__VLS_StyleScopedClasses['modal-mask']} */ ;
+    __VLS_asFunctionalElement1(__VLS_intrinsics.form, __VLS_intrinsics.form)({
+        ...{ onSubmit: (__VLS_ctx.saveRiskTemplateForm) },
+        ...{ class: "modal risk-template-modal" },
+    });
+    /** @type {__VLS_StyleScopedClasses['modal']} */ ;
+    /** @type {__VLS_StyleScopedClasses['risk-template-modal']} */ ;
+    __VLS_asFunctionalElement1(__VLS_intrinsics.div, __VLS_intrinsics.div)({
+        ...{ class: "modal-head" },
+    });
+    /** @type {__VLS_StyleScopedClasses['modal-head']} */ ;
+    __VLS_asFunctionalElement1(__VLS_intrinsics.div, __VLS_intrinsics.div)({});
+    __VLS_asFunctionalElement1(__VLS_intrinsics.small, __VLS_intrinsics.small)({});
+    __VLS_asFunctionalElement1(__VLS_intrinsics.h2, __VLS_intrinsics.h2)({});
+    (__VLS_ctx.editingRiskTemplateId ? '编辑风险模板' : '新增风险模板');
+    __VLS_asFunctionalElement1(__VLS_intrinsics.p, __VLS_intrinsics.p)({});
+    __VLS_asFunctionalElement1(__VLS_intrinsics.button, __VLS_intrinsics.button)({
+        ...{ onClick: (...[$event]) => {
+                if (!(__VLS_ctx.showRiskTemplateModal))
+                    throw 0;
+                return (__VLS_ctx.showRiskTemplateModal = false);
+                // @ts-ignore
+                [showRiskTemplateModal, saveRiskTemplateForm, editingRiskTemplateId,];
+            } },
+        type: "button",
+    });
+    __VLS_asFunctionalElement1(__VLS_intrinsics.div, __VLS_intrinsics.div)({
+        ...{ class: "risk-template-modal-grid" },
+    });
+    /** @type {__VLS_StyleScopedClasses['risk-template-modal-grid']} */ ;
+    __VLS_asFunctionalElement1(__VLS_intrinsics.label, __VLS_intrinsics.label)({});
+    __VLS_asFunctionalElement1(__VLS_intrinsics.select, __VLS_intrinsics.select)({
+        ...{ onChange: (__VLS_ctx.changeRiskTemplateLayer) },
+        value: (__VLS_ctx.riskTemplateForm.layer),
+        disabled: (!!__VLS_ctx.editingRiskTemplateId),
+    });
+    for (const [layer] of __VLS_vFor((__VLS_ctx.riskLayers))) {
+        __VLS_asFunctionalElement1(__VLS_intrinsics.option, __VLS_intrinsics.option)({
+            key: (layer),
+            value: (layer),
+        });
+        (layer);
+        // @ts-ignore
+        [riskLayers, editingRiskTemplateId, changeRiskTemplateLayer, riskTemplateForm,];
+    }
+    __VLS_asFunctionalElement1(__VLS_intrinsics.label, __VLS_intrinsics.label)({});
+    __VLS_asFunctionalElement1(__VLS_intrinsics.select, __VLS_intrinsics.select)({
+        ...{ onChange: (__VLS_ctx.changeRiskTemplateLayer) },
+        value: (__VLS_ctx.riskTemplateForm.unit),
+        disabled: (!!__VLS_ctx.editingRiskTemplateId),
+    });
+    for (const [unit] of __VLS_vFor((__VLS_ctx.riskUnits(__VLS_ctx.riskTemplateForm.layer)))) {
+        __VLS_asFunctionalElement1(__VLS_intrinsics.option, __VLS_intrinsics.option)({
+            key: (unit),
+            value: (unit),
+        });
+        (unit);
+        // @ts-ignore
+        [riskUnits, editingRiskTemplateId, changeRiskTemplateLayer, riskTemplateForm, riskTemplateForm,];
+    }
+    __VLS_asFunctionalElement1(__VLS_intrinsics.label, __VLS_intrinsics.label)({});
+    __VLS_asFunctionalElement1(__VLS_intrinsics.input)({
+        placeholder: "如 TP1、TN2",
+    });
+    (__VLS_ctx.riskTemplateForm.threat);
+    __VLS_asFunctionalElement1(__VLS_intrinsics.label, __VLS_intrinsics.label)({});
+    __VLS_asFunctionalElement1(__VLS_intrinsics.select, __VLS_intrinsics.select)({
+        value: (__VLS_ctx.riskTemplateForm.defaultLevel),
+    });
+    __VLS_asFunctionalElement1(__VLS_intrinsics.option, __VLS_intrinsics.option)({});
+    __VLS_asFunctionalElement1(__VLS_intrinsics.option, __VLS_intrinsics.option)({});
+    __VLS_asFunctionalElement1(__VLS_intrinsics.option, __VLS_intrinsics.option)({});
+    __VLS_asFunctionalElement1(__VLS_intrinsics.label, __VLS_intrinsics.label)({
+        ...{ class: "span-2" },
+    });
+    /** @type {__VLS_StyleScopedClasses['span-2']} */ ;
+    __VLS_asFunctionalElement1(__VLS_intrinsics.textarea, __VLS_intrinsics.textarea)({
+        value: (__VLS_ctx.riskTemplateForm.analysis),
+        rows: "6",
+        required: true,
+        placeholder: "支持 {系统名称}、{安全层面}、{测评单元} 占位符",
+    });
+    __VLS_asFunctionalElement1(__VLS_intrinsics.label, __VLS_intrinsics.label)({
+        ...{ class: "span-2" },
+    });
+    /** @type {__VLS_StyleScopedClasses['span-2']} */ ;
+    __VLS_asFunctionalElement1(__VLS_intrinsics.textarea, __VLS_intrinsics.textarea)({
+        value: (__VLS_ctx.riskTemplateForm.advice),
+        rows: "6",
+        required: true,
+        placeholder: "请输入该测评单元对应的整改建议",
+    });
+    __VLS_asFunctionalElement1(__VLS_intrinsics.label, __VLS_intrinsics.label)({
+        ...{ class: "risk-enabled" },
+    });
+    /** @type {__VLS_StyleScopedClasses['risk-enabled']} */ ;
+    __VLS_asFunctionalElement1(__VLS_intrinsics.input)({
+        type: "checkbox",
+    });
+    (__VLS_ctx.riskTemplateForm.enabled);
+    __VLS_asFunctionalElement1(__VLS_intrinsics.div, __VLS_intrinsics.div)({
+        ...{ class: "modal-foot" },
+    });
+    /** @type {__VLS_StyleScopedClasses['modal-foot']} */ ;
+    __VLS_asFunctionalElement1(__VLS_intrinsics.button, __VLS_intrinsics.button)({
+        ...{ onClick: (...[$event]) => {
+                if (!(__VLS_ctx.showRiskTemplateModal))
+                    throw 0;
+                return (__VLS_ctx.showRiskTemplateModal = false);
+                // @ts-ignore
+                [showRiskTemplateModal, riskTemplateForm, riskTemplateForm, riskTemplateForm, riskTemplateForm, riskTemplateForm,];
+            } },
+        type: "button",
+        ...{ class: "secondary" },
+    });
+    /** @type {__VLS_StyleScopedClasses['secondary']} */ ;
+    __VLS_asFunctionalElement1(__VLS_intrinsics.button, __VLS_intrinsics.button)({
+        ...{ class: "primary" },
+    });
+    /** @type {__VLS_StyleScopedClasses['primary']} */ ;
 }
 if (__VLS_ctx.activePlanningModule) {
     __VLS_asFunctionalElement1(__VLS_intrinsics.div, __VLS_intrinsics.div)({
@@ -2041,7 +2704,7 @@ if (__VLS_ctx.activePlanningModule) {
                     throw 0;
                 return (__VLS_ctx.activePlanningModule = null);
                 // @ts-ignore
-                [templateInfo, templateInfo, uploadRawFolder, activePlanningModule, activePlanningModule,];
+                [activePlanningModule, activePlanningModule,];
             } },
         ...{ class: "modal-mask" },
     });
@@ -2248,6 +2911,101 @@ if (__VLS_ctx.showProjectModal) {
     /** @type {__VLS_StyleScopedClasses['primary']} */ ;
     (__VLS_ctx.editingProjectId ? '保存修改' : '创建并进入项目');
 }
+if (__VLS_ctx.copySourceProject) {
+    __VLS_asFunctionalElement1(__VLS_intrinsics.div, __VLS_intrinsics.div)({
+        ...{ onClick: (...[$event]) => {
+                if (!(__VLS_ctx.copySourceProject))
+                    throw 0;
+                return (__VLS_ctx.copySourceProject = null);
+                // @ts-ignore
+                [editingProjectId, copySourceProject, copySourceProject,];
+            } },
+        ...{ class: "modal-mask" },
+    });
+    /** @type {__VLS_StyleScopedClasses['modal-mask']} */ ;
+    __VLS_asFunctionalElement1(__VLS_intrinsics.form, __VLS_intrinsics.form)({
+        ...{ onSubmit: (__VLS_ctx.copyProject) },
+        ...{ class: "modal small" },
+    });
+    /** @type {__VLS_StyleScopedClasses['modal']} */ ;
+    /** @type {__VLS_StyleScopedClasses['small']} */ ;
+    __VLS_asFunctionalElement1(__VLS_intrinsics.div, __VLS_intrinsics.div)({
+        ...{ class: "modal-head" },
+    });
+    /** @type {__VLS_StyleScopedClasses['modal-head']} */ ;
+    __VLS_asFunctionalElement1(__VLS_intrinsics.div, __VLS_intrinsics.div)({});
+    __VLS_asFunctionalElement1(__VLS_intrinsics.small, __VLS_intrinsics.small)({});
+    __VLS_asFunctionalElement1(__VLS_intrinsics.h2, __VLS_intrinsics.h2)({});
+    __VLS_asFunctionalElement1(__VLS_intrinsics.p, __VLS_intrinsics.p)({});
+    __VLS_asFunctionalElement1(__VLS_intrinsics.button, __VLS_intrinsics.button)({
+        ...{ onClick: (...[$event]) => {
+                if (!(__VLS_ctx.copySourceProject))
+                    throw 0;
+                return (__VLS_ctx.copySourceProject = null);
+                // @ts-ignore
+                [copySourceProject, copyProject,];
+            } },
+        type: "button",
+    });
+    __VLS_asFunctionalElement1(__VLS_intrinsics.div, __VLS_intrinsics.div)({
+        ...{ class: "form-grid" },
+    });
+    /** @type {__VLS_StyleScopedClasses['form-grid']} */ ;
+    __VLS_asFunctionalElement1(__VLS_intrinsics.label, __VLS_intrinsics.label)({
+        ...{ class: "span-2" },
+    });
+    /** @type {__VLS_StyleScopedClasses['span-2']} */ ;
+    __VLS_asFunctionalElement1(__VLS_intrinsics.input)({
+        required: true,
+        placeholder: "请输入被测系统全称",
+    });
+    (__VLS_ctx.copyForm.systemName);
+    __VLS_asFunctionalElement1(__VLS_intrinsics.label, __VLS_intrinsics.label)({});
+    __VLS_asFunctionalElement1(__VLS_intrinsics.input)({
+        placeholder: "请输入新报告编号",
+    });
+    (__VLS_ctx.copyForm.reportCode);
+    __VLS_asFunctionalElement1(__VLS_intrinsics.label, __VLS_intrinsics.label)({});
+    __VLS_asFunctionalElement1(__VLS_intrinsics.input)({
+        type: "number",
+        min: "2000",
+        max: "2100",
+        required: true,
+    });
+    (__VLS_ctx.copyForm.assessmentYear);
+    __VLS_asFunctionalElement1(__VLS_intrinsics.label, __VLS_intrinsics.label)({});
+    __VLS_asFunctionalElement1(__VLS_intrinsics.input)({
+        type: "date",
+        required: true,
+    });
+    (__VLS_ctx.copyForm.startDate);
+    __VLS_asFunctionalElement1(__VLS_intrinsics.label, __VLS_intrinsics.label)({});
+    __VLS_asFunctionalElement1(__VLS_intrinsics.input)({
+        type: "date",
+        required: true,
+    });
+    (__VLS_ctx.copyForm.endDate);
+    __VLS_asFunctionalElement1(__VLS_intrinsics.div, __VLS_intrinsics.div)({
+        ...{ class: "modal-foot" },
+    });
+    /** @type {__VLS_StyleScopedClasses['modal-foot']} */ ;
+    __VLS_asFunctionalElement1(__VLS_intrinsics.button, __VLS_intrinsics.button)({
+        ...{ onClick: (...[$event]) => {
+                if (!(__VLS_ctx.copySourceProject))
+                    throw 0;
+                return (__VLS_ctx.copySourceProject = null);
+                // @ts-ignore
+                [copySourceProject, copyForm, copyForm, copyForm, copyForm, copyForm,];
+            } },
+        type: "button",
+        ...{ class: "secondary" },
+    });
+    /** @type {__VLS_StyleScopedClasses['secondary']} */ ;
+    __VLS_asFunctionalElement1(__VLS_intrinsics.button, __VLS_intrinsics.button)({
+        ...{ class: "primary" },
+    });
+    /** @type {__VLS_StyleScopedClasses['primary']} */ ;
+}
 if (__VLS_ctx.projectToDelete) {
     __VLS_asFunctionalElement1(__VLS_intrinsics.div, __VLS_intrinsics.div)({
         ...{ onClick: (...[$event]) => {
@@ -2255,7 +3013,7 @@ if (__VLS_ctx.projectToDelete) {
                     throw 0;
                 return (__VLS_ctx.projectToDelete = null);
                 // @ts-ignore
-                [projectToDelete, projectToDelete, editingProjectId,];
+                [projectToDelete, projectToDelete,];
             } },
         ...{ class: "modal-mask" },
     });

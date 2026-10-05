@@ -4,6 +4,25 @@ import sharp from 'sharp';
 const layerNames = ['物理和环境安全', '网络和通信安全', '设备和计算安全', '应用和数据安全', '管理制度', '人员管理', '建设运行', '应急处置'];
 type Evidence = { no?: string; name?: string; dataUrl?: string };
 type OnsiteRecord = { evidence?: Evidence[] };
+type EvidenceImage = { id?: string; dataUrl?: string };
+type EvidenceGroup = { id?: string; layer?: number; no?: string; name?: string; images?: EvidenceImage[]; dataUrl?: string };
+
+function evidenceGroupsForLayer(records: Record<string, OnsiteRecord>, groups: EvidenceGroup[], layer: number) {
+  let evidenceGroups = (groups || [])
+    .filter(group => Number(group.layer) === layer)
+    .map(group => ({ ...group, images: Array.isArray(group.images) ? group.images : (group.dataUrl ? [{ dataUrl: group.dataUrl }] : []) }))
+    .sort((a, b) => Number(/\.(\d+)$/.exec(a.no || '')?.[1] || 0) - Number(/\.(\d+)$/.exec(b.no || '')?.[1] || 0));
+  // 兼容旧项目“一张图片一个编号、图片挂在测评对象记录上”的历史数据。
+  if (!evidenceGroups.length) {
+    evidenceGroups = Object.entries(records || {})
+      .filter(([key]) => key.split('|')[0] === String(layer))
+      .flatMap(([, record]) => (record.evidence || []).map(item => ({
+        no: item.no, name: item.name, images: item.dataUrl ? [{ dataUrl: item.dataUrl }] : [],
+      })))
+      .sort((a, b) => Number(/\.(\d+)$/.exec(a.no || '')?.[1] || 0) - Number(/\.(\d+)$/.exec(b.no || '')?.[1] || 0));
+  }
+  return evidenceGroups;
+}
 
 const xmlEscape = (value: string) => value.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&apos;');
 const paragraphText = (xml: string) => [...xml.matchAll(/<w:t\b[^>]*>([\s\S]*?)<\/w:t>/g)].map(match => match[1]).join('').replace(/&amp;/g, '&');
@@ -42,9 +61,10 @@ function imageSize(data: Buffer, type: string): { width: number; height: number 
   throw new Error('证据截图格式无效，请重新上传 PNG、JPEG 或 GIF 图片');
 }
 
-// 旧项目可能保存了未经浏览器压缩的原图；导出时统一限制嵌入文件大小与像素尺寸。
-const PHOTO_THRESHOLD = 400 * 1024;
-const PHOTO_LONG_EDGE = 1400;
+// 优先原样嵌入截图，保留文字和细线；仅对超大图片做一次高质量缩放。
+// 2400px 足以覆盖报告中最大约 13cm 的图片在 300 DPI 下的清晰度需求。
+const PHOTO_THRESHOLD = 8 * 1024 * 1024;
+const PHOTO_LONG_EDGE = 2400;
 const EMU_PER_CM = 360_000;
 const APPENDIX_B_IMAGE_WIDTH_EMU = 7 * EMU_PER_CM;
 const APPENDIX_B1_IMAGE_WIDTH_EMU = 5 * EMU_PER_CM;
@@ -52,6 +72,9 @@ const APPENDIX_B3_PHOTO_WIDTH_EMU = 5 * EMU_PER_CM;
 const APPENDIX_B4_IMAGE_WIDTH_EMU = 5 * EMU_PER_CM;
 const APPENDIX_B_OTHER_IMAGE_WIDTH_EMU = 10 * EMU_PER_CM;
 const REPORT_IMAGE_WIDTH_EMU = 13 * EMU_PER_CM;
+// 当前报告模板中 15cm 高的图片已接近占满正文页；证据图超过 12cm 时等比例缩小，
+// 确保“图片 + 编号/名称”能够作为一组放进同一页。
+const REPORT_IMAGE_MAX_HEIGHT_EMU = 12 * EMU_PER_CM;
 async function exportImage(dataUrl: string, label: string) {
   const match = /^data:image\/(png|jpe?g|gif);base64,([A-Za-z0-9+/=]+)$/.exec(dataUrl);
   if (!match) throw new Error(`${label}图片格式不支持`);
@@ -62,7 +85,7 @@ async function exportImage(dataUrl: string, label: string) {
   if (bytes.length > PHOTO_THRESHOLD || Math.max(original.width, original.height) > PHOTO_LONG_EDGE) {
     const encoded = await sharp(bytes, { failOn: 'error' })
       .rotate().resize({ width: PHOTO_LONG_EDGE, height: PHOTO_LONG_EDGE, fit: 'inside', withoutEnlargement: true })
-      .flatten({ background: '#ffffff' }).jpeg({ quality: 82, mozjpeg: true }).toBuffer();
+      .flatten({ background: '#ffffff' }).jpeg({ quality: 94, chromaSubsampling: '4:4:4', mozjpeg: true }).toBuffer();
     if (encoded.length < bytes.length || Math.max(original.width, original.height) > PHOTO_LONG_EDGE) {
       bytes = encoded;
       ext = 'jpeg';
@@ -74,20 +97,30 @@ async function exportImage(dataUrl: string, label: string) {
 }
 
 function imageRun(rid: string, id: number, width: number, height: number, description: string,
-  targetWidth = REPORT_IMAGE_WIDTH_EMU): string {
-  // Word 中固定图片宽度，高度按原图比例自动计算。
-  const cx = targetWidth;
-  const cy = Math.max(1, Math.round(targetWidth * height / width));
+  targetWidth = REPORT_IMAGE_WIDTH_EMU, maxHeight = 0): string {
+  // Word 中以目标宽度为上限，高度按原图比例计算；超高图片再按最大高度等比例缩小。
+  let cx = targetWidth;
+  let cy = Math.max(1, Math.round(targetWidth * height / width));
+  if (maxHeight > 0 && cy > maxHeight) {
+    cx = Math.max(1, Math.round(cx * maxHeight / cy));
+    cy = maxHeight;
+  }
   const label = xmlEscape(description);
   return `<w:r><w:drawing><wp:inline xmlns:wp="http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing" distT="0" distB="0" distL="0" distR="0"><wp:extent cx="${cx}" cy="${cy}"/><wp:docPr id="${id}" name="${label}" descr="${label}"/><wp:cNvGraphicFramePr><a:graphicFrameLocks xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" noChangeAspect="1"/></wp:cNvGraphicFramePr><a:graphic xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"><a:graphicData uri="http://schemas.openxmlformats.org/drawingml/2006/picture"><pic:pic xmlns:pic="http://schemas.openxmlformats.org/drawingml/2006/picture"><pic:nvPicPr><pic:cNvPr id="0" name="${label}"/><pic:cNvPicPr/></pic:nvPicPr><pic:blipFill><a:blip xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" r:embed="${rid}"/><a:stretch><a:fillRect/></a:stretch></pic:blipFill><pic:spPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="${cx}" cy="${cy}"/></a:xfrm><a:prstGeom prst="rect"><a:avLst/></a:prstGeom></pic:spPr></pic:pic></a:graphicData></a:graphic></wp:inline></w:drawing></w:r>`;
 }
 
 function imageParagraph(rid: string, id: number, width: number, height: number, description: string,
-  targetWidth = REPORT_IMAGE_WIDTH_EMU): string {
-  return `<w:p><w:pPr><w:jc w:val="center"/><w:spacing w:after="120"/></w:pPr>${imageRun(rid, id, width, height, description, targetWidth)}</w:p>`;
+  targetWidth = REPORT_IMAGE_WIDTH_EMU, keepWithCaption = false, maxHeight = 0): string {
+  const keepNext = keepWithCaption ? '<w:keepNext/>' : '';
+  return `<w:p><w:pPr><w:jc w:val="center"/>${keepNext}<w:spacing w:after="120"/></w:pPr>${imageRun(rid, id, width, height, description, targetWidth, maxHeight)}</w:p>`;
 }
 
-export async function writeReportEvidence(xml: string, zip: JSZip, records: Record<string, OnsiteRecord>): Promise<string> {
+function evidenceCaptionParagraph(description: string): string {
+  return `<w:p><w:pPr><w:jc w:val="center"/><w:keepLines/><w:widowControl/><w:spacing w:before="0" w:after="120"/></w:pPr><w:r><w:t>${xmlEscape(description)}</w:t></w:r></w:p>`;
+}
+
+export async function writeReportEvidence(xml: string, zip: JSZip, records: Record<string, OnsiteRecord>,
+  groups: EvidenceGroup[] = []): Promise<string> {
   const relPath = 'word/_rels/document.xml.rels';
   let rels = await zip.file(relPath)?.async('string');
   let types = await zip.file('[Content_Types].xml')?.async('string');
@@ -96,26 +129,30 @@ export async function writeReportEvidence(xml: string, zip: JSZip, records: Reco
   let drawingId = Math.max(0, ...[...xml.matchAll(/<wp:docPr\b[^>]*\bid="(\d+)"/g)].map(match => Number(match[1]))) + 1;
   const inserts: string[] = [];
   for (let layer = 0; layer < layerNames.length; layer++) {
-    const evidence = Object.entries(records || {})
-      .filter(([key]) => key.split('|')[0] === String(layer))
-      .flatMap(([, record]) => record.evidence || [])
-      .sort((a, b) => Number(/\.(\d+)$/.exec(a.no || '')?.[1] || 0) - Number(/\.(\d+)$/.exec(b.no || '')?.[1] || 0));
+    const evidenceGroups = evidenceGroupsForLayer(records, groups, layer);
     const paragraphs: string[] = [];
-    for (let index = 0; index < evidence.length; index++) {
-      const item = evidence[index];
-      const { bytes, ext, size } = await exportImage(item.dataUrl || '', '证据截图' + (item.no || layerNames[layer]));
-      const filename = `bb-evidence-${layer + 1}-${index + 1}.${ext === 'jpeg' ? 'jpg' : ext}`;
-      zip.file(`word/media/${filename}`, bytes);
-      const relationId = `rId${rid++}`;
-      rels = rels.replace('</Relationships>', `<Relationship Id="${relationId}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" Target="media/${filename}"/></Relationships>`);
-      const description = [item.no || `图A-${layer + 1}.${index + 1}`, item.name || ''].filter(Boolean).join(' ');
-      paragraphs.push(imageParagraph(relationId, drawingId++, size.width, size.height, description));
-      paragraphs.push(`<w:p><w:pPr><w:jc w:val="center"/></w:pPr><w:r><w:t>${xmlEscape(description)}</w:t></w:r></w:p>`);
-      const mime = ext === 'jpeg' ? 'image/jpeg' : `image/${ext}`;
-      const suffix = ext === 'jpeg' ? 'jpg' : ext;
-      if (!new RegExp(`<Default\\b[^>]*Extension="${suffix}"`, 'i').test(types)) {
-        types = types.replace('</Types>', `<Default Extension="${suffix}" ContentType="${mime}"/></Types>`);
+    for (let groupIndex = 0; groupIndex < evidenceGroups.length; groupIndex++) {
+      const group = evidenceGroups[groupIndex];
+      const description = [group.no || `图A-${layer + 1}.${groupIndex + 1}`, group.name || ''].filter(Boolean).join(' ');
+      const images = (group.images || []).filter(image => image.dataUrl);
+      for (let imageIndex = 0; imageIndex < images.length; imageIndex++) {
+        const { bytes, ext, size } = await exportImage(images[imageIndex].dataUrl || '',
+          `${description}第${imageIndex + 1}张`);
+        const filename = `bb-evidence-${layer + 1}-${groupIndex + 1}-${imageIndex + 1}.${ext === 'jpeg' ? 'jpg' : ext}`;
+        zip.file(`word/media/${filename}`, bytes);
+        const relationId = `rId${rid++}`;
+        rels = rels.replace('</Relationships>', `<Relationship Id="${relationId}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" Target="media/${filename}"/></Relationships>`);
+        paragraphs.push(imageParagraph(relationId, drawingId++, size.width, size.height, description,
+          REPORT_IMAGE_WIDTH_EMU, imageIndex === images.length - 1, REPORT_IMAGE_MAX_HEIGHT_EMU));
+        const mime = ext === 'jpeg' ? 'image/jpeg' : `image/${ext}`;
+        const suffix = ext === 'jpeg' ? 'jpg' : ext;
+        if (!new RegExp(`<Default\\b[^>]*Extension="${suffix}"`, 'i').test(types)) {
+          types = types.replace('</Types>', `<Default Extension="${suffix}" ContentType="${mime}"/></Types>`);
+        }
       }
+      if (!images.length) continue;
+      // 同一证据编号只输出一次图题；该编号下的多张图片连续列出。
+      paragraphs.push(evidenceCaptionParagraph(description));
     }
     inserts.push(paragraphs.join(''));
   }
@@ -168,6 +205,50 @@ export async function writeReportEvidence(xml: string, zip: JSZip, records: Reco
   zip.file(relPath, rels);
   zip.file('[Content_Types].xml', types);
   return xml;
+}
+
+// 原始记录的每个安全层面是独立 DOCX。证据的筛选、排序、多图连续排列和图题规则
+// 与正式报告保持一致，并统一插入到现场测评表之后、文档末尾节属性之前。
+export async function appendRawRecordEvidence(xml: string, zip: JSZip, records: Record<string, OnsiteRecord>,
+  groups: EvidenceGroup[] = [], layer: number): Promise<string> {
+  const evidenceGroups = evidenceGroupsForLayer(records, groups, layer);
+  if (!evidenceGroups.length) return xml;
+  const relPath = 'word/_rels/document.xml.rels';
+  let rels = await zip.file(relPath)?.async('string');
+  let types = await zip.file('[Content_Types].xml')?.async('string');
+  if (!rels || !types) throw new Error('现场核查模板缺少图片关系或内容类型定义');
+  let rid = Math.max(0, ...[...rels.matchAll(/\bId="rId(\d+)"/g)].map(match => Number(match[1]))) + 1;
+  let drawingId = Math.max(0, ...[...xml.matchAll(/<wp:docPr\b[^>]*\bid="(\d+)"/g)].map(match => Number(match[1]))) + 1;
+  const paragraphs: string[] = [];
+  for (let groupIndex = 0; groupIndex < evidenceGroups.length; groupIndex++) {
+    const group = evidenceGroups[groupIndex];
+    const description = [group.no || `图A-${layer + 1}.${groupIndex + 1}`, group.name || ''].filter(Boolean).join(' ');
+    const images = (group.images || []).filter(image => image.dataUrl);
+    for (let imageIndex = 0; imageIndex < images.length; imageIndex++) {
+      const { bytes, ext, size } = await exportImage(images[imageIndex].dataUrl || '', `${description}第${imageIndex + 1}张`);
+      const filename = `raw-evidence-${layer + 1}-${groupIndex + 1}-${imageIndex + 1}.${ext === 'jpeg' ? 'jpg' : ext}`;
+      zip.file(`word/media/${filename}`, bytes);
+      const relationId = `rId${rid++}`;
+      rels = rels.replace('</Relationships>', `<Relationship Id="${relationId}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" Target="media/${filename}"/></Relationships>`);
+      paragraphs.push(imageParagraph(relationId, drawingId++, size.width, size.height, description,
+        REPORT_IMAGE_WIDTH_EMU, imageIndex === images.length - 1, REPORT_IMAGE_MAX_HEIGHT_EMU));
+      const mime = ext === 'jpeg' ? 'image/jpeg' : `image/${ext}`;
+      const suffix = ext === 'jpeg' ? 'jpg' : ext;
+      if (!new RegExp(`<Default\\b[^>]*Extension="${suffix}"`, 'i').test(types)) {
+        types = types.replace('</Types>', `<Default Extension="${suffix}" ContentType="${mime}"/></Types>`);
+      }
+    }
+    if (images.length) {
+      paragraphs.push(evidenceCaptionParagraph(description));
+    }
+  }
+  if (!paragraphs.length) return xml;
+  const bodyEnd = xml.lastIndexOf('</w:body>');
+  const finalSection = xml.lastIndexOf('<w:sectPr', bodyEnd);
+  if (bodyEnd < 0 || finalSection < 0) throw new Error('现场核查模板正文结构无效，无法写入证据列表');
+  zip.file(relPath, rels);
+  zip.file('[Content_Types].xml', types);
+  return xml.slice(0, finalSection) + paragraphs.join('') + xml.slice(finalSection);
 }
 
 const appendixImageSlots: Record<string, string[]> = {
@@ -281,11 +362,68 @@ export async function writeAppendixBImages(xml: string, zip: JSZip, saved: Recor
 }
 
 const planningImageSlots: Record<string, string> = {
-  '被测系统情况_拓扑图': 'topology-image',
   '工具接入示意图': 'access-image',
   '被测系统情况_密码应用情况_设备和计算安全_密码应用情况图片': 'device-crypto-image',
   '被测系统情况_密码应用情况_应用和数据安全_密码应用情况图片': 'application-crypto-image',
 };
+
+type TopologyBlock = { type?: string; content?: string; dataUrl?: string; caption?: string };
+
+function topologyTextParagraph(content: string) {
+  const value = xmlEscape(String(content || '').replace(/\r\n?/g, '\n'))
+    .replace(/\n/g, '</w:t><w:br/><w:t xml:space="preserve">');
+  return `<w:p><w:pPr><w:spacing w:line="360" w:lineRule="auto"/><w:ind w:firstLine="480" w:firstLineChars="200"/></w:pPr><w:r><w:t xml:space="preserve">${value}</w:t></w:r></w:p>`;
+}
+
+export async function writeTopologyBlocks(xml: string, zip: JSZip, blocks: TopologyBlock[] | undefined,
+  legacyImage: string | undefined, legacyDescription: string | undefined, systemName: string): Promise<string> {
+  const imageSlot = [...xml.matchAll(/<w:p\b[^>]*>[\s\S]*?<\/w:p>/g)]
+    .find(match => paragraphText(match[0]).trim() === '{{被测系统情况_拓扑图}}');
+  const descriptionSlot = [...xml.matchAll(/<w:p\b[^>]*>[\s\S]*?<\/w:p>/g)]
+    .find(match => paragraphText(match[0]).trim() === '{{被测系统情况_网络拓扑图及描述_描述}}');
+  if (!imageSlot || !descriptionSlot || descriptionSlot.index! < imageSlot.index!) {
+    throw new Error('Word模板中的网络拓扑图和描述占位符位置无效');
+  }
+  let ordered = Array.isArray(blocks) ? blocks.filter(block => block && (block.type === 'text' || block.type === 'image')) : [];
+  if (!ordered.length) {
+    ordered = [];
+    if (legacyImage) ordered.push({ type: 'image', dataUrl: legacyImage });
+    if (legacyDescription) ordered.push({ type: 'text', content: legacyDescription });
+  }
+  const relPath = 'word/_rels/document.xml.rels';
+  let rels = await zip.file(relPath)?.async('string');
+  let types = await zip.file('[Content_Types].xml')?.async('string');
+  if (!rels || !types) throw new Error('报告模板缺少图片关系或内容类型定义');
+  let rid = Math.max(0, ...[...rels.matchAll(/\bId="rId(\d+)"/g)].map(match => Number(match[1]))) + 1;
+  let drawingId = Math.max(0, ...[...xml.matchAll(/<wp:docPr\b[^>]*\bid="(\d+)"/g)].map(match => Number(match[1]))) + 1;
+  let imageNumber = 0;
+  const output: string[] = [];
+  for (let index = 0; index < ordered.length; index++) {
+    const block = ordered[index];
+    if (block.type === 'text') {
+      if (String(block.content || '').trim()) output.push(topologyTextParagraph(String(block.content)));
+      continue;
+    }
+    if (!block.dataUrl) continue;
+    const { bytes, ext, size } = await exportImage(block.dataUrl, `网络拓扑图第${imageNumber + 1}张`);
+    const suffix = ext === 'jpeg' ? 'jpg' : ext;
+    const filename = `bb-topology-${++imageNumber}.${suffix}`;
+    zip.file(`word/media/${filename}`, bytes);
+    const relationId = `rId${rid++}`;
+    rels = rels.replace('</Relationships>', `<Relationship Id="${relationId}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" Target="media/${filename}"/></Relationships>`);
+    output.push(imageParagraph(relationId, drawingId++, size.width, size.height, `网络拓扑图 ${imageNumber}`));
+    const caption = String(block.caption || `图 2-${imageNumber} ${systemName || '被测信息系统'}网络拓扑图`).trim();
+    output.push(`<w:p><w:pPr><w:jc w:val="center"/></w:pPr><w:r><w:rPr><w:b/><w:sz w:val="21"/></w:rPr><w:t>${xmlEscape(caption)}</w:t></w:r></w:p>`);
+    if (!new RegExp(`<Default\\b[^>]*Extension="${suffix}"`, 'i').test(types)) {
+      types = types.replace('</Types>', `<Default Extension="${suffix}" ContentType="${ext === 'jpeg' ? 'image/jpeg' : `image/${ext}`}"/></Types>`);
+    }
+  }
+  zip.file(relPath, rels);
+  zip.file('[Content_Types].xml', types);
+  const start = imageSlot.index!;
+  const end = descriptionSlot.index! + descriptionSlot[0].length;
+  return xml.slice(0, start) + (output.join('') || '<w:p/>') + xml.slice(end);
+}
 
 export async function writePlanningImages(xml: string, zip: JSZip, images: Record<string, string>): Promise<string> {
   const relPath = 'word/_rels/document.xml.rels';

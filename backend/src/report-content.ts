@@ -30,7 +30,15 @@ export function writeReportContent(xml: string, styles: string, content: ReportC
   // Table matching is restricted to captions immediately preceding existing tables.
   xml = xml.replace(/<w:tbl\b[^>]*>[\s\S]*?<\/w:tbl>|<w:p\b[^>]*>[\s\S]*?<\/w:p>/g, block => {
     if (!block.startsWith('<w:tbl')) { const t = text(block).trim(); if (t) caption = t; return block; }
-    const patch = tables.find(t => norm(caption) === norm(t.caption));
+    const patch = tables.find(t => {
+      if (norm(caption) === norm(t.caption)) return true;
+      // 当前报告模板在表6-1前使用说明段落（“……具体见表6-1”），而不是独立表题。
+      // 同时校验表号和固定表头，避免说明文字中的“风险分析”误匹配其他表格。
+      if (norm(t.caption) !== '风险分析' || !/表\s*6\s*[-—－.]?\s*1/.test(caption)) return false;
+      const header = text(block).replace(/\s/g, '');
+      return ['序号', '安全层面', '问题描述', '关联威胁', '风险分析', '风险等级']
+        .every(label => header.includes(label));
+    });
     caption = '';
     if (!patch) return block;
     if (seen.has(patch.caption)) throw new Error('模板中存在重复表名，无法安全写入：' + patch.caption);

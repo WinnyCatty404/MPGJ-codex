@@ -5,7 +5,7 @@ import JSZip from 'jszip';
 import sharp from 'sharp';
 import { combined } from './test-level-three-table-bindings.mjs';
 import { formatReportTables, replaceReportSlots, specializeReportTemplate, unresolvedReportSlots } from '../backend/dist/report-template.js';
-import { writePlanningImages, writeAppendixBImages, writeReportEvidence } from '../backend/dist/report-evidence.js';
+import { writePlanningImages, writeAppendixBImages, writeReportEvidence, writeTopologyBlocks } from '../backend/dist/report-evidence.js';
 
 const template = fs.readFileSync(new URL('../storage/templates/report/default-report-template.docx', import.meta.url));
 const zip = await JSZip.loadAsync(template);
@@ -21,7 +21,11 @@ Object.assign(values, {
 xml = specializeReportTemplate(xml, values);
 const photo = await sharp({create:{width:3000,height:2000,channels:3,background:'#b7c8d9'}}).jpeg().toBuffer();
 const image = `data:image/jpeg;base64,${photo.toString('base64')}`;
-xml = await writePlanningImages(xml, zip, {'topology-image':image,'device-crypto-image':image});
+xml = await writeTopologyBlocks(xml, zip, [
+  { type: 'image', dataUrl: image, caption: '图 2-1 导出链路测试系统网络拓扑图' },
+  { type: 'text', content: '网络拓扑说明' },
+], undefined, undefined, '导出链路测试系统');
+xml = await writePlanningImages(xml, zip, {'device-crypto-image':image});
 xml = await writeReportEvidence(xml, zip, {});
 xml = await writeAppendixBImages(xml, zip, {'b1-file':[image,image,image,image]});
 const replacements = Object.fromEntries(Object.entries(values).map(([key,value])=>[`{{${key}}}`,value]));
