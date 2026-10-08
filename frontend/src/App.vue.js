@@ -19,6 +19,9 @@ const projectToDelete = ref(null);
 const showUserModal = ref(false);
 const editingUserId = ref('');
 const certificateFileData = ref('');
+const userImporting = ref(false);
+const showUserImportResult = ref(false);
+const userImportResults = ref([]);
 const showPasswordModal = ref(false);
 const passwordForm = reactive({ currentPassword: '', newPassword: '', confirmPassword: '' });
 const userFilters = reactive({ search: '', status: '' });
@@ -409,6 +412,63 @@ async function createUser() {
     catch (error) {
         notify(error.message);
     }
+}
+function downloadBase64File(dataBase64, name, mimeType) {
+    const link = document.createElement('a');
+    link.href = `data:${mimeType};base64,${dataBase64}`;
+    link.download = name;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+}
+async function downloadUserImportTemplate() {
+    try {
+        const file = await api('/users/import-template');
+        downloadBase64File(file.dataBase64, file.name || '用户批量导入模板.xlsx', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+        notify('用户导入模板已下载');
+    }
+    catch (error) {
+        notify(error.message);
+    }
+}
+async function importUsers(event) {
+    const input = event.target;
+    const file = input.files?.[0];
+    if (!file)
+        return;
+    userImporting.value = true;
+    try {
+        const result = await api('/users/import', {
+            method: 'POST',
+            body: JSON.stringify({ name: file.name, dataBase64: await fileAsBase64(file) }),
+        });
+        users.value = await api('/users');
+        userImportResults.value = result.users || [];
+        showUserImportResult.value = true;
+        notify(`已成功导入 ${result.created} 名用户`);
+    }
+    catch (error) {
+        notify(error.message);
+    }
+    finally {
+        userImporting.value = false;
+        input.value = '';
+    }
+}
+function downloadUserPasswordList() {
+    const quote = (value) => `"${String(value || '').replace(/"/g, '""')}"`;
+    const rows = [
+        ['用户名', '姓名', '初始密码'],
+        ...userImportResults.value.map(user => [user.username, user.display_name, user.defaultPassword]),
+    ];
+    const blob = new Blob(['\ufeff' + rows.map(row => row.map(quote).join(',')).join('\r\n')], { type: 'text/csv;charset=utf-8' });
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(blob);
+    link.download = '批量导入用户初始密码.csv';
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    URL.revokeObjectURL(link.href);
 }
 function openAddUser() {
     editingUserId.value = '';
@@ -816,10 +876,6 @@ if (!__VLS_ctx.token) {
     /** @type {__VLS_StyleScopedClasses['primary']} */ ;
     /** @type {__VLS_StyleScopedClasses['wide']} */ ;
     (__VLS_ctx.loading ? '正在登录…' : '登录系统');
-    __VLS_asFunctionalElement1(__VLS_intrinsics.div, __VLS_intrinsics.div)({
-        ...{ class: "login-tip" },
-    });
-    /** @type {__VLS_StyleScopedClasses['login-tip']} */ ;
 }
 else {
     __VLS_asFunctionalElement1(__VLS_intrinsics.div, __VLS_intrinsics.div)({
@@ -1884,6 +1940,29 @@ else {
         __VLS_asFunctionalElement1(__VLS_intrinsics.h1, __VLS_intrinsics.h1)({});
         __VLS_asFunctionalElement1(__VLS_intrinsics.p, __VLS_intrinsics.p)({});
         if (__VLS_ctx.currentUser?.role === 'admin') {
+            __VLS_asFunctionalElement1(__VLS_intrinsics.div, __VLS_intrinsics.div)({
+                ...{ class: "user-page-actions" },
+            });
+            /** @type {__VLS_StyleScopedClasses['user-page-actions']} */ ;
+            __VLS_asFunctionalElement1(__VLS_intrinsics.button, __VLS_intrinsics.button)({
+                ...{ onClick: (__VLS_ctx.downloadUserImportTemplate) },
+                ...{ class: "secondary" },
+            });
+            /** @type {__VLS_StyleScopedClasses['secondary']} */ ;
+            __VLS_asFunctionalElement1(__VLS_intrinsics.label, __VLS_intrinsics.label)({
+                ...{ class: "primary upload-button" },
+                ...{ class: ({ disabled: __VLS_ctx.userImporting }) },
+            });
+            /** @type {__VLS_StyleScopedClasses['primary']} */ ;
+            /** @type {__VLS_StyleScopedClasses['upload-button']} */ ;
+            /** @type {__VLS_StyleScopedClasses['disabled']} */ ;
+            (__VLS_ctx.userImporting ? '正在导入…' : '批量导入用户');
+            __VLS_asFunctionalElement1(__VLS_intrinsics.input)({
+                ...{ onChange: (__VLS_ctx.importUsers) },
+                type: "file",
+                accept: ".xlsx",
+                disabled: (__VLS_ctx.userImporting),
+            });
             __VLS_asFunctionalElement1(__VLS_intrinsics.button, __VLS_intrinsics.button)({
                 ...{ onClick: (__VLS_ctx.openAddUser) },
                 ...{ class: "primary" },
@@ -2041,7 +2120,7 @@ else {
                             throw 0;
                         return (__VLS_ctx.editUser(u));
                         // @ts-ignore
-                        [page, currentUser, statusMap, fmtDate, fmtDate, activeStage, selectedStage, selectedStage, selectedStage, openAddUser, users, users, users, users, userFilters, userFilters, visibleUsers, editUser,];
+                        [page, currentUser, statusMap, fmtDate, fmtDate, activeStage, selectedStage, selectedStage, selectedStage, downloadUserImportTemplate, userImporting, userImporting, userImporting, importUsers, openAddUser, users, users, users, users, userFilters, userFilters, visibleUsers, editUser,];
                     } },
             });
             __VLS_asFunctionalElement1(__VLS_intrinsics.button, __VLS_intrinsics.button)({
@@ -3159,6 +3238,89 @@ if (__VLS_ctx.showUserModal) {
     /** @type {__VLS_StyleScopedClasses['primary']} */ ;
     (__VLS_ctx.editingUserId ? '保存修改' : '确认添加');
 }
+if (__VLS_ctx.showUserImportResult) {
+    __VLS_asFunctionalElement1(__VLS_intrinsics.div, __VLS_intrinsics.div)({
+        ...{ onClick: (...[$event]) => {
+                if (!(__VLS_ctx.showUserImportResult))
+                    throw 0;
+                return (__VLS_ctx.showUserImportResult = false);
+                // @ts-ignore
+                [editingUserId, showUserImportResult, showUserImportResult,];
+            } },
+        ...{ class: "modal-mask" },
+    });
+    /** @type {__VLS_StyleScopedClasses['modal-mask']} */ ;
+    __VLS_asFunctionalElement1(__VLS_intrinsics.div, __VLS_intrinsics.div)({
+        ...{ class: "modal user-import-result-modal" },
+    });
+    /** @type {__VLS_StyleScopedClasses['modal']} */ ;
+    /** @type {__VLS_StyleScopedClasses['user-import-result-modal']} */ ;
+    __VLS_asFunctionalElement1(__VLS_intrinsics.div, __VLS_intrinsics.div)({
+        ...{ class: "modal-head" },
+    });
+    /** @type {__VLS_StyleScopedClasses['modal-head']} */ ;
+    __VLS_asFunctionalElement1(__VLS_intrinsics.div, __VLS_intrinsics.div)({});
+    __VLS_asFunctionalElement1(__VLS_intrinsics.small, __VLS_intrinsics.small)({});
+    __VLS_asFunctionalElement1(__VLS_intrinsics.h2, __VLS_intrinsics.h2)({});
+    (__VLS_ctx.userImportResults.length);
+    __VLS_asFunctionalElement1(__VLS_intrinsics.p, __VLS_intrinsics.p)({});
+    __VLS_asFunctionalElement1(__VLS_intrinsics.button, __VLS_intrinsics.button)({
+        ...{ onClick: (...[$event]) => {
+                if (!(__VLS_ctx.showUserImportResult))
+                    throw 0;
+                return (__VLS_ctx.showUserImportResult = false);
+                // @ts-ignore
+                [showUserImportResult, userImportResults,];
+            } },
+        type: "button",
+    });
+    __VLS_asFunctionalElement1(__VLS_intrinsics.div, __VLS_intrinsics.div)({
+        ...{ class: "user-import-result-table" },
+    });
+    /** @type {__VLS_StyleScopedClasses['user-import-result-table']} */ ;
+    __VLS_asFunctionalElement1(__VLS_intrinsics.div, __VLS_intrinsics.div)({
+        ...{ class: "result-head" },
+    });
+    /** @type {__VLS_StyleScopedClasses['result-head']} */ ;
+    __VLS_asFunctionalElement1(__VLS_intrinsics.span, __VLS_intrinsics.span)({});
+    __VLS_asFunctionalElement1(__VLS_intrinsics.span, __VLS_intrinsics.span)({});
+    __VLS_asFunctionalElement1(__VLS_intrinsics.span, __VLS_intrinsics.span)({});
+    for (const [user] of __VLS_vFor((__VLS_ctx.userImportResults))) {
+        __VLS_asFunctionalElement1(__VLS_intrinsics.div, __VLS_intrinsics.div)({
+            key: (user.username),
+            ...{ class: "result-row" },
+        });
+        /** @type {__VLS_StyleScopedClasses['result-row']} */ ;
+        __VLS_asFunctionalElement1(__VLS_intrinsics.b, __VLS_intrinsics.b)({});
+        (user.username);
+        __VLS_asFunctionalElement1(__VLS_intrinsics.span, __VLS_intrinsics.span)({});
+        (user.display_name);
+        __VLS_asFunctionalElement1(__VLS_intrinsics.code, __VLS_intrinsics.code)({});
+        (user.defaultPassword);
+        // @ts-ignore
+        [userImportResults,];
+    }
+    __VLS_asFunctionalElement1(__VLS_intrinsics.div, __VLS_intrinsics.div)({
+        ...{ class: "modal-foot" },
+    });
+    /** @type {__VLS_StyleScopedClasses['modal-foot']} */ ;
+    __VLS_asFunctionalElement1(__VLS_intrinsics.button, __VLS_intrinsics.button)({
+        ...{ onClick: (...[$event]) => {
+                if (!(__VLS_ctx.showUserImportResult))
+                    throw 0;
+                return (__VLS_ctx.showUserImportResult = false);
+                // @ts-ignore
+                [showUserImportResult,];
+            } },
+        ...{ class: "secondary" },
+    });
+    /** @type {__VLS_StyleScopedClasses['secondary']} */ ;
+    __VLS_asFunctionalElement1(__VLS_intrinsics.button, __VLS_intrinsics.button)({
+        ...{ onClick: (__VLS_ctx.downloadUserPasswordList) },
+        ...{ class: "primary" },
+    });
+    /** @type {__VLS_StyleScopedClasses['primary']} */ ;
+}
 if (__VLS_ctx.showPasswordModal) {
     __VLS_asFunctionalElement1(__VLS_intrinsics.div, __VLS_intrinsics.div)({
         ...{ onClick: (...[$event]) => {
@@ -3166,7 +3328,7 @@ if (__VLS_ctx.showPasswordModal) {
                     throw 0;
                 return (__VLS_ctx.showPasswordModal = false);
                 // @ts-ignore
-                [showPasswordModal, showPasswordModal, editingUserId,];
+                [showPasswordModal, showPasswordModal, downloadUserPasswordList,];
             } },
         ...{ class: "modal-mask" },
     });

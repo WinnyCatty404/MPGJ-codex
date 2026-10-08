@@ -161,8 +161,21 @@
 .user-actions { display:flex; gap:5px; flex-wrap:wrap; }
 .user-actions button { border:1px solid #cfdeeb; color:#1768b6; background:#fff; border-radius:6px; height:27px; padding:0 7px; font-size:10px; }
 .user-table a { color:#1768b6; text-decoration:none; }
+.user-page-actions { display:flex; align-items:center; gap:8px; }
+.user-page-actions .upload-button { position:static; right:auto; bottom:auto; display:inline-flex; align-items:center; justify-content:center; cursor:pointer; }
+.user-page-actions .upload-button.disabled { opacity:.65; cursor:not-allowed; }
+.user-import-result-modal { width:min(680px,calc(100vw - 40px)); }
+.user-import-result-modal .modal-head p { margin:5px 0 0; color:#718096; font-size:11px; }
+.user-import-result-table { max-height:420px; margin:18px 22px; overflow:auto; border:1px solid #dfe7ef; border-radius:8px; }
+.user-import-result-table .result-head,.user-import-result-table .result-row { display:grid; grid-template-columns:1fr 1fr 1.2fr; gap:12px; align-items:center; padding:9px 12px; }
+.user-import-result-table .result-head { position:sticky; top:0; z-index:1; background:#eef4fa; color:#607286; font-size:10px; font-weight:700; }
+.user-import-result-table .result-row { border-top:1px solid #e8edf2; color:#42536a; font-size:11px; }
+.user-import-result-table .result-row b { color:#1c3550; }
+.user-import-result-table .result-row code { padding:4px 7px; border-radius:5px; background:#f3f6f9; color:#174f86; font-family:Consolas,monospace; }
 
 .settings-page { max-width:1280px; }
+/* 风险分析页是宽表格页：取消限宽，内容随窗口自适应铺满（表格列已是 minmax 弹性宽度） */
+.settings-page.risk-analysis-page { max-width:none; }
 .settings-card { padding-bottom:18px; }
 .institution-grid { grid-template-columns:repeat(3,1fr); }
 .template-grid { display:grid; grid-template-columns:1fr 1fr; gap:14px; }

@@ -20,6 +20,7 @@ import { generateRawRecords } from './raw-records.js';
 import { replaceProjectTextInStageData, syncProjectDatesInStageData } from './project-date-sync.js';
 import { calculateStageCompletion, deriveProjectProgress } from './project-progress.js';
 import { buildRiskTemplateWorkbook, parseRiskTemplateWorkbook } from './risk-template-xlsx.js';
+import { buildUserImportWorkbook, parseUserImportWorkbook } from './user-import-xlsx.js';
 
 dotenv.config({ path: fileURLToPath(new URL('../../.env', import.meta.url)) });
 
@@ -679,10 +680,64 @@ app.get('/api/users', auth, asyncRoute(async (_req, res) => {
   res.json(result.rows);
 }));
 
+function defaultPasswordForUsername(username: string) {
+  return `${username.slice(-4)}@Pwd${String(new Date().getFullYear()).slice(-2)}`;
+}
+
+app.get('/api/users/import-template', auth, asyncRoute(async (req, res) => {
+  if (req.user!.role !== 'admin') return res.status(403).json({ message: '仅管理员可下载用户导入模板' });
+  const workbook = await buildUserImportWorkbook();
+  res.json({ name: '用户批量导入模板.xlsx', dataBase64: workbook.toString('base64') });
+}));
+
+app.post('/api/users/import', auth, asyncRoute(async (req, res) => {
+  if (req.user!.role !== 'admin') return res.status(403).json({ message: '仅管理员可批量导入用户' });
+  const input = z.object({ name: z.string().min(1).max(255), dataBase64: z.string().min(1).max(15_000_000) }).parse(req.body);
+  if (!/\.xlsx$/i.test(input.name)) return res.status(400).json({ message: '请选择 .xlsx 用户导入文件' });
+  let rows;
+  try {
+    rows = await parseUserImportWorkbook(Buffer.from(input.dataBase64, 'base64'));
+  } catch (error) {
+    return res.status(400).json({ message: error instanceof Error ? error.message : '用户导入文件解析失败' });
+  }
+  const usernames = rows.map(row => row.username.toLowerCase());
+  const existing = await pool.query('SELECT username FROM users WHERE lower(username)=ANY($1::text[]) ORDER BY username', [usernames]);
+  if (existing.rows.length) {
+    return res.status(409).json({ message: `以下用户名已存在：${existing.rows.map(row => row.username).join('、')}` });
+  }
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    const created = [];
+    for (const row of rows) {
+      const defaultPassword = defaultPasswordForUsername(row.username);
+      const result = await client.query(
+        `INSERT INTO users(username,display_name,password_hash,role,status,certificate_date,must_change_password)
+         VALUES($1,$2,crypt($3,gen_salt('bf')),$4,'pending',$5,true)
+         RETURNING id,username,display_name,role,status,certificate_date,created_at`,
+        [row.username, row.displayName, defaultPassword, row.role, row.certificateDate],
+      );
+      created.push({ ...result.rows[0], defaultPassword });
+    }
+    await client.query(
+      `INSERT INTO audit_logs(user_id,action,entity_type,entity_id,detail,ip_address)
+       VALUES($1,'batch_import','user','batch',$2,$3)`,
+      [req.user!.id, JSON.stringify({ count: created.length, usernames: created.map(user => user.username) }), req.ip || null],
+    );
+    await client.query('COMMIT');
+    res.status(201).json({ created: created.length, users: created });
+  } catch (error) {
+    await client.query('ROLLBACK');
+    throw error;
+  } finally {
+    client.release();
+  }
+}));
+
 app.post('/api/users', auth, asyncRoute(async (req, res) => {
   if (req.user!.role !== 'admin') return res.status(403).json({ message: '仅管理员可新增用户' });
   const input = z.object({ username: z.string().regex(/^[A-Za-z0-9_]{3,20}$/), displayName: z.string().min(2), role: z.enum(['admin','manager','evaluator','reviewer']), certificateDate: z.string().optional().nullable(), certificateFileName: z.string().max(255).optional().nullable(), certificateFileData: z.string().max(8_000_000).optional().nullable() }).parse(req.body);
-  const defaultPassword = `${input.username.slice(-4)}@Pwd${String(new Date().getFullYear()).slice(-2)}`;
+  const defaultPassword = defaultPasswordForUsername(input.username);
   const result = await pool.query(
     `INSERT INTO users(username,display_name,password_hash,role,status,certificate_date,certificate_file_name,certificate_file_path,must_change_password)
      VALUES($1,$2,crypt($3,gen_salt('bf')),$4,'pending',$5,$6,$7,true)
@@ -709,7 +764,7 @@ app.post('/api/users/:id/reset-password', auth, asyncRoute(async (req, res) => {
   if (req.user!.role !== 'admin') return res.status(403).json({ message: '仅管理员可重置密码' });
   const found = await pool.query('SELECT username FROM users WHERE id=$1', [req.params.id]);
   if (!found.rows[0]) return res.status(404).json({ message: '用户不存在' });
-  const defaultPassword = `${found.rows[0].username.slice(-4)}@Pwd${String(new Date().getFullYear()).slice(-2)}`;
+  const defaultPassword = defaultPasswordForUsername(found.rows[0].username);
   await pool.query(`UPDATE users SET password_hash=crypt($1,gen_salt('bf')),must_change_password=true,status='pending',updated_at=now() WHERE id=$2`, [defaultPassword, req.params.id]);
   res.json({ reset: true, defaultPassword });
 }));

@@ -4,6 +4,7 @@ import { computed, onMounted, reactive, ref } from 'vue';
 type Page = 'dashboard' | 'projects' | 'workspace' | 'users' | 'templates' | 'risk-analysis' | 'institution';
 const restorablePages: Page[] = ['dashboard', 'projects', 'users', 'templates', 'risk-analysis', 'institution'];
 type User = { id: string; username: string; display_name: string; role: string; status: string; certificate_date?: string; certificate_file_name?: string; certificate_file_path?: string; must_change_password?: boolean; last_login_at?: string; created_at?: string };
+type ImportedUser = { username: string; display_name: string; defaultPassword: string };
 type Project = { id: string; code: string; report_code?: string; system_name: string; org_name: string; assessment_year: number; system_level: number; status: string; current_stage: number; progress: number; start_date?: string; end_date?: string; owner_name?: string; high_risk_count?: number; system_score?: number; stages?: Stage[]; risks?: Risk[]; assets?: Asset[] };
 type Stage = { id: string; stage_key: string; title: string; completion: number; data: Record<string, unknown> };
 type Risk = { id: string; domain: string; issue_description: string; risk_level: string; status: string };
@@ -30,6 +31,9 @@ const projectToDelete = ref<Project | null>(null);
 const showUserModal = ref(false);
 const editingUserId = ref('');
 const certificateFileData = ref('');
+const userImporting = ref(false);
+const showUserImportResult = ref(false);
+const userImportResults = ref<ImportedUser[]>([]);
 const showPasswordModal = ref(false);
 const passwordForm = reactive({ currentPassword: '', newPassword: '', confirmPassword: '' });
 const userFilters = reactive({ search: '', status: '' });
@@ -406,6 +410,53 @@ async function createUser() {
   } catch (error) { notify((error as Error).message); }
 }
 
+function downloadBase64File(dataBase64: string, name: string, mimeType: string) {
+  const link = document.createElement('a');
+  link.href = `data:${mimeType};base64,${dataBase64}`;
+  link.download = name;
+  document.body.appendChild(link); link.click(); link.remove();
+}
+
+async function downloadUserImportTemplate() {
+  try {
+    const file = await api('/users/import-template');
+    downloadBase64File(file.dataBase64, file.name || '用户批量导入模板.xlsx', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    notify('用户导入模板已下载');
+  } catch (error) { notify((error as Error).message); }
+}
+
+async function importUsers(event: Event) {
+  const input = event.target as HTMLInputElement;
+  const file = input.files?.[0];
+  if (!file) return;
+  userImporting.value = true;
+  try {
+    const result = await api('/users/import', {
+      method: 'POST',
+      body: JSON.stringify({ name: file.name, dataBase64: await fileAsBase64(file) }),
+    });
+    users.value = await api('/users');
+    userImportResults.value = result.users || [];
+    showUserImportResult.value = true;
+    notify(`已成功导入 ${result.created} 名用户`);
+  } catch (error) { notify((error as Error).message); }
+  finally { userImporting.value = false; input.value = ''; }
+}
+
+function downloadUserPasswordList() {
+  const quote = (value: string) => `"${String(value || '').replace(/"/g, '""')}"`;
+  const rows = [
+    ['用户名', '姓名', '初始密码'],
+    ...userImportResults.value.map(user => [user.username, user.display_name, user.defaultPassword]),
+  ];
+  const blob = new Blob(['\ufeff' + rows.map(row => row.map(quote).join(',')).join('\r\n')], { type: 'text/csv;charset=utf-8' });
+  const link = document.createElement('a');
+  link.href = URL.createObjectURL(blob);
+  link.download = '批量导入用户初始密码.csv';
+  document.body.appendChild(link); link.click(); link.remove();
+  URL.revokeObjectURL(link.href);
+}
+
 function openAddUser() {
   editingUserId.value = ''; certificateFileData.value = '';
   Object.assign(userForm, { username: '', displayName: '', role: 'evaluator', certificateDate: '', certificateFileName: '' });
@@ -715,7 +766,6 @@ onMounted(async () => {
         <label>密码<input v-model="loginForm.password" type="password" autocomplete="current-password" placeholder="请输入密码" /></label>
         <div v-if="loginError" class="form-error">{{ loginError }}</div>
         <button class="primary wide" :disabled="loading">{{ loading ? '正在登录…' : '登录系统' }}</button>
-        <div class="login-tip">演示账号：admin / Admin@123</div>
       </form>
     </section>
   </div>
@@ -779,7 +829,7 @@ onMounted(async () => {
       </div>
 
       <div v-else-if="page==='users'" class="content list-page">
-        <section class="page-title"><div><small>账号、状态与密评资质</small><h1>用户管理</h1><p>内容与用户体系原型保持一致，集中维护人员资料与账号安全。</p></div><button v-if="currentUser?.role==='admin'" class="primary" @click="openAddUser">＋ 添加用户</button></section>
+        <section class="page-title"><div><small>账号、状态与密评资质</small><h1>用户管理</h1><p>支持通过 Excel 批量创建账号；密评证书请在导入后通过“管理”手动添加。</p></div><div v-if="currentUser?.role==='admin'" class="user-page-actions"><button class="secondary" @click="downloadUserImportTemplate">下载导入模板</button><label class="primary upload-button" :class="{disabled:userImporting}">{{ userImporting ? '正在导入…' : '批量导入用户' }}<input type="file" accept=".xlsx" :disabled="userImporting" @change="importUsers" /></label><button class="primary" @click="openAddUser">＋ 添加用户</button></div></section>
         <section class="metric-grid user-metrics"><article><div class="metric-icon blue">人</div><div><small>用户总数</small><strong>{{ users.length }}</strong></div></article><article><div class="metric-icon green">✓</div><div><small>正常</small><strong>{{ users.filter(u=>u.status==='active').length }}</strong></div></article><article><div class="metric-icon amber">钥</div><div><small>待改密</small><strong>{{ users.filter(u=>u.status==='pending').length }}</strong></div></article><article><div class="metric-icon amber">停</div><div><small>已禁用</small><strong>{{ users.filter(u=>u.status==='disabled').length }}</strong></div></article></section>
         <section class="panel filter-panel"><div class="search"><span>⌕</span><input v-model="userFilters.search" placeholder="搜索用户名或姓名" /></div><select v-model="userFilters.status"><option value="">全部状态</option><option value="active">正常</option><option value="pending">待改密</option><option value="disabled">已禁用</option></select></section>
         <section class="panel data-table user-table detailed"><div class="table-head"><span>序号</span><span>用户名 / 姓名</span><span>密评考试通过时间</span><span>密评证书</span><span>状态</span><span>创建时间</span><span>操作</span></div><div v-for="(u,index) in visibleUsers" :key="u.id" class="table-row"><span>{{ index+1 }}</span><span class="user-cell"><i>{{ u.display_name.slice(0,1) }}</i><span><b>{{ u.username }}</b><small>{{ u.display_name }}</small></span></span><span>{{ fmtDate(u.certificate_date) }}</span><span><a v-if="u.certificate_file_path" :href="u.certificate_file_path" target="_blank">{{ u.certificate_file_name || '查看证书' }}</a><small v-else>未上传</small></span><span><i class="status-pill" :class="u.status">{{ statusMap[u.status] }}</i></span><span>{{ fmtDate(u.created_at) }}</span><span class="user-actions"><button @click="editUser(u)">管理</button><button @click="resetPassword(u)">重置密码</button><button @click="toggleUser(u)">{{ u.status==='disabled'?'启用':'禁用' }}</button></span></div></section>
@@ -834,7 +884,7 @@ onMounted(async () => {
   <div v-if="copySourceProject" class="modal-mask" @click.self="copySourceProject=null"><form class="modal small" @submit.prevent="copyProject"><div class="modal-head"><div><small>RETEST COPY</small><h2>复制为复测项目</h2><p>保留现场测评记录和证据，附录 B 的独立材料将清空。</p></div><button type="button" @click="copySourceProject=null">×</button></div><div class="form-grid"><label class="span-2">系统名称<input v-model="copyForm.systemName" required placeholder="请输入被测系统全称" /></label><label>报告编号<input v-model="copyForm.reportCode" placeholder="请输入新报告编号" /></label><label>测评年度<input v-model.number="copyForm.assessmentYear" type="number" min="2000" max="2100" required /></label><label>开始时间<input v-model="copyForm.startDate" type="date" required /></label><label>结束时间<input v-model="copyForm.endDate" type="date" required /></label></div><div class="modal-foot"><button type="button" class="secondary" @click="copySourceProject=null">取消</button><button class="primary">确认复制</button></div></form></div>
   <div v-if="projectToDelete" class="modal-mask" @click.self="projectToDelete=null"><div class="modal confirm-dialog"><div class="confirm-symbol">!</div><h2>确认删除该项目？</h2><p>将删除“{{ projectToDelete.system_name }}”及其阶段数据、资产、测评记录、风险和证据文件记录。此操作不可恢复。</p><div class="modal-foot"><button class="secondary" @click="projectToDelete=null">取消</button><button class="primary danger-button" @click="deleteProject">确认删除</button></div></div></div>
   <div v-if="showUserModal" class="modal-mask" @click.self="showUserModal=false"><form class="modal small" @submit.prevent="createUser"><div class="modal-head"><div><small>USER</small><h2>{{ editingUserId ? '编辑用户信息' : '添加系统用户' }}</h2></div><button type="button" @click="showUserModal=false">×</button></div><div class="form-grid"><label>用户名<input v-model="userForm.username" required :readonly="!!editingUserId" placeholder="英文、数字或下划线" /></label><label>姓名<input v-model="userForm.displayName" required placeholder="真实姓名" /></label><label>系统角色<select v-model="userForm.role"><option value="evaluator">测评人员</option><option value="manager">项目负责人</option><option value="reviewer">审核人员</option><option value="admin">系统管理员</option></select></label><label>密评考试通过时间<input v-model="userForm.certificateDate" type="date" /></label><label class="span-2">密评证书<input type="file" accept="image/*,.pdf" @change="chooseCertificate" /><small>{{ userForm.certificateFileName || '支持图片或 PDF' }}</small></label></div><div class="modal-foot"><button type="button" class="secondary" @click="showUserModal=false">取消</button><button class="primary">{{ editingUserId ? '保存修改' : '确认添加' }}</button></div></form></div>
+  <div v-if="showUserImportResult" class="modal-mask" @click.self="showUserImportResult=false"><div class="modal user-import-result-modal"><div class="modal-head"><div><small>IMPORT COMPLETE</small><h2>成功导入 {{ userImportResults.length }} 名用户</h2><p>所有账号首次登录均需修改密码，请妥善保存以下初始密码。</p></div><button type="button" @click="showUserImportResult=false">×</button></div><div class="user-import-result-table"><div class="result-head"><span>用户名</span><span>姓名</span><span>初始密码</span></div><div v-for="user in userImportResults" :key="user.username" class="result-row"><b>{{ user.username }}</b><span>{{ user.display_name }}</span><code>{{ user.defaultPassword }}</code></div></div><div class="modal-foot"><button class="secondary" @click="showUserImportResult=false">关闭</button><button class="primary" @click="downloadUserPasswordList">下载初始密码清单</button></div></div></div>
   <div v-if="showPasswordModal" class="modal-mask" @click.self="showPasswordModal=false"><form class="modal small" @submit.prevent="changePassword"><div class="modal-head"><div><small>ACCOUNT SECURITY</small><h2>修改账户密码</h2></div><button type="button" @click="showPasswordModal=false">×</button></div><div class="form-grid password-grid"><label class="span-2">当前密码<input v-model="passwordForm.currentPassword" type="password" required autocomplete="current-password" /></label><label>新密码<input v-model="passwordForm.newPassword" type="password" minlength="8" required autocomplete="new-password" /></label><label>确认新密码<input v-model="passwordForm.confirmPassword" type="password" minlength="8" required autocomplete="new-password" /></label></div><div class="modal-foot"><button type="button" class="secondary" @click="showPasswordModal=false">取消</button><button class="primary">确认修改</button></div></form></div>
   <transition name="toast"><div v-if="toast" class="toast">✓ {{ toast }}</div></transition>
 </template>
-
