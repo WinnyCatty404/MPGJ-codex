@@ -24,3 +24,4 @@ pgsql/
 data/
 pgdata/
 bb-config.json
+bb-data-path.txt

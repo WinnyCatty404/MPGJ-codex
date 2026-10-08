@@ -127,6 +127,13 @@ try {
 
 # 5) 注入环境变量并后台启动后端与前端（使用私有 Node，不修改系统 PATH）
 $env:PORT = "$apiPort"
+$env:BB_DATA_ROOT = $p.DataRoot
+if (Test-Path -LiteralPath (Join-Path $AppRoot 'bb-data-path.txt')) {
+  New-Item -ItemType Directory -Path (Join-Path $p.DataRoot 'storage') -Force | Out-Null
+  if (-not (Test-Path -LiteralPath (Join-Path $p.DataRoot 'storage\templates'))) {
+    Copy-Item -LiteralPath (Join-Path $AppRoot 'storage\templates') -Destination (Join-Path $p.DataRoot 'storage\templates') -Recurse
+  }
+}
 $env:JWT_SECRET = $jwtSecret
 $env:DATABASE_URL = "postgresql://bb_miping_app:BbMiping-App-2026!@127.0.0.1:$pgPort/bb_miping"
 

@@ -13,7 +13,7 @@ param(
 )
 $ErrorActionPreference = 'Stop'
 . (Join-Path $AppRoot 'bb-common.ps1')
-if (-not $BackupRoot) { $BackupRoot = Join-Path $AppRoot 'data\backups' }
+if (-not $BackupRoot) { $BackupRoot = Get-BBBackupRoot $AppRoot }
 
 $config  = Get-BBConfig -AppRoot $AppRoot
 $pgPort  = if ($config -and $config.pgPort) { [int]$config.pgPort } else { 54328 }
@@ -53,7 +53,7 @@ if ($LASTEXITCODE -ne 0) { Write-Error '数据库恢复失败（请确认 Postgr
 # 恢复文件目录
 foreach ($d in @('storage', 'uploads')) {
   $src = Join-Path $BackupSet $d
-  if (Test-Path -LiteralPath $src) { robocopy $src (Join-Path $p.AppRoot $d) /E /R:1 /W:1 /NFL /NDL /NJH /NJS | Out-Null }
+  if (Test-Path -LiteralPath $src) { robocopy $src (Join-Path $p.DataRoot $d) /E /R:1 /W:1 /NFL /NDL /NJH /NJS | Out-Null }
 }
 
 Write-Host "恢复完成：$BackupSet（恢复后请重启 BMPBGS）"

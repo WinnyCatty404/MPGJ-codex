@@ -24,7 +24,7 @@ function Test-BBAsciiPath {
 # GBK 中文路径字节被按 UTF-8 校验失败。因此路径含非 ASCII 时，
 # 自动把 pgsql 复制到全 ASCII 的 C:\ProgramData\BBMiPing\pgsql 后使用（只复制一次）。
 function Resolve-BBPgRoot {
-  param([string]$AppRoot)
+  param([string]$AppRoot, [string]$DataRoot)
 
   $bundled  = Join-Path $AppRoot 'pgsql'
   $fallback = 'D:\BBMipingDB\PostgreSQL'
@@ -36,7 +36,7 @@ function Resolve-BBPgRoot {
 
   if (Test-BBAsciiPath $bundled) { return $bundled }
 
-  $ascii = Join-Path $env:ProgramData 'BBMiPing\pgsql'
+  $ascii = if ($DataRoot -and (Test-BBAsciiPath $DataRoot)) { Join-Path $DataRoot 'runtime\pgsql' } else { Join-Path $env:ProgramData 'BBMiPing\pgsql' }
   $asciiPgCtl = Join-Path $ascii 'bin\pg_ctl.exe'
   $marker = Join-Path $ascii '.bb-src-marker'
   $srcStamp = (Get-Item -LiteralPath (Join-Path $bundled 'bin\pg_ctl.exe')).LastWriteTimeUtc.Ticks
@@ -64,13 +64,15 @@ function Resolve-BBPaths {
     [string]$ConfiguredPgData = ''
   )
 
-  $pgRoot = Resolve-BBPgRoot -AppRoot $AppRoot
+  $dataRoot = Get-BBDataRoot -AppRoot $AppRoot
+  $pgRoot = Resolve-BBPgRoot -AppRoot $AppRoot -DataRoot $dataRoot
 
   $installData  = Join-Path $AppRoot 'data\pgdata'
   $legacyBundledData = Join-Path $AppRoot 'pgdata'
   $fallbackData = 'D:\BBMipingDB\data'
   $legacyProgramData = Join-Path $env:ProgramData 'BBMiPing\pgdata'
-  if ($ConfiguredPgData) { $pgData = [System.IO.Path]::GetFullPath($ConfiguredPgData) }
+  if (Test-Path -LiteralPath (Join-Path $AppRoot 'bb-data-path.txt')) { $pgData = Join-Path $dataRoot 'pgdata' }
+  elseif ($ConfiguredPgData) { $pgData = [System.IO.Path]::GetFullPath($ConfiguredPgData) }
   elseif (Test-Path -LiteralPath (Join-Path $installData 'PG_VERSION')) { $pgData = $installData }
   elseif (Test-Path -LiteralPath (Join-Path $legacyBundledData 'PG_VERSION')) { $pgData = $legacyBundledData }
   elseif (Test-Path -LiteralPath (Join-Path $legacyProgramData 'PG_VERSION')) { $pgData = $legacyProgramData }
@@ -82,9 +84,27 @@ function Resolve-BBPaths {
     AppRoot = $AppRoot
     PgRoot  = $pgRoot
     PgData  = $pgData
-    DataRoot = Split-Path -Parent $pgData
+    DataRoot = $dataRoot
     PgPort  = $PgPort
   }
+}
+
+# 安装器写入的独立数据目录；旧版继续使用原有文件位置。
+function Get-BBDataRoot {
+  param([string]$AppRoot)
+  $marker = Join-Path $AppRoot 'bb-data-path.txt'
+  if (Test-Path -LiteralPath $marker) {
+    $selected = (Get-Content -LiteralPath $marker -Raw -Encoding UTF8).Trim()
+    if (-not (Test-BBAsciiPath $selected) -or -not [IO.Path]::IsPathRooted($selected)) { throw '数据存储位置必须是绝对英文路径。' }
+    return [IO.Path]::GetFullPath($selected)
+  }
+  return $AppRoot
+}
+
+function Get-BBBackupRoot {
+  param([string]$AppRoot)
+  if (Test-Path -LiteralPath (Join-Path $AppRoot 'bb-data-path.txt')) { return Join-Path (Get-BBDataRoot $AppRoot) 'backups' }
+  return Join-Path $AppRoot 'data\backups'
 }
 
 # 返回 bb-config.json 的绝对路径（端口与密钥的持久化文件，位于安装目录根）。

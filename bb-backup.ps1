@@ -11,7 +11,7 @@ param(
 )
 $ErrorActionPreference = 'Stop'
 . (Join-Path $AppRoot 'bb-common.ps1')
-if (-not $BackupRoot) { $BackupRoot = Join-Path $AppRoot 'data\backups' }
+if (-not $BackupRoot) { $BackupRoot = Get-BBBackupRoot $AppRoot }
 
 $config  = Get-BBConfig -AppRoot $AppRoot
 $pgPort  = if ($config -and $config.pgPort) { [int]$config.pgPort } else { 54328 }
@@ -32,7 +32,7 @@ if ($LASTEXITCODE -ne 0) { Write-Error '数据库备份失败（请确认 Postgr
 
 # 备份文件目录（若存在）
 foreach ($d in @('storage', 'uploads')) {
-  $src = Join-Path $p.AppRoot $d
+  $src = Join-Path $p.DataRoot $d
   if (Test-Path -LiteralPath $src) { robocopy $src (Join-Path $setDir $d) /E /R:1 /W:1 /NFL /NDL /NJH /NJS | Out-Null }
 }
 

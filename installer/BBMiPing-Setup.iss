@@ -4,7 +4,7 @@
 ;   1) 私有 Node.js：把 node.exe 及其依赖 DLL 放入 pgsql 同级目录的 node\（即 node\node.exe 存在）
 ;   2) 私有 PostgreSQL：把解压后的 bin/lib/share 放入根目录 pgsql\（即 pgsql\bin\pg_ctl.exe 存在）
 #define MyAppName "BMPBGS"
-#define MyAppVersion "1.1.0"
+#define MyAppVersion "1.2.0"
 
 [Setup]
 AppId={{BB-MIPING-TOOL-2026}
@@ -24,6 +24,7 @@ ArchitecturesAllowed=x64compatible
 ArchitecturesInstallIn64BitMode=x64
 WizardStyle=modern
 DisableProgramGroupPage=no
+DisableDirPage=no
 CloseApplications=no
 
 [Languages]
@@ -53,6 +54,37 @@ Type: files; Name: "{userdesktop}\BMPBGS控制台.lnk"
 ; 这些目录属于用户运行期数据，卸载时保留可避免误删；如需彻底清理，请手动删除安装目录。
 
 [Code]
+var
+  DataPage: TInputDirWizardPage;
+  SuggestedDataDir: String;
+
+procedure InitializeWizard;
+begin
+  DataPage := CreateInputDirPage(wpSelectDir, '数据存储位置',
+    '选择数据库、项目文件和备份的存储位置',
+    '默认在安装盘创建 BMPBGS-Data。请选择有写入权限的英文目录。' + #13#10 +
+    '升级时请选择原数据目录；选择新的空目录会创建新的初始数据库。',
+    False, '');
+  DataPage.Add('数据存储目录：');
+end;
+
+procedure CurPageChanged(CurPageID: Integer);
+var
+  ExistingPath: AnsiString;
+  NewSuggestion: String;
+begin
+  if CurPageID = DataPage.ID then
+  begin
+    NewSuggestion := ExtractFileDrive(WizardDirValue) + '\BMPBGS-Data';
+    if LoadStringFromFile(AddBackslash(WizardDirValue) + 'bb-data-path.txt', ExistingPath) then
+      NewSuggestion := Trim(String(ExistingPath));
+    if (DataPage.Values[0] = '') or (DataPage.Values[0] = SuggestedDataDir) then
+      DataPage.Values[0] := NewSuggestion;
+    SuggestedDataDir := NewSuggestion;
+    DataPage.Values[0] := ExpandConstant('{param:DATADIR|' + DataPage.Values[0] + '}');
+  end;
+end;
+
 function IsAsciiPath(const Value: String): Boolean;
 var
   I: Integer;
@@ -69,12 +101,39 @@ begin
 end;
 
 function NextButtonClick(CurPageID: Integer): Boolean;
+var
+  DataDir, Probe: String;
 begin
   Result := True;
-  if (CurPageID = wpSelectDir) and (not IsAsciiPath(WizardDirValue)) then
+  if CurPageID = DataPage.ID then
   begin
-    MsgBox('BMPBGS 内置 PostgreSQL 要求安装路径仅包含英文、数字和常用符号。' + #13#10 +
-      '请改用纯英文路径，例如 D:\BMPBGS。', mbError, MB_OK);
-    Result := False;
+    DataDir := RemoveBackslashUnlessRoot(Trim(DataPage.Values[0]));
+    if (not IsAsciiPath(DataDir)) or (Length(DataDir) < 4) or
+      (Copy(DataDir, 2, 2) <> ':\') then
+    begin
+      MsgBox('数据目录必须是本地磁盘的英文绝对路径，例如 D:\BMPBGS-Data。', mbError, MB_OK);
+      Result := False;
+      Exit;
+    end;
+    Probe := AddBackslash(DataDir) + '.bmpbgs-write-' + GetDateTimeString('yyyymmddhhnnsszzz', '-', ':') + '.tmp';
+    if not ForceDirectories(DataDir) then
+      Result := False
+    else if not SaveStringToFile(Probe, 'write-test', False) then
+      Result := False
+    else
+      DeleteFile(Probe);
+    if not Result then
+      MsgBox('无法创建或写入此数据目录，请选择其他有写入权限的英文目录。', mbError, MB_OK)
+    else
+      DataPage.Values[0] := DataDir;
+  end;
+end;
+
+procedure CurStepChanged(CurStep: TSetupStep);
+begin
+  if CurStep = ssPostInstall then
+  begin
+    if not SaveStringToFile(ExpandConstant('{app}\bb-data-path.txt'), DataPage.Values[0], False) then
+      RaiseException('无法保存数据存储位置配置。');
   end;
 end;

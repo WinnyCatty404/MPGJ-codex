@@ -48,7 +48,7 @@ function Invoke-Script([string]$Name) {
 }
 
 function Invoke-ScriptSilent([string]$Name, [string[]]$Extra) {
-  $a = @('-NoProfile','-ExecutionPolicy','Bypass','-File',(Join-Path $AppRoot $Name)) + $Extra
+  $a = @('-NoProfile','-NonInteractive','-ExecutionPolicy','Bypass','-File',('"' + (Join-Path $AppRoot $Name) + '"')) + ($Extra | ForEach-Object { '"' + $_ + '"' })
   Start-Process -FilePath 'powershell.exe' -ArgumentList $a -WindowStyle Hidden | Out-Null
 }
 
@@ -195,7 +195,7 @@ $btnBackup.Add_Click({
   $btnBackup.Enabled = $false
   Write-Log '正在备份数据（数据库 + 上传文件），后台执行中…' ([System.Drawing.Color]::FromArgb(240, 150, 30))
   Invoke-ScriptSilent 'bb-backup.ps1' @('-Silent')
-  Write-Log ('备份已启动，完成后写入：' + (Join-Path $AppRoot 'data\backups') + '\<时间戳>') $C_TEXT
+  Write-Log ('备份已启动，完成后写入：' + (Get-BBBackupRoot $AppRoot) + '\<时间戳>') $C_TEXT
   $btnBackup.Enabled = $true
 })
 $btnRestore.Add_Click({
@@ -205,7 +205,7 @@ $btnRestore.Add_Click({
     $btnRestore.Enabled = $true
     return
   }
-  $bkRoot = Join-Path $AppRoot 'data\backups'
+  $bkRoot = Get-BBBackupRoot $AppRoot
   $sets = Get-ChildItem -Directory $bkRoot -ErrorAction SilentlyContinue | Sort-Object Name -Descending
   if ($sets.Count -eq 0) { Write-Log ('未找到任何备份集：' + $bkRoot) $C_RED; $btnRestore.Enabled = $true; return }
   $answer = [System.Windows.Forms.MessageBox]::Show(

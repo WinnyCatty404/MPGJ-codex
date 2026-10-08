@@ -34,7 +34,9 @@ const execFileAsync = promisify(execFile);
 // 大量证据截图会使报告达到约 30 MB。Word 更新目录、重新分页及 PDF 转换
 // 在此体积下可能超过 3 分钟，保留充足处理时间，避免正常任务被提前终止。
 const WORD_AUTOMATION_TIMEOUT_MS = 10 * 60 * 1000;
-const storageRoot = fileURLToPath(new URL('../../storage/', import.meta.url));
+const storageRoot = process.env.BB_DATA_ROOT
+  ? path.join(process.env.BB_DATA_ROOT, 'storage')
+  : fileURLToPath(new URL('../../storage/', import.meta.url));
 const defaultReportTemplate = path.join(storageRoot, 'templates', 'report', 'default-report-template.docx');
 const levelTwoReportTemplate = path.join(storageRoot, 'templates', 'report', 'level-2', 'default-report-template.docx');
 const reportTemplateForLevel = (level: number) => level === 2 ? levelTwoReportTemplate : defaultReportTemplate;

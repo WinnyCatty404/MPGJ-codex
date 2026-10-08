@@ -30,14 +30,16 @@ powershell -NoProfile -ExecutionPolicy Bypass -File installer\build-windows.ps1
 
 ## 安装和数据位置
 
-默认安装到 `%LOCALAPPDATA%\BMPBGS`，用户可在安装向导中选择任意磁盘，但路径必须只含英文、数字和常用符号，例如 `D:\BMPBGS`。
+每次安装均显示程序安装位置页，允许中文路径。随后显示独立的数据存储位置页，默认使用安装盘的 `BMPBGS-Data`，检查写入权限并自动创建。数据目录必须是本地磁盘的英文绝对路径；没有权限时可改选其他目录。静默安装可使用 `/DATADIR=D:\BMPBGS-Data`。
 
-运行数据均位于实际安装目录：
+运行数据均位于所选数据目录：
 
-- 数据库：`data\pgdata`
-- 备份：`data\backups`
+- 数据库：`pgdata`
+- 备份：`backups`
 - 上传文件：`uploads`
 - 项目文件：`storage\projects`
-- 运行配置：`bb-config.json`
+- 中文安装路径下的 PostgreSQL 运行时：`runtime\pgsql`
+
+安装目录中的 `bb-data-path.txt` 记录数据目录，`bb-config.json` 保存端口等运行配置。升级时自动复用记录的数据目录；更换目录不会自动迁移旧数据，可先备份，再在新目录恢复。
 
 升级安装和卸载不会主动删除上述用户数据。
