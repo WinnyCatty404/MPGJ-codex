@@ -1,4 +1,4 @@
-$ErrorActionPreference = 'Stop'
+﻿$ErrorActionPreference = 'Stop'
 
 $pgCtl = 'D:\BBMipingDB\PostgreSQL\bin\pg_ctl.exe'
 $dataDir = 'D:\BBMipingDB\data'

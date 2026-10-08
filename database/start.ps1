@@ -1,4 +1,4 @@
-param(
+﻿param(
   [string]$PostgresRoot = 'D:\BBMipingDB\PostgreSQL',
   [string]$DataDir = 'D:\BBMipingDB\data'
 )

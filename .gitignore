@@ -12,3 +12,14 @@ storage/projects/
 storage/*.log
 *.tsbuildinfo
 ~$*.docx
+installer/out/
+installer/pkgsrc/
+installer/staging*/
+installer/st-bisect*/
+installer/verify-out/
+linux/build/
+node/
+pgsql/
+data/
+pgdata/
+bb-config.json

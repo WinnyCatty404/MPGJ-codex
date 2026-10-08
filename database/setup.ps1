@@ -1,4 +1,4 @@
-param(
+﻿param(
   [string]$PostgresRoot = 'D:\BBMipingDB\PostgreSQL',
   [string]$DataDir = 'D:\BBMipingDB\data',
   [int]$Port = 54328,
@@ -28,8 +28,13 @@ if (-not (Test-Path -LiteralPath (Join-Path $DataDir 'PG_VERSION'))) {
     Remove-Item -LiteralPath $staleConfig -Force
   }
   $passwordFile = Join-Path ([System.IO.Path]::GetTempPath()) 'bb-miping-pg-password.txt'
-  Set-Content -LiteralPath $passwordFile -Value $SuperuserPassword -NoNewline -Encoding utf8
-  & $initdb -D $DataDir -U postgres -A scram-sha-256 --pwfile=$passwordFile --encoding=UTF8 --locale-provider=icu --icu-locale=zh-CN
+  # 用无 BOM 的 UTF-8 写密码文件，避免 PS5.1 的 Set-Content -Encoding utf8 把 BOM 混进密码
+  [System.IO.File]::WriteAllText($passwordFile, $SuperuserPassword, [System.Text.UTF8Encoding]::new($false))
+  # 注意：不要用 --locale-provider=icu --icu-locale=zh-CN。
+  # PG 16+ 在 initdb 后续初始化会导入 ICU 系统排序规则，ICU 按系统显示语言返回
+  # GBK 编码的中文显示名，被按 UTF-8 校验导致"无效的 UTF8 编码字节顺序: 0xc3 0xdc"。
+  # 应用层只按时间/数字/枚举排序，不依赖中文排序规则，故用 libc + C 最稳妥。
+  & $initdb -D $DataDir -U postgres -A scram-sha-256 --pwfile=$passwordFile --encoding=UTF8 --locale-provider=libc --locale=C
   Assert-NativeSuccess '初始化 PostgreSQL 数据目录'
   Remove-Item -LiteralPath $passwordFile -Force
   Add-Content -LiteralPath (Join-Path $DataDir 'postgresql.conf') -Value "`nport = $Port`nlisten_addresses = '127.0.0.1'`n"
@@ -42,6 +47,10 @@ if ($LASTEXITCODE -ne 0) {
   Start-Sleep -Seconds 2
 }
 $env:PGPASSWORD = $SuperuserPassword
+# 关键：schema.sql/seed.sql 均为 UTF-8 保存，但中文 Windows 上 psql 默认按 GBK(系统区域)读文件，
+# 含中文的 COMMENT/INSERT 会报 "encoding GBK has no equivalent in encoding UTF8" 并被跳过
+#（会导致默认账号等初始数据缺失）。强制 psql 以 UTF-8 解读文件内容。
+$env:PGCLIENTENCODING = 'UTF8'
 
 $roleExists = & $psql -h 127.0.0.1 -p $Port -U postgres -d postgres -tAc "SELECT 1 FROM pg_roles WHERE rolname='bb_miping_app'"
 if ($roleExists -ne '1') {
