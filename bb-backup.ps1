@@ -6,7 +6,8 @@ param(
   [string]$DbUser = 'postgres',
   [string]$DbName = 'bb_miping',
   [string]$PgPassword = 'BbMiping-Local-2026!',
-  [string]$BackupRoot = ''
+  [string]$BackupRoot,
+  [switch]$Silent
 )
 $ErrorActionPreference = 'Stop'
 . (Join-Path $AppRoot 'bb-common.ps1')
@@ -18,7 +19,7 @@ $configuredPgData = if ($config -and $config.pgData) { [string]$config.pgData } 
 $p = Resolve-BBPaths -AppRoot $AppRoot -PgPort $pgPort -ConfiguredPgData $configuredPgData
 
 $pgDump = Join-Path $p.PgRoot 'bin\pg_dump.exe'
-if (-not (Test-Path -LiteralPath $pgDump)) { Write-Error "未找到 pg_dump：$pgDump"; Read-Host '按回车退出'; exit 1 }
+if (-not (Test-Path -LiteralPath $pgDump)) { Write-Error "未找到 pg_dump：$pgDump"; if (-not $Silent) { Read-Host '按回车退出' }; exit 1 }
 
 $ts = Get-Date -Format 'yyyyMMdd-HHmmss'
 $setDir = Join-Path $BackupRoot $ts
@@ -27,7 +28,7 @@ New-Item -ItemType Directory -Path $setDir -Force | Out-Null
 $sqlFile = Join-Path $setDir "$DbName-$ts.dump"
 $env:PGPASSWORD = $PgPassword
 & $pgDump -h 127.0.0.1 -p $p.PgPort -U $DbUser -F c -f $sqlFile $DbName
-if ($LASTEXITCODE -ne 0) { Write-Error '数据库备份失败（请确认 PostgreSQL 正在运行、postgres 密码正确）。'; Read-Host '按回车退出'; exit 1 }
+if ($LASTEXITCODE -ne 0) { Write-Error '数据库备份失败（请确认 PostgreSQL 正在运行、postgres 密码正确）。'; if (-not $Silent) { Read-Host '按回车退出' }; exit 1 }
 
 # 备份文件目录（若存在）
 foreach ($d in @('storage', 'uploads')) {
@@ -36,4 +37,4 @@ foreach ($d in @('storage', 'uploads')) {
 }
 
 Write-Host "备份完成：$setDir"
-Read-Host '按回车退出'
+if (-not $Silent) { Read-Host '按回车退出' }

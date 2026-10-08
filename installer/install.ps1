@@ -9,9 +9,7 @@ $group = Join-Path $env:ProgramData 'Microsoft\Windows\Start Menu\Programs\BMPBG
 $desktop = [Environment]::GetFolderPath('CommonDesktopDirectory')
 
 $shortcuts = @(
-  @{Name = 'BMPBGS控制台'; Script = 'bb-control.vbs'; Vbs = $true },
-  @{Name = '备份BMPBGS数据'; Script = 'bb-backup.ps1' },
-  @{Name = '恢复BMPBGS数据'; Script = 'bb-restore.ps1' }
+  @{Name = 'BMPBGS控制台'; Script = 'bb-control.vbs'; Vbs = $true }
 )
 
 function New-Shortcut($linkPath, $s) {

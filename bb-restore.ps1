@@ -7,8 +7,9 @@ param(
   [string]$AppUser = 'bb_miping_app',
   [string]$DbName = 'bb_miping',
   [string]$PgPassword = 'BbMiping-Local-2026!',
-  [string]$BackupRoot = '',
-  [string]$BackupSet = ''
+  [string]$BackupRoot,
+  [string]$BackupSet,
+  [switch]$Silent
 )
 $ErrorActionPreference = 'Stop'
 . (Join-Path $AppRoot 'bb-common.ps1')
@@ -21,20 +22,25 @@ $p = Resolve-BBPaths -AppRoot $AppRoot -PgPort $pgPort -ConfiguredPgData $config
 
 $psql = Join-Path $p.PgRoot 'bin\psql.exe'
 $pgRestore = Join-Path $p.PgRoot 'bin\pg_restore.exe'
-if (-not (Test-Path -LiteralPath $pgRestore)) { Write-Error "未找到 pg_restore：$pgRestore"; Read-Host '按回车退出'; exit 1 }
+if (-not (Test-Path -LiteralPath $pgRestore)) { Write-Error "未找到 pg_restore：$pgRestore"; if (-not $Silent) { Read-Host '按回车退出' }; exit 1 }
 
 # 选择备份集
 if (-not $BackupSet) {
   $sets = Get-ChildItem -Directory $BackupRoot -ErrorAction SilentlyContinue | Sort-Object Name -Descending
-  if ($sets.Count -eq 0) { Write-Error "未找到任何备份：$BackupRoot"; Read-Host '按回车退出'; exit 1 }
-  Write-Host '可用备份集：'
-  for ($i = 0; $i -lt $sets.Count; $i++) { Write-Host "  [$i] $($sets[$i].Name)" }
-  $idx = Read-Host '请输入要恢复的备份集编号'
-  $BackupSet = $sets[[int]$idx].FullName
+  if ($sets.Count -eq 0) { Write-Error "未找到任何备份：$BackupRoot"; if (-not $Silent) { Read-Host '按回车退出' }; exit 1 }
+  if ($Silent) {
+    $BackupSet = $sets[0].FullName
+    Write-Host "静默模式自动选择最新备份集：$($sets[0].Name)"
+  } else {
+    Write-Host '可用备份集：'
+    for ($i = 0; $i -lt $sets.Count; $i++) { Write-Host "  [$i] $($sets[$i].Name)" }
+    $idx = Read-Host '请输入要恢复的备份集编号'
+    $BackupSet = $sets[[int]$idx].FullName
+  }
 }
 
 $sqlFile = Get-Item (Join-Path $BackupSet "$DbName-*.dump") -ErrorAction SilentlyContinue | Select-Object -First 1
-if (-not $sqlFile) { Write-Error '备份集中未找到数据库 dump 文件。'; Read-Host '按回车退出'; exit 1 }
+if (-not $sqlFile) { Write-Error '备份集中未找到数据库 dump 文件。'; if (-not $Silent) { Read-Host '按回车退出' }; exit 1 }
 
 $env:PGPASSWORD = $PgPassword
 # 终止连接并重建数据库
@@ -42,7 +48,7 @@ $env:PGPASSWORD = $PgPassword
 & $psql -h 127.0.0.1 -p $p.PgPort -U $SuperUser -d postgres -c "DROP DATABASE IF EXISTS $DbName;"
 & $psql -h 127.0.0.1 -p $p.PgPort -U $SuperUser -d postgres -c "CREATE DATABASE $DbName OWNER $AppUser ENCODING 'UTF8';"
 & $pgRestore -h 127.0.0.1 -p $p.PgPort -U $SuperUser -d $DbName -F c $sqlFile.FullName
-if ($LASTEXITCODE -ne 0) { Write-Error '数据库恢复失败（请确认 PostgreSQL 正在运行、postgres 密码正确）。'; Read-Host '按回车退出'; exit 1 }
+if ($LASTEXITCODE -ne 0) { Write-Error '数据库恢复失败（请确认 PostgreSQL 正在运行、postgres 密码正确）。'; if (-not $Silent) { Read-Host '按回车退出' }; exit 1 }
 
 # 恢复文件目录
 foreach ($d in @('storage', 'uploads')) {
@@ -51,4 +57,4 @@ foreach ($d in @('storage', 'uploads')) {
 }
 
 Write-Host "恢复完成：$BackupSet（恢复后请重启 BMPBGS）"
-Read-Host '按回车退出'
+if (-not $Silent) { Read-Host '按回车退出' }

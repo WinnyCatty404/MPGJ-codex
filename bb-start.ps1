@@ -4,7 +4,8 @@
 #       后台启动后端与前端静态服务器 -> 健康检查 -> 打开浏览器。
 # 注意：本文件含中文注释，保存时必须带 UTF-8 BOM。
 param(
-  [string]$AppRoot = (Split-Path -Parent $MyInvocation.MyCommand.Definition)
+  [string]$AppRoot = (Split-Path -Parent $MyInvocation.MyCommand.Definition),
+  [switch]$Silent
 )
 $ErrorActionPreference = 'Continue'
 . (Join-Path $AppRoot 'bb-common.ps1')
@@ -27,7 +28,7 @@ try {
   $nodeExe = Resolve-BBNode -AppRoot $AppRoot
   Write-BBLog "Node 运行时：$nodeExe"
 } catch {
-  Write-BBLog "$($_.Exception.Message)" 'ERROR'; Read-Host '按回车退出'; exit 1
+  Write-BBLog "$($_.Exception.Message)" 'ERROR'; if (-not $Silent) { Read-Host '按回车退出' }; exit 1
 }
 
 # 2) 端口、密钥和数据库目录（持久化到 bb-config.json）
@@ -58,13 +59,13 @@ try {
   Write-BBLog "端口：PostgreSQL=$pgPort  后端=$apiPort  前端=$webPort"
   Write-BBLog "数据库目录：$($p.PgData)"
 } catch {
-  Write-BBLog "端口/配置初始化失败：$($_.Exception.Message)" 'ERROR'; Read-Host '按回车退出'; exit 1
+  Write-BBLog "端口/配置初始化失败：$($_.Exception.Message)" 'ERROR'; if (-not $Silent) { Read-Host '按回车退出' }; exit 1
 }
 
 $pgCtl = Join-Path $p.PgRoot 'bin\pg_ctl.exe'
 if (-not (Test-Path -LiteralPath $pgCtl)) {
   Write-BBLog "未找到 PostgreSQL(pg_ctl)：$pgCtl。请将 PostgreSQL 二进制（bin/lib/share）放入 $($p.AppRoot)\pgsql\" 'ERROR'
-  Read-Host '按回车退出'; exit 1
+  if (-not $Silent) { Read-Host '按回车退出' }; exit 1
 }
 
 # 3) 首次启动：初始化数据库
@@ -77,7 +78,7 @@ if (-not (Test-Path -LiteralPath (Join-Path $p.PgData 'PG_VERSION'))) {
   } catch {
     Write-BBLog "数据库初始化失败：$($_.Exception.Message)" 'ERROR'
     Write-BBLog "请查看：$(Join-Path $p.PgData 'postgresql.log')" 'ERROR'
-    Read-Host '按回车退出'; exit 1
+    if (-not $Silent) { Read-Host '按回车退出' }; exit 1
   }
 }
 
@@ -95,12 +96,12 @@ try {
   }
   if (-not $ready) {
     Write-BBLog "PostgreSQL 启动超时（端口 $($p.PgPort) 未监听）。日志：$(Join-Path $p.PgData 'postgresql.log')" 'ERROR'
-    Read-Host '按回车退出'; exit 1
+    if (-not $Silent) { Read-Host '按回车退出' }; exit 1
   }
   Write-BBLog 'PostgreSQL 已就绪'
 } catch {
   Write-BBLog "PostgreSQL 启动异常：$($_.Exception.Message)" 'ERROR'
-  Read-Host '按回车退出'; exit 1
+  if (-not $Silent) { Read-Host '按回车退出' }; exit 1
 }
 
 # 4.5) 自愈：历史版本初始化时中文行曾被跳过导致初始数据缺失（users 空表 -> 登录失败）。
@@ -147,7 +148,7 @@ try {
 } catch {
   Write-BBLog "后端启动失败：$($_.Exception.Message)" 'ERROR'
   Write-BBLog "可查看 $backendErr 进一步定位" 'ERROR'
-  Read-Host '按回车退出'; exit 1
+  if (-not $Silent) { Read-Host '按回车退出' }; exit 1
 }
 
 Start-Sleep -Seconds 1
@@ -160,7 +161,7 @@ try {
   Write-BBLog "前端已启动，PID=$($frontendProc.Id)"
 } catch {
   Write-BBLog "前端启动失败：$($_.Exception.Message)" 'ERROR'
-  Read-Host '按回车退出'; exit 1
+  if (-not $Silent) { Read-Host '按回车退出' }; exit 1
 }
 
 @"
@@ -229,4 +230,4 @@ Write-Host '   停止请使用快捷方式"停止BMPBGS"'
 Write-Host '================================================'
 Write-Host ''
 
-Read-Host '按回车关闭本窗口（工具继续在后台运行）'
+if (-not $Silent) { Read-Host '按回车关闭本窗口（工具继续在后台运行）' }

@@ -2,7 +2,8 @@
 # 用法：powershell -ExecutionPolicy Bypass -File bb-stop.ps1
 # 注意：本文件含中文注释，保存时必须带 UTF-8 BOM。
 param(
-  [string]$AppRoot = (Split-Path -Parent $MyInvocation.MyCommand.Definition)
+  [string]$AppRoot = (Split-Path -Parent $MyInvocation.MyCommand.Definition),
+  [switch]$Silent
 )
 $ErrorActionPreference = 'Continue'
 . (Join-Path $AppRoot 'bb-common.ps1')
@@ -38,4 +39,4 @@ $pgCtl = Join-Path $p.PgRoot 'bin\pg_ctl.exe'
 if (Test-Path -LiteralPath $pgCtl) { & $pgCtl -D $p.PgData stop -m fast 2>$null | Out-Null }
 
 Write-Host 'BMPBGS已停止。'
-Read-Host '按回车退出'
+if (-not $Silent) { Read-Host '按回车退出' }

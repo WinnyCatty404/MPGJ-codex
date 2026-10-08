@@ -8,7 +8,7 @@ $ErrorActionPreference = 'Stop'
 
 # 隐藏自身控制台窗口（双击/右键"使用 PowerShell 运行"时避免黑窗残留）
 try {
-  Add-Type -Namespace Native -Name Win -MemberDefinition '[DllImport("user32.dll")] public static extern bool ShowWindow(IntPtr hWnd, int nCmdShow); [DllImport("kernel32.dll")] public static extern IntPtr GetConsoleWindow();'
+  Add-Type -Namespace Native -Name Win -MemberDefinition '[DllImport("user32.dll")] public static extern bool ShowWindow(IntPtr hWnd, int nCmdShow); [DllImport("kernel32.dll")] public static extern IntPtr GetConsoleWindow(); [DllImport("user32.dll")] public static extern IntPtr SendMessage(IntPtr hWnd, uint Msg, IntPtr wParam, IntPtr lParam);'
   [void][Native.Win]::ShowWindow([Native.Win]::GetConsoleWindow(), 0)
 } catch {}
 
@@ -47,10 +47,15 @@ function Invoke-Script([string]$Name) {
     -WindowStyle Hidden | Out-Null
 }
 
+function Invoke-ScriptSilent([string]$Name, [string[]]$Extra) {
+  $a = @('-NoProfile','-ExecutionPolicy','Bypass','-File',(Join-Path $AppRoot $Name)) + $Extra
+  Start-Process -FilePath 'powershell.exe' -ArgumentList $a -WindowStyle Hidden | Out-Null
+}
+
 # ---- 窗体 ----
 $form = New-Object Windows.Forms.Form
 $form.Text = 'BMPBGS 控制台'
-$form.Size = New-Object Drawing.Size(640, 520)
+$form.Size = New-Object Drawing.Size(760, 520)
 $form.StartPosition = 'CenterScreen'
 $form.MaximizeBox = $false
 $form.BackColor = $C_BG
@@ -147,7 +152,7 @@ $panel.BringToFront()
 function New-Btn([string]$text, [System.Drawing.Color]$base, [System.Drawing.Color]$hover, [int]$x) {
   $b = New-Object Windows.Forms.Button
   $b.Text = $text
-  $b.Bounds = New-Object Drawing.Rectangle($x, 19, 132, 44)
+  $b.Bounds = New-Object Drawing.Rectangle($x, 19, 108, 44)
   $b.FlatStyle = 'Flat'
   $b.FlatAppearance.BorderSize = 0
   $b.FlatAppearance.MouseOverBackColor = $hover
@@ -161,10 +166,12 @@ function New-Btn([string]$text, [System.Drawing.Color]$base, [System.Drawing.Col
   return $b
 }
 
-$btnStart = New-Btn '启动系统' $C_GREEN  ([System.Drawing.Color]::FromArgb(23, 143, 80))  22
-$btnStop  = New-Btn '停止系统' $C_RED    ([System.Drawing.Color]::FromArgb(200, 68, 64))  162
-$btnOpen  = New-Btn '打开系统' $C_PRIMARY([System.Drawing.Color]::FromArgb(22, 91, 187))  302
-$btnExit  = New-Btn '退出'     $C_GRAY   ([System.Drawing.Color]::FromArgb(116, 121, 128)) 442
+$btnStart   = New-Btn '启动系统' $C_GREEN  ([System.Drawing.Color]::FromArgb(23, 143, 80))   16
+$btnStop    = New-Btn '停止系统' $C_RED    ([System.Drawing.Color]::FromArgb(200, 68, 64))   138
+$btnOpen    = New-Btn '打开系统' $C_PRIMARY([System.Drawing.Color]::FromArgb(22, 91, 187))   260
+$btnBackup  = New-Btn '备份数据' ([System.Drawing.Color]::FromArgb(240, 150, 30)) ([System.Drawing.Color]::FromArgb(214, 130, 20)) 382
+$btnRestore = New-Btn '恢复数据' ([System.Drawing.Color]::FromArgb(120, 90, 200)) ([System.Drawing.Color]::FromArgb(102, 76, 172)) 504
+$btnExit    = New-Btn '退出'     $C_GRAY   ([System.Drawing.Color]::FromArgb(116, 121, 128)) 626
 
 $btnStart.Add_Click({
   $btnStart.Enabled = $false
@@ -172,7 +179,7 @@ $btnStart.Add_Click({
   $statusPill.ForeColor = $C_PRIMARY
   $statusPill.BackColor = [System.Drawing.Color]::FromArgb(232, 240, 252)
   Write-Log '启动中：初始化数据库并拉起前后端服务…' $C_PRIMARY
-  Invoke-Script 'bb-start.ps1'
+  Invoke-ScriptSilent 'bb-start.ps1' @('-Silent')
   Write-Log '启动脚本已在后台执行，完成后浏览器自动打开。' $C_TEXT
 })
 $btnStop.Add_Click({
@@ -181,8 +188,41 @@ $btnStop.Add_Click({
   $statusPill.ForeColor = $C_RED
   $statusPill.BackColor = $C_STOPBG
   Write-Log '停止中：结束前后端进程并停止数据库…' $C_RED
-  Invoke-Script 'bb-stop.ps1'
+  Invoke-ScriptSilent 'bb-stop.ps1' @('-Silent')
   Write-Log '停止脚本已在后台执行。' $C_TEXT
+})
+$btnBackup.Add_Click({
+  $btnBackup.Enabled = $false
+  Write-Log '正在备份数据（数据库 + 上传文件），后台执行中…' ([System.Drawing.Color]::FromArgb(240, 150, 30))
+  Invoke-ScriptSilent 'bb-backup.ps1' @('-Silent')
+  Write-Log ('备份已启动，完成后写入：' + (Join-Path $AppRoot 'data\backups') + '\<时间戳>') $C_TEXT
+  $btnBackup.Enabled = $true
+})
+$btnRestore.Add_Click({
+  $btnRestore.Enabled = $false
+  if ((Test-Port $webPort) -or (Test-Port $apiPort)) {
+    Write-Log '恢复前请先点击「停止系统」，确认服务完全停止后再恢复。' $C_RED
+    $btnRestore.Enabled = $true
+    return
+  }
+  $bkRoot = Join-Path $AppRoot 'data\backups'
+  $sets = Get-ChildItem -Directory $bkRoot -ErrorAction SilentlyContinue | Sort-Object Name -Descending
+  if ($sets.Count -eq 0) { Write-Log ('未找到任何备份集：' + $bkRoot) $C_RED; $btnRestore.Enabled = $true; return }
+  $answer = [System.Windows.Forms.MessageBox]::Show(
+    ('将用备份「' + $sets[0].Name + '」覆盖当前数据库和文件，是否继续？'),
+    '确认恢复数据',
+    [System.Windows.Forms.MessageBoxButtons]::YesNo,
+    [System.Windows.Forms.MessageBoxIcon]::Warning
+  )
+  if ($answer -ne [System.Windows.Forms.DialogResult]::Yes) {
+    Write-Log '已取消恢复。' $C_TEXT
+    $btnRestore.Enabled = $true
+    return
+  }
+  Write-Log ('正在恢复最新备份集：' + $sets[0].Name + '（后台执行中）') ([System.Drawing.Color]::FromArgb(120, 90, 200))
+  Invoke-ScriptSilent 'bb-restore.ps1' @('-BackupSet', $sets[0].FullName, '-Silent')
+  Write-Log '恢复已启动，完成后请点「启动系统」重新拉起服务。' $C_TEXT
+  $btnRestore.Enabled = $true
 })
 $btnOpen.Add_Click({ Start-Process ('http://127.0.0.1:' + $webPort) })
 $btnExit.Add_Click({ $form.Close() })
@@ -212,4 +252,17 @@ $timer.Start()
 
 Write-Log 'BMPBGS 控制台已就绪，点击「启动系统」开始使用。' $C_TEXT
 $form.Topmost = $true
+
+# 强制刷新任务栏/Alt-Tab 图标：任务栏取窗口 ICON_BIG，PowerShell 宿主下默认回落为
+# powershell.exe 的图标（标题栏小图标正常、任务栏显示 PS 图标）。句柄创建后显式
+# 发送 WM_SETICON 把 32x32（任务栏）与 16x16（标题栏）都钉为本工具图标。
+try {
+  $script:IcoPath  = Join-Path $AppRoot 'bmpbgs.ico'
+  $script:IcoBig   = New-Object Drawing.Icon($script:IcoPath, 32, 32)
+  $script:IcoSmall = New-Object Drawing.Icon($script:IcoPath, 16, 16)
+  [void]$form.Handle  # 强制创建窗口句柄
+  [void][Native.Win]::SendMessage($form.Handle, 0x0080, [IntPtr]1, $script:IcoBig.Handle)   # ICON_BIG
+  [void][Native.Win]::SendMessage($form.Handle, 0x0080, [IntPtr]0, $script:IcoSmall.Handle) # ICON_SMALL
+} catch {}
+
 [void]$form.ShowDialog()

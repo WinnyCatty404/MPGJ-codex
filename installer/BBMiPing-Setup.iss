@@ -4,7 +4,7 @@
 ;   1) 私有 Node.js：把 node.exe 及其依赖 DLL 放入 pgsql 同级目录的 node\（即 node\node.exe 存在）
 ;   2) 私有 PostgreSQL：把解压后的 bin/lib/share 放入根目录 pgsql\（即 pgsql\bin\pg_ctl.exe 存在）
 #define MyAppName "BMPBGS"
-#define MyAppVersion "1.0"
+#define MyAppVersion "1.1.0"
 
 [Setup]
 AppId={{BB-MIPING-TOOL-2026}
@@ -14,14 +14,17 @@ AppPublisher=BMPBGS团队
 DefaultDirName={localappdata}\{#MyAppName}
 DefaultGroupName={#MyAppName}
 OutputDir=out
-OutputBaseFilename=BMPBGS
-SetupIconFile=pkgsrc\bmpbgs.ico
+OutputBaseFilename=BMPBGS-Windows-x64-Setup
+SetupIconFile=build\windows\app\bmpbgs.ico
+UninstallDisplayIcon={app}\BMPBGS.exe
 Compression=lzma2
 SolidCompression=yes
 PrivilegesRequired=lowest
+ArchitecturesAllowed=x64compatible
 ArchitecturesInstallIn64BitMode=x64
 WizardStyle=modern
 DisableProgramGroupPage=no
+CloseApplications=no
 
 [Languages]
 Name: "chinese"; MessagesFile: "compiler:Languages\ChineseSimplified.isl"
@@ -29,13 +32,22 @@ Name: "chinese"; MessagesFile: "compiler:Languages\ChineseSimplified.isl"
 [Files]
 ; 打包 installer\staging\（由 build-installer.bat 先用 robocopy 生成干净暂存副本，
 ; 排除规则全部在 build-installer.bat 中，不在本文件里做 Excludes 匹配，避免语义坑）。
-Source: "pkgsrc\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
+Source: "build\windows\app\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
 
 [Icons]
-Name: "{group}\BMPBGS控制台"; Filename: "{app}\bb-control.vbs"; WorkingDir: "{app}"; IconFilename: "{app}\bmpbgs.ico"
-Name: "{userdesktop}\BMPBGS控制台"; Filename: "{app}\bb-control.vbs"; WorkingDir: "{app}"; IconFilename: "{app}\bmpbgs.ico"
-Name: "{group}\备份BMPBGS数据"; Filename: "powershell.exe"; Parameters: "-ExecutionPolicy Bypass -File ""{app}\bb-backup.ps1"""; WorkingDir: "{app}"; IconFilename: "{app}\bmpbgs.ico"
-Name: "{group}\恢复BMPBGS数据"; Filename: "powershell.exe"; Parameters: "-ExecutionPolicy Bypass -File ""{app}\bb-restore.ps1"""; WorkingDir: "{app}"; IconFilename: "{app}\bmpbgs.ico"
+Name: "{group}\BMPBGS"; Filename: "{app}\BMPBGS.exe"; WorkingDir: "{app}"; IconFilename: "{app}\bmpbgs.ico"
+Name: "{userdesktop}\BMPBGS"; Filename: "{app}\BMPBGS.exe"; WorkingDir: "{app}"; IconFilename: "{app}\bmpbgs.ico"
+
+[Run]
+Filename: "{app}\BMPBGS.exe"; Description: "启动 BMPBGS"; Flags: nowait postinstall skipifsilent
+
+; 自动清理旧版（req8 之前）遗留的独立「备份/恢复」快捷方式（仅在开始菜单程序组，名称无空格）。
+; 正常升级时旧卸载会移除它们；此处兜底处理"手动删目录未卸载"导致的残留。
+[InstallDelete]
+Type: files; Name: "{group}\备份BMPBGS数据.lnk"
+Type: files; Name: "{group}\恢复BMPBGS数据.lnk"
+Type: files; Name: "{group}\BMPBGS控制台.lnk"
+Type: files; Name: "{userdesktop}\BMPBGS控制台.lnk"
 
 ; 注意：有意不配置 [UninstallDelete] 清理 data / storage\projects / uploads。
 ; 这些目录属于用户运行期数据，卸载时保留可避免误删；如需彻底清理，请手动删除安装目录。

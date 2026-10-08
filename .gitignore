@@ -17,6 +17,7 @@ installer/pkgsrc/
 installer/staging*/
 installer/st-bisect*/
 installer/verify-out/
+installer/build/
 linux/build/
 node/
 pgsql/
