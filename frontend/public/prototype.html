@@ -8928,9 +8928,15 @@
         keyTableCount++;
         add(s2, config.label + '：导入 ' + rows.length + ' 行');
       });
-      const serviceTable = findTN('密码服务');
+      // Word 自动题注编号可能被域代码拆散（例如“表2-13”在 XML 中不是连续文本）。
+      // 优先按表头精确定位，避免误取其他包含“密码服务”字样的表格。
+      const serviceTable = wt.find(function (table) {
+        const header = (table.rows[0] || []).map(function (cell) { return String(cell || '').replace(/[\s\u3000]/g, ''); });
+        return header.some(function (cell) { return cell.indexOf('密码服务名称') >= 0; }) &&
+          header.some(function (cell) { return cell.indexOf('密码服务提供商') >= 0; });
+      }) || findTN('密码服务');
       if (serviceTable) {
-        const header = (serviceTable.rows[0] || []).map(function (cell) { return String(cell || '').replace(/\s+/g, ''); });
+        const header = (serviceTable.rows[0] || []).map(function (cell) { return String(cell || '').replace(/[\s\u3000]/g, ''); });
         const nameIndex = header.findIndex(function (cell) { return cell.indexOf('密码服务名称') >= 0; });
         const providerIndex = header.findIndex(function (cell) { return cell.indexOf('密码服务提供商') >= 0; });
         const rows = serviceTable.rows.slice(1).map(function (row) {
@@ -8939,9 +8945,10 @@
             provider: String(row[providerIndex >= 0 ? providerIndex : 2] || '').trim()
           };
         }).filter(function (row) { return row.name || row.provider; });
-        cryptoServices = rows.length ? rows : [{ name: '', provider: '' }];
+        // 每个数据行创建独立对象，确保后续编辑和保存不会串行引用第一行。
+        cryptoServices = rows.length ? rows.map(function (row) { return { name: row.name, provider: row.provider }; }) : [{ name: '', provider: '' }];
         renderCryptoServices();
-        add(s2, '密码服务：按表2-13导入 ' + rows.length + ' 行');
+        add(s2, '密码服务：按表2-13逐行导入 ' + rows.length + ' 行');
       } else {
         add(s2, '密码服务：未找到表2-13，保持现有内容', true);
       }
@@ -10532,10 +10539,16 @@
         [String(index + 1), tool.name || '', tool.version || '', tool.vendor || '', tool.desc || '']) });
     ['物理和环境安全', '网络和通信安全', '设备和计算安全', '应用和数据安全', '安全管理'].forEach(function (name, index) {
       const rows = (objData[index + 1] || []).filter(row => row.object || row.desc).map(function (row, rowIndex) {
-        const methods = METHOD_LABELS.map((label, methodIndex) => (row.methods?.[methodIndex] ? '☑' : '□') + label).join('\n');
+        // 表3-8安全管理层与页面保持一致，只包含“访谈、文档审查”两种测评方式。
+        const methodLabels = index === 4 ? METHOD_LABELS.slice(0, 2) : METHOD_LABELS;
+        const methods = methodLabels.map((label, methodIndex) => (row.methods?.[methodIndex] ? '☑' : '□') + label).join('\n');
+        // 表3-8说明列不保留用户输入或历史数据中的首行缩进空白。
+        const description = index === 4
+          ? String(row.desc || '').replace(/^[\t \u00a0\u3000]+/, '')
+          : (row.desc || '');
         return index === 4
-          ? [String(rowIndex + 1), row.unit || '', row.object || '', methods, row.desc || '']
-          : [String(rowIndex + 1), row.object || '', methods, row.desc || ''];
+          ? [String(rowIndex + 1), row.unit || '', row.object || '', methods, description]
+          : [String(rowIndex + 1), row.object || '', methods, description];
       });
       tables.push({ caption: name + '测评对象', skip: 1, repeat: true, rows: rows });
     });
