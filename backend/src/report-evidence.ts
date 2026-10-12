@@ -75,6 +75,10 @@ const REPORT_IMAGE_WIDTH_EMU = 13 * EMU_PER_CM;
 // 当前报告模板中 15cm 高的图片已接近占满正文页；证据图超过 12cm 时等比例缩小，
 // 确保“图片 + 编号/名称”能够作为一组放进同一页。
 const REPORT_IMAGE_MAX_HEIGHT_EMU = 12 * EMU_PER_CM;
+// 附录A同编号的截图按原图比例并排。低于此尺寸时改为下一行，避免为了塞进一行而无法辨认。
+const EVIDENCE_MIN_ROW_HEIGHT_EMU = 3.5 * EMU_PER_CM;
+const EVIDENCE_MIN_IMAGE_WIDTH_EMU = 2.5 * EMU_PER_CM;
+const EVIDENCE_IMAGE_GAP_EMU = 0.2 * EMU_PER_CM;
 async function exportImage(dataUrl: string, label: string) {
   const match = /^data:image\/(png|jpe?g|gif);base64,([A-Za-z0-9+/=]+)$/.exec(dataUrl);
   if (!match) throw new Error(`${label}图片格式不支持`);
@@ -120,6 +124,43 @@ function imageRowParagraph(runs: string[], keepWithCaption = false): string {
   return `<w:p><w:pPr><w:jc w:val="center"/>${keepNext}<w:spacing w:after="120"/></w:pPr>${runs.join('')}</w:p>`;
 }
 
+type SizedEvidenceImage = { relationId: string; drawingId: number; width: number; height: number };
+
+function evidenceImageRows(images: SizedEvidenceImage[]): SizedEvidenceImage[][] {
+  const rows: SizedEvidenceImage[][] = [];
+  let row: SizedEvidenceImage[] = [];
+  const fits = (candidate: SizedEvidenceImage[]) => {
+    const availableWidth = REPORT_IMAGE_WIDTH_EMU - EVIDENCE_IMAGE_GAP_EMU * (candidate.length - 1);
+    const ratioSum = candidate.reduce((sum, image) => sum + image.width / image.height, 0);
+    const rowHeight = Math.min(REPORT_IMAGE_MAX_HEIGHT_EMU, availableWidth / ratioSum);
+    return rowHeight >= EVIDENCE_MIN_ROW_HEIGHT_EMU && candidate.every(image =>
+      rowHeight * image.width / image.height >= EVIDENCE_MIN_IMAGE_WIDTH_EMU);
+  };
+  for (const image of images) {
+    if (row.length && !fits([...row, image])) {
+      rows.push(row);
+      row = [];
+    }
+    row.push(image);
+  }
+  if (row.length) rows.push(row);
+  return rows;
+}
+
+function evidenceImageRowParagraph(row: SizedEvidenceImage[], description: string, keepWithCaption: boolean): string {
+  const availableWidth = REPORT_IMAGE_WIDTH_EMU - EVIDENCE_IMAGE_GAP_EMU * (row.length - 1);
+  const ratioSum = row.reduce((sum, image) => sum + image.width / image.height, 0);
+  const height = Math.min(REPORT_IMAGE_MAX_HEIGHT_EMU, availableWidth / ratioSum);
+  const runs = row.flatMap((image, index) => {
+    const width = Math.floor(height * image.width / image.height);
+    const drawing = imageRun(image.relationId, image.drawingId, image.width, image.height, description, width, height);
+    return index ? ['<w:r><w:t xml:space="preserve"> </w:t></w:r>', drawing] : [drawing];
+  });
+  const keepNext = keepWithCaption ? '<w:keepNext/>' : '';
+  // 清除正文样式继承的首行缩进，保证按 13cm 计算的图片不会被 Word 提前折行。
+  return `<w:p><w:pPr><w:jc w:val="center"/><w:ind w:left="0" w:right="0" w:firstLine="0" w:firstLineChars="0"/>${keepNext}<w:spacing w:after="120"/></w:pPr>${runs.join('')}</w:p>`;
+}
+
 function evidenceCaptionParagraph(description: string): string {
   return `<w:p><w:pPr><w:jc w:val="center"/><w:keepLines/><w:widowControl/><w:spacing w:before="0" w:after="120"/></w:pPr><w:r><w:t>${xmlEscape(description)}</w:t></w:r></w:p>`;
 }
@@ -140,6 +181,7 @@ export async function writeReportEvidence(xml: string, zip: JSZip, records: Reco
       const group = evidenceGroups[groupIndex];
       const description = [group.no || `图A-${layer + 1}.${groupIndex + 1}`, group.name || ''].filter(Boolean).join(' ');
       const images = (group.images || []).filter(image => image.dataUrl);
+      const sizedImages: SizedEvidenceImage[] = [];
       for (let imageIndex = 0; imageIndex < images.length; imageIndex++) {
         const { bytes, ext, size } = await exportImage(images[imageIndex].dataUrl || '',
           `${description}第${imageIndex + 1}张`);
@@ -147,8 +189,7 @@ export async function writeReportEvidence(xml: string, zip: JSZip, records: Reco
         zip.file(`word/media/${filename}`, bytes);
         const relationId = `rId${rid++}`;
         rels = rels.replace('</Relationships>', `<Relationship Id="${relationId}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" Target="media/${filename}"/></Relationships>`);
-        paragraphs.push(imageParagraph(relationId, drawingId++, size.width, size.height, description,
-          REPORT_IMAGE_WIDTH_EMU, imageIndex === images.length - 1, REPORT_IMAGE_MAX_HEIGHT_EMU));
+        sizedImages.push({ relationId, drawingId: drawingId++, width: size.width, height: size.height });
         const mime = ext === 'jpeg' ? 'image/jpeg' : `image/${ext}`;
         const suffix = ext === 'jpeg' ? 'jpg' : ext;
         if (!new RegExp(`<Default\\b[^>]*Extension="${suffix}"`, 'i').test(types)) {
@@ -156,7 +197,9 @@ export async function writeReportEvidence(xml: string, zip: JSZip, records: Reco
         }
       }
       if (!images.length) continue;
-      // 同一证据编号只输出一次图题；该编号下的多张图片连续列出。
+      // 同一行的图片共用段落；只有图片行之间，以及最后一行与图题之间换段。
+      const rows = evidenceImageRows(sizedImages);
+      rows.forEach((row, index) => paragraphs.push(evidenceImageRowParagraph(row, description, index === rows.length - 1)));
       paragraphs.push(evidenceCaptionParagraph(description));
     }
     inserts.push(paragraphs.join(''));

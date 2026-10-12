@@ -52,6 +52,10 @@ const hdPngBytes = await sharp({
   create: { width: 1800, height: 1000, channels: 3, background: { r: 248, g: 250, b: 252 } },
 }).png().toBuffer();
 const hdPng = 'data:image/png;base64,' + hdPngBytes.toString('base64');
+const widePngBytes = await sharp({
+  create: { width: 1600, height: 900, channels: 3, background: { r: 235, g: 240, b: 245 } },
+}).png().toBuffer();
+const widePng = 'data:image/png;base64,' + widePngBytes.toString('base64');
 const tallPngBytes = await sharp({
   create: { width: 500, height: 1800, channels: 3, background: { r: 245, g: 247, b: 250 } },
 }).png().toBuffer();
@@ -61,9 +65,25 @@ xml = await writeReportEvidence(xml, zip, {
   '0|0|0': { evidence: [{ no: '图A-1.1', name: '测试截图', dataUrl: png }] },
   '1|0|0': { evidence: [{ no: '图A-2.1', name: '高清截图', dataUrl: hdPng }] },
   '7|0|0': { evidence: [{ no: '图A-8.1', name: '应急截图', dataUrl: tallPng }] },
-});
+}, [{ layer: 2, no: '图A-3.1', name: '多张并排测试', images: [widePng, widePng, widePng].map(dataUrl => ({ dataUrl })) }]);
 assert.ok(xml.includes('图A-1.1 测试截图'));
 assert.ok(xml.includes('图A-8.1 应急截图'));
+const evidenceParagraphs = [...xml.matchAll(/<w:p\b[^>]*>[\s\S]*?<\/w:p>/g)].map(match => match[0]);
+const multiImageRows = evidenceParagraphs.filter(paragraph =>
+  paragraph.includes('<w:drawing>') && paragraph.includes('图A-3.1 多张并排测试'));
+assert.deepEqual(multiImageRows.map(paragraph => (paragraph.match(/<w:drawing>/g) || []).length), [2, 1],
+  '三张宽图应按原比例排成两张一行、末张单独一行');
+assert.ok(multiImageRows.every(paragraph => paragraph.includes('<w:ind w:left="0" w:right="0" w:firstLine="0" w:firstLineChars="0"/>')),
+  '图片行不能继承正文首行缩进');
+assert.ok(!multiImageRows[0].includes('<w:keepNext/>'), '前一行允许跨页');
+assert.ok(multiImageRows[1].includes('<w:keepNext/>'), '最后一行必须与图题同页');
+assert.equal(evidenceParagraphs[evidenceParagraphs.indexOf(multiImageRows[1]) + 1].includes('图A-3.1 多张并排测试'), true,
+  '图题应在最后一行图片后另起一段');
+for (const paragraph of multiImageRows) {
+  const widths = [...paragraph.matchAll(/<wp:extent cx="(\d+)" cy="(\d+)"\/>/g)].map(match => Number(match[1]));
+  assert.ok(widths.reduce((sum, width) => sum + width, 0) <= 13 * 360000,
+    '同一行图片总宽度不能超过报告可用宽度');
+}
 assert.ok(!xml.includes('门禁控制器实物图'));
 assert.ok(!xml.includes('密码安全事件上报'));
 assert.ok(xml.includes('<w:vMerge w:val="restart"/>'));
