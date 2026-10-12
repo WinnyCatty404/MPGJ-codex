@@ -17,16 +17,17 @@ for (const relative of ['../frontend/public/prototype.html', '../frontend/src/re
   vm.runInContext(html.slice(start, handler), context);
 
   const itemImage = { name: 'clipboard.png', type: 'image/png', size: 12, lastModified: 1 };
+  const duplicateFileImage = { name: 'image.png', type: 'image/png', size: 13, lastModified: 0 };
   const fileOnlyImage = { name: 'evidence.jpg', type: '', size: 34, lastModified: 2 };
   const textFile = { name: 'notes.txt', type: 'text/plain', size: 5, lastModified: 3 };
   context.clipboard = {
     items: [{ kind: 'file', type: 'image/png', getAsFile: () => itemImage }],
-    files: [itemImage, fileOnlyImage, textFile]
+    files: [duplicateFileImage, fileOnlyImage, textFile]
   };
   assert.deepEqual(
     Array.from(vm.runInContext('onsiteClipboardImageFiles(clipboard)', context), file => file.name),
-    ['clipboard.png', 'evidence.jpg'],
-    relative + ' 应合并 items/files、去重并过滤非图片'
+    ['clipboard.png'],
+    relative + ' items 已有图片时不应再读取 files 中的重复图片'
   );
   context.clipboard = { items: [], files: [fileOnlyImage] };
   assert.deepEqual(

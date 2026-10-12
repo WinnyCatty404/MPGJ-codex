@@ -5519,8 +5519,9 @@
       if (item.type && !String(item.type).toLowerCase().startsWith('image/')) return;
       add(typeof item.getAsFile === 'function' ? item.getAsFile() : null);
     });
-    // 从资源管理器和部分截图工具复制时，Chromium 可能只在 files 中提供图片。
-    Array.from(clipboardData.files || []).forEach(add);
+    // Chromium 可能在 items 和 files 中各提供一次同一张图片，且两份 File 的元数据不同。
+    // 仅当 items 没有可用图片时回退到 files，避免附录 B 多图槽把一次粘贴保存成两张。
+    if (!files.length) Array.from(clipboardData.files || []).forEach(add);
     return files;
   }
 
