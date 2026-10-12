@@ -870,6 +870,8 @@
     .report-hero-card .value.pass { color: #1e8e3e; }
     .report-hero-card .value.fail { color: #c62828; }
     .report-textarea { width: 100%; min-height: 200px; border: 1px solid #d0d5e0; border-radius: 6px; padding: 10px 12px; font-size: 13px; line-height: 1.8; resize: vertical; box-sizing: border-box; }
+    /* 评估结论字号仅用于屏幕编辑，Word/PDF 导出仍由模板样式控制。 */
+    #report-panel-3 #report-conclusion-text { font-size: 17px; }
     .report-analysis-card { border: 1px solid #d6e0ec; border-radius: 8px; background: #fff; padding: 14px 20px 18px; }
     .report-analysis-card .report-textarea {
       min-height: 240px; height: auto; overflow-y: hidden; resize: none; field-sizing: content;
@@ -955,7 +957,8 @@
     .overall-editor-card .doc-editor textarea {
       min-height: 270px; padding: 16px 18px; border: 1px solid #b9c9db; border-radius: 8px;
       background: #fff; color: #28384d; font-family: inherit; font-size: 16px; line-height: 2;
-      text-align: justify; resize: vertical; transition: border-color .15s, box-shadow .15s;
+      height: auto; overflow-y: hidden; text-align: justify; resize: none; field-sizing: content;
+      transition: border-color .15s, box-shadow .15s;
     }
     .overall-editor-card .doc-editor textarea:focus {
       border-color: #3d73b7; outline: none; box-shadow: 0 0 0 3px rgba(36, 94, 168, .11);
@@ -6853,6 +6856,12 @@
     renderReportOverall();
   }
 
+  function autoResizeOverallTextarea(textarea) {
+    if (!textarea) return;
+    textarea.style.height = 'auto';
+    textarea.style.height = Math.max(270, textarea.scrollHeight + 2) + 'px';
+  }
+
   function renderReportOverall() {
     const panel = document.getElementById('report-panel-4');
     if (!panel) return;
@@ -6887,15 +6896,18 @@
     html += '<div class="overall-editor-head"><div><div class="overall-editor-title">' + onsiteEsc(cfg.name) + '</div>' +
       '<div class="overall-editor-hint">当前仅展示本层面，切换 Tab 时编辑内容会自动保留</div></div>' +
       '<div class="overall-stat">符合 ' + lc['符合'] + ' 项　部分符合 ' + lc['部分符合'] + ' 项　不符合 ' + lc['不符合'] + ' 项　不适用 ' + lc['不适用'] + ' 项</div></div>';
-    html += '<div class="doc-editor"><textarea oninput="saveReportText(\'' + taId + '\',this.value)" ' +
+    html += '<div class="doc-editor"><textarea oninput="saveReportText(\'' + taId + '\',this.value);autoResizeOverallTextarea(this)" ' +
       'aria-label="' + onsiteEsc(cfg.name) + '总体评价" placeholder="在' + onsiteEsc(cfg.name) + '方面，……（自动生成，可编辑）">' +
       onsiteEsc(getReportTextVal(taId, buildLayerOverallText(activeOverallLayer))) + '</textarea>' +
-      '<div class="doc-meta">系统已生成初稿，可直接修改；拖动编辑框右下角可继续增大高度。</div></div>';
+      '<div class="doc-meta">系统已生成初稿，可直接修改；编辑框高度会随内容自动调整。</div></div>';
     html += '</div>';
     html += '<div class="overall-conclusion"><div class="doc-h">评估结论</div>';
     html += '<p class="doc-p">' + onsiteEsc(buildConclusionSentence()) + '</p></div>';
     html += '</div>';
     panel.innerHTML = html;
+    requestAnimationFrame(function() {
+      autoResizeOverallTextarea(panel.querySelector('.overall-editor-card textarea'));
+    });
   }
 
   // ----- Tab 5：安全问题及改进建议 -----
