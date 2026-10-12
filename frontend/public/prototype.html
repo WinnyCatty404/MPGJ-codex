@@ -10458,11 +10458,11 @@
       put('安全问题及改进建议_' + name + '_问题描述', getReportTextVal('report-sug-prob-' + index, buildSugProblemText(index)));
       put('安全问题及改进建议_' + name + '_改进建议', getReportTextVal('report-sug-adv-' + index, buildSugAdviceText(index)));
     });
-    [['委托证明文件_文件类型','b1-type'], ['委托证明文件_签订时间','b1-date'],
-      ['委托证明文件_委托金额','b1-amount'], ['委托证明文件_系统密评单价','b1-price'],
-      ['现场测评实施地点','b3-loc'], ['等保定级备案时间','b9-date']]
-      .forEach(([name, key]) => {
-        const current = apbVal(key, '');
+    [['委托证明文件_文件类型','b1-type','政府采购合同'], ['委托证明文件_签订时间','b1-date',''],
+      ['委托证明文件_委托金额','b1-amount',''], ['委托证明文件_系统密评单价','b1-price',''],
+      ['现场测评实施地点','b3-loc',''], ['等保定级备案时间','b9-date','']]
+      .forEach(([name, key, defaultValue]) => {
+        const current = apbVal(key, defaultValue);
         put(name, current && (key === 'b1-date' || key === 'b9-date') ? formatCnDate(current) : current);
       });
     put('B1委托单位', apbVal('b1-org', values['被测单位名称']));
@@ -10624,16 +10624,8 @@
         const fix = reportFixes[reportKey(3, itemIdx, objIdx)] || {};
         const compScore = fix.comp ? getReportCompScore(fix.comp) : null;
         const after = typeof compScore === 'number' ? Math.max(0.5 * compScore, raw) : fix.after;
-        let compLabel = '';
-        if (fix.comp) {
-          const pos = locateOnsiteRecordKey(fix.comp);
-          const compUnit = pos ? evaluationIndicatorLevels[pos.t]?.items[pos.itemIdx]?.name : '';
-          const compObject = pos && pos.objIdx >= 0 ? getOnsiteUnitObjects(pos.t, compUnit)[pos.objIdx] : '';
-          compLabel = compUnit && compObject ? '弥补指标（测评对象A）：' + ONSITE_LAYERS[pos.t].name + '·' + compUnit + '·' + compObject : '';
-        }
-        const reason = [compLabel, fix.reason || ''].filter(Boolean).join('\n');
         fixRows.push([String(fixRows.length + 1), ONSITE_LAYERS[3].name, item.name, name,
-          reportClassify(raw) + '/' + raw, typeof after === 'number' ? reportClassify(after) + '/' + Number(after.toFixed(4)) : '--', reason]);
+          reportClassify(raw) + '/' + raw, typeof after === 'number' ? reportClassify(after) + '/' + Number(after.toFixed(4)) : '--', fix.reason || '']);
       });
     });
     tables.push({ caption: '测评结果修正', rows: fixRows, skip: 1, repeat: true });
