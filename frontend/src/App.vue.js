@@ -1,4 +1,4 @@
-import { computed, onMounted, reactive, ref } from 'vue';
+import { computed, onBeforeUnmount, onMounted, reactive, ref } from 'vue';
 const restorablePages = ['dashboard', 'projects', 'users', 'templates', 'risk-analysis', 'institution'];
 const apiBase = '/api';
 const token = ref(localStorage.getItem('bb-token') || '');
@@ -15,6 +15,7 @@ const activeStage = ref(0);
 const showProjectModal = ref(false);
 const editingProjectId = ref('');
 const copySourceProject = ref(null);
+const copyingProject = ref(false);
 const projectToDelete = ref(null);
 const showUserModal = ref(false);
 const editingUserId = ref('');
@@ -88,6 +89,14 @@ const importTargetProject = ref(null);
 const institutionForm = reactive({ name: '', address: '', postalCode: '', contact: '', title: '', department: '', telephone: '', mobile: '', email: '' });
 const activePlanningModule = ref(null);
 const planningForm = reactive({});
+function resizePlanningTextarea(element) {
+    element.style.height = 'auto';
+    element.style.height = `${element.scrollHeight}px`;
+}
+const vAutoResize = {
+    mounted: resizePlanningTextarea,
+    updated: resizePlanningTextarea,
+};
 function indentEveryParagraph(value) {
     return String(value || '').replace(/\r\n?/g, '\n').split('\n').map(line => line.trim() ? '\u3000\u3000' + line.replace(/^[ \t\u3000]+/, '') : line).join('\n');
 }
@@ -278,6 +287,28 @@ async function loadProjects() {
     const query = new URLSearchParams(Object.entries(filters).filter(([, value]) => value));
     projects.value = await api(`/projects?${query}`);
 }
+let projectRefreshPromise = null;
+function refreshProjectsIfVisible() {
+    if (!token.value || page.value !== 'projects' || document.hidden)
+        return;
+    if (projectRefreshPromise)
+        return projectRefreshPromise;
+    projectRefreshPromise = loadProjects()
+        .catch(error => notify(error.message || '项目列表刷新失败'))
+        .finally(() => { projectRefreshPromise = null; });
+    return projectRefreshPromise;
+}
+function handleProjectListFocus() {
+    void refreshProjectsIfVisible();
+}
+function handleProjectListVisibility() {
+    if (document.visibilityState === 'visible')
+        void refreshProjectsIfVisible();
+}
+function handleProjectDataUpdated(event) {
+    if (event.key === 'bb-project-updated')
+        void refreshProjectsIfVisible();
+}
 async function openProject(project) {
     const link = document.createElement('a');
     link.href = `/prototype.html?project=${encodeURIComponent(project.id)}&step=1`;
@@ -337,8 +368,9 @@ function openCopyProjectModal(project) {
 }
 async function copyProject() {
     const project = copySourceProject.value;
-    if (!project)
+    if (!project || copyingProject.value)
         return;
+    copyingProject.value = true;
     try {
         const copied = await api(`/projects/${project.id}/copy`, { method: 'POST', body: JSON.stringify(copyForm) });
         copySourceProject.value = null;
@@ -347,6 +379,9 @@ async function copyProject() {
     }
     catch (error) {
         notify(error.message);
+    }
+    finally {
+        copyingProject.value = false;
     }
 }
 async function createProject() {
@@ -777,6 +812,9 @@ function fmtDate(value) {
     return text;
 }
 onMounted(async () => {
+    window.addEventListener('focus', handleProjectListFocus);
+    window.addEventListener('storage', handleProjectDataUpdated);
+    document.addEventListener('visibilitychange', handleProjectListVisibility);
     if (!token.value)
         return;
     try {
@@ -790,6 +828,11 @@ onMounted(async () => {
     catch {
         logout();
     }
+});
+onBeforeUnmount(() => {
+    window.removeEventListener('focus', handleProjectListFocus);
+    window.removeEventListener('storage', handleProjectDataUpdated);
+    document.removeEventListener('visibilitychange', handleProjectListVisibility);
 });
 const __VLS_ctx = {
     ...{},
@@ -2840,6 +2883,7 @@ if (__VLS_ctx.activePlanningModule) {
                 placeholder: (field.placeholder),
                 rows: "4",
             });
+            __VLS_asFunctionalDirective(__VLS_directives.vAutoResize, {})(null, { ...__VLS_directiveBindingRestFields, }, null, null);
         }
         else {
             __VLS_asFunctionalElement1(__VLS_intrinsics.input)({
@@ -2851,7 +2895,7 @@ if (__VLS_ctx.activePlanningModule) {
             (__VLS_ctx.planningForm[field.key]);
         }
         // @ts-ignore
-        [planningForm, planningForm,];
+        [planningForm, planningForm, vAutoResize,];
     }
     __VLS_asFunctionalElement1(__VLS_intrinsics.div, __VLS_intrinsics.div)({
         ...{ class: "modal-foot" },
@@ -2876,13 +2920,6 @@ if (__VLS_ctx.activePlanningModule) {
 }
 if (__VLS_ctx.showProjectModal) {
     __VLS_asFunctionalElement1(__VLS_intrinsics.div, __VLS_intrinsics.div)({
-        ...{ onClick: (...[$event]) => {
-                if (!(__VLS_ctx.showProjectModal))
-                    throw 0;
-                return (__VLS_ctx.showProjectModal = false);
-                // @ts-ignore
-                [showProjectModal, showProjectModal,];
-            } },
         ...{ class: "modal-mask" },
     });
     /** @type {__VLS_StyleScopedClasses['modal-mask']} */ ;
@@ -2905,7 +2942,7 @@ if (__VLS_ctx.showProjectModal) {
                     throw 0;
                 return (__VLS_ctx.showProjectModal = false);
                 // @ts-ignore
-                [showProjectModal, createProject, editingProjectId,];
+                [showProjectModal, showProjectModal, createProject, editingProjectId,];
             } },
         type: "button",
     });
@@ -2992,19 +3029,13 @@ if (__VLS_ctx.showProjectModal) {
 }
 if (__VLS_ctx.copySourceProject) {
     __VLS_asFunctionalElement1(__VLS_intrinsics.div, __VLS_intrinsics.div)({
-        ...{ onClick: (...[$event]) => {
-                if (!(__VLS_ctx.copySourceProject))
-                    throw 0;
-                return (__VLS_ctx.copySourceProject = null);
-                // @ts-ignore
-                [editingProjectId, copySourceProject, copySourceProject,];
-            } },
         ...{ class: "modal-mask" },
     });
     /** @type {__VLS_StyleScopedClasses['modal-mask']} */ ;
     __VLS_asFunctionalElement1(__VLS_intrinsics.form, __VLS_intrinsics.form)({
         ...{ onSubmit: (__VLS_ctx.copyProject) },
         ...{ class: "modal small" },
+        'aria-busy': (__VLS_ctx.copyingProject),
     });
     /** @type {__VLS_StyleScopedClasses['modal']} */ ;
     /** @type {__VLS_StyleScopedClasses['small']} */ ;
@@ -3022,9 +3053,10 @@ if (__VLS_ctx.copySourceProject) {
                     throw 0;
                 return (__VLS_ctx.copySourceProject = null);
                 // @ts-ignore
-                [copySourceProject, copyProject,];
+                [editingProjectId, copySourceProject, copySourceProject, copyProject, copyingProject,];
             } },
         type: "button",
+        disabled: (__VLS_ctx.copyingProject),
     });
     __VLS_asFunctionalElement1(__VLS_intrinsics.div, __VLS_intrinsics.div)({
         ...{ class: "form-grid" },
@@ -3035,17 +3067,20 @@ if (__VLS_ctx.copySourceProject) {
     });
     /** @type {__VLS_StyleScopedClasses['span-2']} */ ;
     __VLS_asFunctionalElement1(__VLS_intrinsics.input)({
+        disabled: (__VLS_ctx.copyingProject),
         required: true,
         placeholder: "请输入被测系统全称",
     });
     (__VLS_ctx.copyForm.systemName);
     __VLS_asFunctionalElement1(__VLS_intrinsics.label, __VLS_intrinsics.label)({});
     __VLS_asFunctionalElement1(__VLS_intrinsics.input)({
+        disabled: (__VLS_ctx.copyingProject),
         placeholder: "请输入新报告编号",
     });
     (__VLS_ctx.copyForm.reportCode);
     __VLS_asFunctionalElement1(__VLS_intrinsics.label, __VLS_intrinsics.label)({});
     __VLS_asFunctionalElement1(__VLS_intrinsics.input)({
+        disabled: (__VLS_ctx.copyingProject),
         type: "number",
         min: "2000",
         max: "2100",
@@ -3054,12 +3089,14 @@ if (__VLS_ctx.copySourceProject) {
     (__VLS_ctx.copyForm.assessmentYear);
     __VLS_asFunctionalElement1(__VLS_intrinsics.label, __VLS_intrinsics.label)({});
     __VLS_asFunctionalElement1(__VLS_intrinsics.input)({
+        disabled: (__VLS_ctx.copyingProject),
         type: "date",
         required: true,
     });
     (__VLS_ctx.copyForm.startDate);
     __VLS_asFunctionalElement1(__VLS_intrinsics.label, __VLS_intrinsics.label)({});
     __VLS_asFunctionalElement1(__VLS_intrinsics.input)({
+        disabled: (__VLS_ctx.copyingProject),
         type: "date",
         required: true,
     });
@@ -3074,16 +3111,19 @@ if (__VLS_ctx.copySourceProject) {
                     throw 0;
                 return (__VLS_ctx.copySourceProject = null);
                 // @ts-ignore
-                [copySourceProject, copyForm, copyForm, copyForm, copyForm, copyForm,];
+                [copySourceProject, copyingProject, copyingProject, copyingProject, copyingProject, copyingProject, copyingProject, copyForm, copyForm, copyForm, copyForm, copyForm,];
             } },
         type: "button",
         ...{ class: "secondary" },
+        disabled: (__VLS_ctx.copyingProject),
     });
     /** @type {__VLS_StyleScopedClasses['secondary']} */ ;
     __VLS_asFunctionalElement1(__VLS_intrinsics.button, __VLS_intrinsics.button)({
         ...{ class: "primary" },
+        disabled: (__VLS_ctx.copyingProject),
     });
     /** @type {__VLS_StyleScopedClasses['primary']} */ ;
+    (__VLS_ctx.copyingProject ? '正在复制…' : '确认复制');
 }
 if (__VLS_ctx.projectToDelete) {
     __VLS_asFunctionalElement1(__VLS_intrinsics.div, __VLS_intrinsics.div)({
@@ -3092,7 +3132,7 @@ if (__VLS_ctx.projectToDelete) {
                     throw 0;
                 return (__VLS_ctx.projectToDelete = null);
                 // @ts-ignore
-                [projectToDelete, projectToDelete,];
+                [projectToDelete, projectToDelete, copyingProject, copyingProject, copyingProject,];
             } },
         ...{ class: "modal-mask" },
     });

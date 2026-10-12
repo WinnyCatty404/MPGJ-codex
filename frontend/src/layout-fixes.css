@@ -241,3 +241,4 @@
 .risk-template-modal-grid .risk-enabled input { width:15px; height:15px; }
 @media (max-width:1200px) { .risk-template-list-head,.risk-template-list-row { grid-template-columns:minmax(160px,1fr) 60px 76px minmax(180px,1.3fr) minmax(180px,1.3fr) 62px 105px; } }
 .readonly-input { background:#f3f6f9!important; color:#708096!important; }
+.planning-form textarea { overflow-y:hidden; resize:none; }

@@ -8,8 +8,11 @@ $ErrorActionPreference = 'Stop'
 
 # 隐藏自身控制台窗口（双击/右键"使用 PowerShell 运行"时避免黑窗残留）
 try {
-  Add-Type -Namespace Native -Name Win -MemberDefinition '[DllImport("user32.dll")] public static extern bool ShowWindow(IntPtr hWnd, int nCmdShow); [DllImport("kernel32.dll")] public static extern IntPtr GetConsoleWindow(); [DllImport("user32.dll")] public static extern IntPtr SendMessage(IntPtr hWnd, uint Msg, IntPtr wParam, IntPtr lParam);'
+  Add-Type -Namespace Native -Name Win -MemberDefinition '[DllImport("user32.dll")] public static extern bool ShowWindow(IntPtr hWnd, int nCmdShow); [DllImport("kernel32.dll")] public static extern IntPtr GetConsoleWindow(); [DllImport("user32.dll")] public static extern IntPtr SendMessage(IntPtr hWnd, uint Msg, IntPtr wParam, IntPtr lParam); [DllImport("shell32.dll", CharSet = CharSet.Unicode)] public static extern int SetCurrentProcessExplicitAppUserModelID(string AppID);'
   [void][Native.Win]::ShowWindow([Native.Win]::GetConsoleWindow(), 0)
+  # PowerShell 是实际持有 WinForms 窗口的进程。为它设置产品自己的 AppUserModelID，
+  # 避免任务栏把窗口归到 powershell.exe 并沿用 PowerShell 的默认图标/缓存。
+  [void][Native.Win]::SetCurrentProcessExplicitAppUserModelID('BMPBGS.Desktop.ControlPanel')
 } catch {}
 
 $config  = Get-BBConfig -AppRoot $AppRoot
@@ -58,6 +61,8 @@ $form.Text = 'BMPBGS 控制台'
 $form.Size = New-Object Drawing.Size(760, 520)
 $form.StartPosition = 'CenterScreen'
 $form.MaximizeBox = $false
+$form.ShowIcon = $true
+$form.ShowInTaskbar = $true
 $form.BackColor = $C_BG
 $form.Font = New-Object Drawing.Font('微软雅黑', 9)
 try { $form.Icon = New-Object Drawing.Icon((Join-Path $AppRoot 'bmpbgs.ico')) } catch {}

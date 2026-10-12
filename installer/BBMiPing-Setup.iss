@@ -4,7 +4,7 @@
 ;   1) 私有 Node.js：把 node.exe 及其依赖 DLL 放入 pgsql 同级目录的 node\（即 node\node.exe 存在）
 ;   2) 私有 PostgreSQL：把解压后的 bin/lib/share 放入根目录 pgsql\（即 pgsql\bin\pg_ctl.exe 存在）
 #define MyAppName "BMPBGS"
-#define MyAppVersion "1.2.0"
+#define MyAppVersion "1.2.1"
 
 [Setup]
 AppId={{BB-MIPING-TOOL-2026}

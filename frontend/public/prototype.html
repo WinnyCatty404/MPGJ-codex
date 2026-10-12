@@ -486,6 +486,13 @@
     .btn-add-row:hover { background: #c8e6c9; }
     .btn-del-row { background: #ffebee; color: #c62828; border: 1px solid #ef9a9a; }
     .btn-del-row:hover { background: #ffcdd2; }
+    tbody[data-selectable-delete="1"] > tr { cursor: pointer; transition: background-color .15s, box-shadow .15s; }
+    tbody[data-selectable-delete="1"] > tr.bb-row-selected > td {
+      background: #e8f2ff !important;
+      box-shadow: inset 0 2px 0 #1a73e8, inset 0 -2px 0 #1a73e8;
+    }
+    tbody[data-selectable-delete="1"] > tr.bb-row-selected > td:first-child { box-shadow: inset 2px 0 0 #1a73e8, inset 0 2px 0 #1a73e8, inset 0 -2px 0 #1a73e8; }
+    tbody[data-selectable-delete="1"] > tr.bb-row-selected > td:last-child { box-shadow: inset -2px 0 0 #1a73e8, inset 0 2px 0 #1a73e8, inset 0 -2px 0 #1a73e8; }
     .asset-sub-title { font-size: 12px; font-weight: 600; color: #555; margin-bottom: 6px; }
 
     /* ===== 被测系统基本信息表单页 ===== */
@@ -623,6 +630,61 @@
       color:#263445; font-size:12px; line-height:1.7; outline:none;
     }
     .onsite-record-editor-count { position:absolute; right:10px; bottom:7px; color:#7b8797; font-size:10.5px; pointer-events:none; }
+    body.onsite-record-modal-open { overflow:hidden; }
+    .onsite-record-modal-overlay {
+      position:fixed; inset:0; z-index:1200; background:rgba(13,34,64,.58);
+    }
+    .onsite-record-modal-shell {
+      position:absolute; left:clamp(18px,4vw,72px); right:clamp(18px,4vw,72px); top:54px; bottom:28px;
+      display:flex; flex-direction:column; min-width:0; overflow:hidden;
+      background:#fff; border:1px solid #c9d6e6; border-radius:12px; box-shadow:0 18px 54px rgba(12,35,66,.3);
+      transition:right .2s ease;
+    }
+    body.onsite-evidence-drawer-open .onsite-record-modal-shell { right:calc(var(--onsite-evidence-width,420px) + 18px); }
+    .onsite-record-modal-head {
+      flex:none; display:flex; align-items:flex-start; gap:14px; padding:16px 20px 14px;
+      border-bottom:1px solid #dce5f0; background:#f5f9ff;
+    }
+    .onsite-record-modal-heading { flex:1; min-width:0; }
+    .onsite-record-modal-heading strong { display:block; color:#173b6d; font-size:16px; line-height:1.5; }
+    .onsite-record-modal-context { margin-top:4px; color:#617086; font-size:12px; line-height:1.6; overflow-wrap:anywhere; }
+    .onsite-record-modal-close {
+      flex:none; width:32px; height:32px; border:0; border-radius:16px; background:#e6edf7;
+      color:#4f6075; font-size:22px; line-height:30px; cursor:pointer;
+    }
+    .onsite-record-modal-close:hover { background:#d7e3f2; color:#173b6d; }
+    .onsite-record-modal-body { flex:1; min-height:0; padding:18px 20px 14px; background:#fff; }
+    .onsite-record-modal-editor {
+      display:block; width:100%; height:100%; min-height:240px; resize:none; box-sizing:border-box;
+      border:1.5px solid #739ad0; border-radius:8px; padding:16px 18px; background:#fff;
+      color:#263445; font-family:inherit; font-size:16px; line-height:1.85; outline:none;
+    }
+    .onsite-record-modal-editor:focus { border-color:#2456A6; box-shadow:0 0 0 3px rgba(36,86,166,.12); }
+    .onsite-record-modal-foot {
+      flex:none; display:flex; align-items:center; gap:12px; flex-wrap:wrap; padding:12px 20px;
+      border-top:1px solid #dce5f0; background:#f8fafc;
+    }
+    .onsite-record-modal-foot .onsite-record-editor-count { position:static; min-width:62px; color:#65758a; font-size:12px; }
+    .onsite-record-modal-foot .evi-record-tools { margin:0; flex:1; }
+    .onsite-record-modal-foot .evi-record-tools select { max-width:220px; height:30px; font-size:12px; }
+    .onsite-record-modal-foot .evi-mini-btn { height:30px; font-size:12px; }
+    .onsite-record-modal-foot .onsite-record-save-state { margin-left:0; font-size:12px; }
+    .onsite-record-modal-done {
+      flex:none; height:34px; padding:0 18px; border:0; border-radius:6px; background:#2456A6;
+      color:#fff; font-size:13px; font-weight:700; cursor:pointer;
+    }
+    .onsite-record-modal-done:hover { background:#194889; }
+    body.onsite-record-modal-open .onsite-evidence-fab { z-index:1210; }
+    body.onsite-record-modal-open .onsite-evidence-drawer { z-index:1220; }
+    @media (max-width:760px) {
+      .onsite-record-modal-shell { left:8px; right:8px; top:10px; bottom:10px; border-radius:9px; }
+      body.onsite-evidence-drawer-open .onsite-record-modal-shell { right:8px; }
+      .onsite-record-modal-head { padding:12px 14px 10px; }
+      .onsite-record-modal-body { padding:10px 12px; }
+      .onsite-record-modal-editor { padding:12px; font-size:15px; line-height:1.75; }
+      .onsite-record-modal-foot { padding:10px 12px; gap:8px; }
+      .onsite-record-modal-foot .evi-record-tools { flex-basis:100%; }
+    }
     .onsite-table .dak-cell { width: 84px; text-align: center; }
     .onsite-table .result-cell { text-align: center; }
     .onsite-table .result-cell select {
@@ -699,6 +761,10 @@
     .onsite-evidence-drawer .evi-group-list { grid-template-columns:1fr; }
     .onsite-evidence-drawer .evi-library-head { align-items:flex-start; }
     .onsite-evidence-drawer .evi-library-actions { justify-content:flex-end; }
+    .onsite-evidence-drawer .evi-active-bar {
+      position:sticky; top:0; z-index:6; margin-bottom:9px;
+      box-shadow:0 4px 10px rgba(23,75,145,.14);
+    }
     .onsite-evidence-resizer { position:absolute; z-index:2; left:-6px; top:12px; bottom:12px; width:12px; cursor:ew-resize; touch-action:none; }
     .onsite-evidence-resizer::after { content:""; position:absolute; left:5px; top:42%; width:2px; height:54px; border-radius:2px; background:#aebed3; opacity:.75; }
     .onsite-evidence-resizer:hover::after,
@@ -804,15 +870,48 @@
     .report-hero-card .value.pass { color: #1e8e3e; }
     .report-hero-card .value.fail { color: #c62828; }
     .report-textarea { width: 100%; min-height: 200px; border: 1px solid #d0d5e0; border-radius: 6px; padding: 10px 12px; font-size: 13px; line-height: 1.8; resize: vertical; box-sizing: border-box; }
+    .report-analysis-card { border: 1px solid #d6e0ec; border-radius: 8px; background: #fff; padding: 14px 20px 18px; }
+    .report-analysis-card .report-textarea {
+      min-height: 240px; height: auto; overflow-y: hidden; resize: none; field-sizing: content;
+      padding: 12px 16px; border: 0; background: transparent; color: #303846;
+      font-size: 17px; line-height: 1.9; letter-spacing: .01em; text-align: justify;
+      white-space: pre-wrap; overflow-wrap: anywhere;
+    }
+    .report-analysis-card .report-textarea:focus { outline: none; box-shadow: none; }
     .risk-high { color: #c62828; font-weight: 700; }
     .risk-mid { color: #e65100; font-weight: 600; }
     .risk-low { color: #2e7d32; font-weight: 600; }
     .sug-table textarea { width: 100%; min-height: 60px; border: 1px solid #d0d5e0; border-radius: 4px; padding: 4px 6px; font-size: 12px; line-height: 1.5; resize: vertical; box-sizing: border-box; }
     .report-section-title { font-size: 14px; font-weight: 700; color: #0d2240; margin: 18px 0 10px; }
-    /* 风险分析表（可编辑） */
-    .risk-table textarea { width: 100%; min-height: 72px; border: 1px solid #d0d5e0; border-radius: 4px; padding: 4px 6px; font-size: 12px; line-height: 1.6; resize: vertical; box-sizing: border-box; }
-    .risk-table select { width: 100%; max-width: 200px; height: 28px; border: 1px solid #c5cbd6; border-radius: 4px; font-size: 12px; outline: none; cursor: pointer; background: #fff; }
-    .risk-unit-tag { display: inline-block; font-weight: 700; color: #0d2240; margin-bottom: 4px; }
+    /* 风险分析表（仅优化屏幕编辑体验，不参与 Word 导出样式） */
+    #report-panel-2 { color: #334155; }
+    #report-panel-2 .onsite-table-caption { margin-bottom: 14px; color: #173b6d; font-size: 16px; }
+    #report-panel-2 > .onsite-note {
+      margin: 0 0 14px !important; padding: 10px 13px; border: 1px solid #dbe5f0;
+      border-radius: 7px; background: #f6f9fd; color: #64748b; font-size: 12px; line-height: 1.75;
+    }
+    #report-panel-2 > .onsite-note:last-child { margin: 12px 0 0 !important; }
+    .risk-table { table-layout: fixed; border-color: #cbd7e5; }
+    .risk-table th { padding: 10px 6px; border-color: #cbd7e5; background: #eaf1f8; color: #173b6d; }
+    .risk-table td { padding: 10px; border-color: #d9e2ec; vertical-align: top; font-size: 13px; line-height: 1.7; }
+    .risk-table tbody tr:nth-child(even) > td { background: #f8fafc; }
+    .risk-table tbody tr:hover > td { background: #f1f6fc; }
+    .risk-table textarea {
+      width: 100%; min-height: 120px; border: 1px solid #cbd5e1; border-radius: 6px;
+      padding: 8px 10px; background: #fcfdff; color: #334155; font-family: inherit;
+      font-size: 14px; line-height: 1.75; resize: vertical; box-sizing: border-box;
+      text-indent: 0; text-align: justify; transition: border-color .15s, box-shadow .15s, background .15s;
+    }
+    .risk-table input.full-input, .risk-table select {
+      width: 100%; box-sizing: border-box; border: 1px solid #cbd5e1; border-radius: 6px;
+      background: #fcfdff; color: #334155; font-family: inherit; font-size: 13px; outline: none;
+    }
+    .risk-table input.full-input { height: 36px; padding: 0 9px; }
+    .risk-table select { max-width: 150px; height: 36px; padding: 0 8px; cursor: pointer; }
+    .risk-table textarea:focus, .risk-table input.full-input:focus, .risk-table select:focus {
+      border-color: #4f7fbd; background: #fff; outline: none; box-shadow: 0 0 0 3px rgba(36, 86, 166, .1);
+    }
+    .risk-unit-tag { display: inline-block; font-weight: 700; color: #173b6d; margin-bottom: 6px; }
     /* 单元测评·结果汇总表 */
     .ua-caption { font-size: 14px; font-weight: 700; color: #1a3a6c; margin: 22px 0 8px; }
     .ua-caption:first-child { margin-top: 0; }
@@ -826,6 +925,44 @@
     .doc-editor textarea { width: 100%; min-height: 110px; border: 1px dashed #b6c4d8; border-radius: 6px; padding: 8px 12px; font-size: 13px; line-height: 1.9; resize: vertical; box-sizing: border-box; background: #fbfcfe; }
     .doc-meta { font-size: 11px; color: #98a2b3; margin-top: 2px; }
     .doc-result-line { font-size: 13px; font-weight: 600; color: #1a3a6c; text-indent: 2em; margin: 2px 0 6px; }
+    /* 总体评价分层编辑器：仅改善屏幕阅读与编辑，不参与 Word 导出样式 */
+    .overall-workspace { display: grid; gap: 16px; }
+    .overall-summary-card { margin-bottom: 0; padding: 14px 20px; }
+    .overall-summary-card .doc-title { margin-bottom: 7px; font-size: 16px; }
+    .overall-summary-card .doc-p { font-size: 12px; line-height: 1.7; }
+    .overall-layer-tabs { display: grid; grid-template-columns: repeat(8, minmax(138px, 1fr)); gap: 7px; padding: 9px; border: 1px solid #dce5ef; border-radius: 10px; background: #f6f9fc; overflow-x: auto; }
+    .overall-layer-tab { display: inline-flex; align-items: center; justify-content: center; gap: 7px; min-width: 0; min-height: 42px; padding: 8px 13px; border: 1px solid #d5dfeb; border-radius: 8px; background: #fff; color: #41546d; font: inherit; font-size: 12px; font-weight: 600; cursor: pointer; transition: all .15s ease; white-space: nowrap; }
+    .overall-layer-tab:hover { border-color: #85a7d0; color: #174a83; background: #fafdff; }
+    .overall-layer-tab.active { border-color: #245ea8; background: #245ea8; color: #fff; box-shadow: 0 3px 9px rgba(36, 94, 168, .2); }
+    .overall-editor-card { width: min(1120px, calc(100% - 48px)); justify-self: center; margin-bottom: 0; padding: 24px 28px; border-color: #d5e0ed; box-shadow: 0 5px 18px rgba(26, 65, 100, .07); }
+    .overall-editor-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; margin-bottom: 13px; }
+    .overall-editor-title { color: #102f57; font-size: 18px; font-weight: 700; line-height: 1.5; }
+    .overall-editor-hint { margin-top: 3px; color: #7b8798; font-size: 12px; font-weight: 400; }
+    .overall-stat { flex: none; padding: 7px 11px; border-radius: 7px; background: #eef4fb; color: #31557e; font-size: 12px; line-height: 1.5; }
+    .overall-editor-card .doc-editor { margin-top: 0; }
+    .overall-editor-card .doc-editor textarea { min-height: 270px; padding: 16px 18px; border: 1px solid #b9c9db; border-radius: 8px; background: #fff; color: #28384d; font-family: inherit; font-size: 16px; line-height: 2; text-align: justify; resize: vertical; transition: border-color .15s, box-shadow .15s; }
+    .overall-editor-card .doc-editor textarea:focus { border-color: #3d73b7; outline: none; box-shadow: 0 0 0 3px rgba(36, 94, 168, .11); }
+    .overall-editor-card .doc-meta { margin-top: 8px; color: #77869a; font-size: 12px; }
+    .overall-conclusion { margin: 0; padding: 16px 20px; border-left: 4px solid #245ea8; background: #f5f8fc; }
+    .overall-conclusion .doc-h { margin-top: 0; font-size: 15px; }
+    .overall-conclusion .doc-p { font-size: 14px; line-height: 1.9; }
+    /* 安全问题及改进建议：以下字号仅用于屏幕阅读，不参与 Word 导出样式。 */
+    .suggestion-workspace { display: grid; gap: 16px; }
+    #report-panel-5 .onsite-note { font-size: 14px; line-height: 1.8; }
+    .suggestion-layer-tabs { display: grid; grid-template-columns: repeat(8, minmax(108px, 1fr)); gap: 6px; padding: 8px; overflow-x: auto; border: 1px solid #dce5ef; border-radius: 10px; background: #f6f9fc; }
+    .suggestion-layer-tab { display: flex; min-width: 0; min-height: 40px; padding: 7px 9px; align-items: center; justify-content: center; border: 1px solid #d5dfeb; border-radius: 7px; background: #fff; color: #41546d; font: inherit; font-size: 13px; font-weight: 600; line-height: 1.45; white-space: nowrap; cursor: pointer; transition: all .15s ease; }
+    .suggestion-layer-tab:hover { border-color: #85a7d0; color: #174a83; background: #fafdff; }
+    .suggestion-layer-tab.active { border-color: #245ea8; background: #245ea8; color: #fff; box-shadow: 0 3px 9px rgba(36, 94, 168, .2); }
+    .suggestion-editor-card { margin-bottom: 0; padding: 24px 28px; border-color: #d5e0ed; box-shadow: 0 5px 18px rgba(26, 65, 100, .07); }
+    .suggestion-editor-head { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-bottom: 14px; }
+    .suggestion-editor-title { color: #102f57; font-size: 20px; font-weight: 700; line-height: 1.5; }
+    .suggestion-problem-count { flex: none; padding: 7px 11px; border-radius: 7px; background: #eef4fb; color: #31557e; font-size: 14px; }
+    .suggestion-editor-card .doc-editor + .doc-editor { margin-top: 16px; }
+    .suggestion-editor-card .doc-meta { font-size: 14px; line-height: 1.6; }
+    .suggestion-editor-card .doc-editor textarea { min-height: 190px; padding: 14px 16px; border-style: solid; font-size: 16px; line-height: 2; resize: none; }
+    .suggestion-empty { padding: 34px 20px; border: 1px dashed #cbd7e5; border-radius: 8px; background: #fafcff; color: #52657c; font-size: 16px; line-height: 1.8; text-align: center; }
+    @media (max-width: 760px) { .overall-summary-card { padding: 12px 14px; } .overall-editor-card { width: auto; padding: 18px; } .overall-editor-head { display: block; } .overall-stat { margin-top: 8px; } }
+    @media (max-width: 760px) { .suggestion-editor-card { padding: 18px; } .suggestion-editor-head { display: block; } .suggestion-problem-count { display: inline-block; margin-top: 8px; } }
     .btn-export { display: inline-flex; align-items: center; gap: 6px; }
 
     /* ===== Word导入 ===== */
@@ -2576,6 +2713,41 @@
   </div>
 </div>
 
+<!-- ==================== Word导入选项弹窗 ==================== -->
+<div id="modal-word-import-options" class="modal-overlay" onclick="event.target===this && cancelWordImportOptions()">
+  <div class="modal" style="width:640px; max-width:94%;">
+    <div class="modal-header">
+      <h3>Word报告导入选项</h3>
+      <button class="modal-close" onclick="cancelWordImportOptions()">✕</button>
+    </div>
+    <div class="modal-body">
+      <div style="margin-bottom:14px; color:#646A73; line-height:1.7;">只有勾选的内容才会从 Word 导入并覆盖；<strong>未勾选的内容保留当前项目原值</strong>。</div>
+      <div style="display:grid; gap:8px; margin-bottom:14px;">
+        <label style="display:flex; align-items:center; gap:8px;"><input type="checkbox" id="word-import-basic" checked /> 项目准备与系统基本信息</label>
+        <label style="display:flex; align-items:center; gap:8px;"><input type="checkbox" id="word-import-planning" checked /> 测评准备与方案（含资产、测评对象、指标和方案内容）</label>
+        <label style="display:flex; align-items:center; gap:8px;"><input type="checkbox" id="word-import-reporting" checked /> 报告编制内容</label>
+      </div>
+      <label style="display:flex; align-items:center; gap:9px; padding:11px 12px; background:#F5F8FC; border:1px solid #DCE5F0; border-radius:7px; font-weight:600; cursor:pointer;">
+        <input type="checkbox" id="word-import-records-enabled" checked onchange="toggleWordImportLayerOptions('records')" />
+        导入现场测评记录（可按 8 个层面选择）
+      </label>
+      <div id="word-import-records-layers" style="display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:8px 16px; margin:8px 0 12px; padding:12px; border:1px solid #E5E7EB; border-radius:7px;"></div>
+      <label style="display:flex; align-items:center; gap:9px; padding:11px 12px; background:#F5F8FC; border:1px solid #DCE5F0; border-radius:7px; font-weight:600; cursor:pointer;">
+        <input type="checkbox" id="word-import-evidence-enabled" onchange="toggleWordImportLayerOptions('evidence')" />
+        导入现场测评证据图片（需单独勾选）
+      </label>
+      <div style="display:flex; justify-content:flex-end; margin-top:6px;"><button type="button" class="btn btn-secondary" style="width:auto; height:28px; padding:0 12px; font-size:12px;" onclick="syncWordImportEvidenceLayers()">图片层面与上方文字选择同步</button></div>
+      <div id="word-import-evidence-layers" style="display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:8px 16px; margin-top:8px; padding:12px; border:1px solid #E5E7EB; border-radius:7px; opacity:.5;"></div>
+      <div id="word-import-selection-summary" style="margin-top:10px; padding:9px 11px; background:#FFF8E8; border:1px solid #F3D58A; border-radius:6px; color:#7A5310; font-size:12px; line-height:1.6;"></div>
+      <div style="margin-top:10px; color:#8F959E; font-size:12px; line-height:1.6;">只识别每个“表A-x 测评结果记录”后、下一层面前的“图A-x.x”证据列表；PNG、JPEG和GIF图片可直接导入。</div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" style="width:auto; padding:0 28px;" onclick="cancelWordImportOptions()">取消</button>
+      <button class="btn btn-primary" style="width:auto; padding:0 28px;" onclick="confirmWordImportOptions()">开始导入</button>
+    </div>
+  </div>
+</div>
+
 <!-- ==================== Word导入日志弹窗 ==================== -->
 <div id="modal-import-log" class="modal-overlay" onclick="event.target===this && closeModal('modal-import-log')" data-page-node-id="impLogModal01">
   <div class="modal" style="width:720px; max-width:94%;" data-page-node-id="impLogModal02">
@@ -2628,7 +2800,6 @@
     '.indicator-table .ind-reason textarea',
     '.onsite-table .rec-cell textarea',
     '.fix-table textarea',
-    '.risk-table textarea',
     '.report-textarea',
     '.doc-editor textarea',
     '.sug-table textarea',
@@ -2678,8 +2849,14 @@
   });
   paragraphObserver.observe(document.getElementById('page-implement'), { childList: true, subtree: true });
 
-  // 表格中的多行内容随输入量自动增高，切换步骤或页签后也会重新计算。
-  const autoGrowTableTextareaSelector = '#page-implement table textarea';
+  // 表格多行内容及指定的长文本输入框随内容自动增高，切换步骤或页签后也会重新计算。
+  const autoGrowTableTextareaSelector = [
+    '#page-implement table textarea',
+    '#plan-sys-intro',
+    '#plan-business-situation',
+    '#topology-block-list textarea',
+    '#report-panel-5 .suggestion-editor-card textarea'
+  ].join(',');
   function autoGrowTableTextarea(el) {
     if (!el || !el.matches || !el.matches(autoGrowTableTextareaSelector)) return;
     const minHeight = parseFloat(window.getComputedStyle(el).minHeight) || 40;
@@ -3108,6 +3285,7 @@
   function renderCryptoServices() {
     const body = document.getElementById('crypto-service-body');
     if (!body) return;
+    body.dataset.selectableDelete = '1';
     body.innerHTML = (cryptoServices || []).map(function (row, index) {
       return '<tr><td>' + (index + 1) + '</td>' +
         '<td><textarea class="full-input asset-text" oninput="updateCryptoService(' + index + ',\'name\',this.value)">' + onsiteEsc(row.name || '') + '</textarea></td>' +
@@ -3127,7 +3305,11 @@
   }
 
   function deleteCryptoServiceRow() {
-    if (cryptoServices.length > 1) cryptoServices.pop();
+    const body = document.getElementById('crypto-service-body');
+    const selected = body?.querySelector(':scope > tr.bb-row-selected');
+    if (!selected) { showToast('请先选中要删除的行', true); return; }
+    const index = Array.from(body.rows).indexOf(selected);
+    if (cryptoServices.length > 1) cryptoServices.splice(index, 1);
     else cryptoServices[0] = { name: '', provider: '' };
     renderCryptoServices();
     document.dispatchEvent(new Event('bb:prototype-change'));
@@ -3852,11 +4034,23 @@
     ).join('');
   }
 
-  // Word 单元格中的安全需求按实际内容导入；空白就是空白，不补默认四项。
+  // Word 单元格中的安全需求按实际内容导入；概括性的“机密性、完整（性）”展开为传输/存储四项。
   function parseImportedDataReqs(value) {
     const text = String(value || '').replace(/\r/g, '').trim();
     if (!text) return [];
-    let reqs = text.split(/\n+|[、，,；;]+/).map(function (item) { return item.trim(); }).filter(Boolean);
+    let reqs = text.split(/\n+|[、，,；;\/／]+/).map(function (item) { return item.trim(); }).filter(Boolean);
+    const expanded = [];
+    reqs.forEach(function (req) {
+      const compact = req.replace(/\s+/g, '');
+      if (compact === '机密性') {
+        expanded.push('存储机密性', '传输机密性');
+      } else if (compact === '完整' || compact === '完整性') {
+        expanded.push('存储完整性', '传输完整性');
+      } else {
+        expanded.push(req);
+      }
+    });
+    reqs = expanded;
     // 少数模板把多个段落提取成连续文本，兼容识别其中的标准需求，但不扩大为四项默认值。
     if (reqs.length === 1) {
       const compact = text.replace(/\s+/g, '');
@@ -4015,6 +4209,9 @@
 
   // 新增、导入和历史数据恢复均保留控件顺序及原有属性。
   function enhanceAssetEditors() {
+    document.querySelectorAll('[id^="asset-tbody-"], #app-user-tbody').forEach(function (tbody) {
+      tbody.dataset.selectableDelete = '1';
+    });
     document.querySelectorAll('[id^="asset-tbody-"] > tr').forEach(function(row) {
       if (!row.dataset.assetId) row.dataset.assetId = newAssetRowId('asset');
     });
@@ -4071,14 +4268,17 @@
     tbody.insertAdjacentHTML('beforeend', getAssetRowHtml(type, idx, useDefaults));
   }
 
-  function deleteAssetRow(type) {
+  function deleteAssetRow(type, forceLast) {
     const tbody = document.getElementById('asset-tbody-' + type);
     if (!tbody || tbody.children.length === 0) return;
-    if (type === 'person' && tbody.dataset.imported !== '1' && tbody.children.length <= PERSON_ASSET_DEFAULTS.length) {
-      showToast('人员表默认六行不可删除', true);
+    const selected = forceLast ? tbody.lastElementChild : tbody.querySelector(':scope > tr.bb-row-selected');
+    if (!selected) { showToast('请先选中要删除的行', true); return; }
+    const selectedIndex = Array.from(tbody.rows).indexOf(selected);
+    if (type === 'person' && tbody.dataset.imported !== '1' && selectedIndex < PERSON_ASSET_DEFAULTS.length) {
+      if (!forceLast) showToast('人员表默认六行不可删除', true);
       return;
     }
-    tbody.deleteRow(-1);
+    selected.remove();
     renumberAssetRows(type);
   }
 
@@ -4093,12 +4293,21 @@
     tbody.insertAdjacentHTML('beforeend', getAppUserRowHtml(tbody.children.length + 1));
   }
 
-  function deleteAppUserRow() {
+  function deleteAppUserRow(forceLast) {
     const tbody = document.getElementById('app-user-tbody');
     if (!tbody || tbody.children.length === 0) return;
-    tbody.deleteRow(-1);
+    const selected = forceLast ? tbody.lastElementChild : tbody.querySelector(':scope > tr.bb-row-selected');
+    if (!selected) { showToast('请先选中要删除的行', true); return; }
+    selected.remove();
     Array.from(tbody.children).forEach((tr, i) => { tr.children[0].textContent = i + 1; });
   }
+
+  document.addEventListener('click', function (event) {
+    const row = event.target.closest('tbody[data-selectable-delete="1"] > tr');
+    if (!row) return;
+    Array.from(row.parentElement.children).forEach(function (item) { item.classList.remove('bb-row-selected'); });
+    row.classList.add('bb-row-selected');
+  });
 
   function getAppUserEntries() {
     const tbody = document.getElementById('app-user-tbody');
@@ -4610,6 +4819,7 @@
     if (savedEvidenceWidth >= 300 && savedEvidenceWidth <= 680) onsiteEvidenceWidth = savedEvidenceWidth;
   } catch (error) { /* 浏览器禁用本地存储时使用默认宽度 */ }
   const onsiteExpandedRecordKeys = new Set();
+  let onsiteRecordModalTarget = null;
   const onsiteRecordSaveTimers = {};
 
   function getImportantDataAssets() {
@@ -4662,10 +4872,12 @@
     delete onsiteRecordSaveTimers[key];
     setOnsiteRecordSaveState(key, 'saving', '保存中…');
     try {
-      await persist(3, true, true);
+      await window.bbPersistProjectStage(3, true, true);
       setOnsiteRecordSaveState(key, '', '已自动保存 ' + formatOnsiteSaveTime(new Date()));
+      return true;
     } catch (error) {
       setOnsiteRecordSaveState(key, 'error', '保存失败');
+      return false;
     }
   }
 
@@ -4684,7 +4896,7 @@
   function updateOnsiteExpandedRecord(t, itemIdx, objIdx, el) {
     const key = onsiteKey(t, itemIdx, objIdx);
     updateOnsiteField(t, itemIdx, objIdx, 'record', el.value);
-    autoGrowOnsiteRecordEditor(el);
+    if (!el.classList.contains('onsite-record-modal-editor')) autoGrowOnsiteRecordEditor(el);
     const count = document.getElementById('onsite-record-editor-count-' + key);
     if (count) count.textContent = onsiteRecordCharCount(el.value) + ' 字';
     scheduleOnsiteRecordSave(key);
@@ -4692,20 +4904,74 @@
 
   function expandOnsiteRecord(t, itemIdx, objIdx) {
     const key = onsiteKey(t, itemIdx, objIdx);
-    onsiteExpandedRecordKeys.add(key);
-    renderOnsiteTables();
+    const unitName = evaluationIndicatorLevels[t]?.items[itemIdx]?.name || '测评单元';
+    const objectName = getOnsiteUnitObjects(t, unitName)[objIdx] || '测评对象';
+    const value = String(getOnsiteRec(t, itemIdx, objIdx).record || '');
+    const host = document.getElementById('step-panel-3');
+    if (!host) return;
+    let modal = document.getElementById('onsite-record-modal');
+    if (!modal) {
+      modal = document.createElement('div');
+      modal.id = 'onsite-record-modal';
+      modal.className = 'onsite-record-modal-overlay';
+      modal.setAttribute('role', 'dialog');
+      modal.setAttribute('aria-modal', 'true');
+      host.appendChild(modal);
+    }
+    const selectId = 'onsite-evi-select-modal-' + key;
+    const groups = onsiteEvidenceLayerGroups(t);
+    modal.innerHTML = '<div class="onsite-record-modal-shell" onkeydown="handleOnsiteRecordModalKeydown(event)">' +
+      '<div class="onsite-record-modal-head"><div class="onsite-record-modal-heading">' +
+      '<strong>结果记录 · 全文编辑</strong><div class="onsite-record-modal-context">' +
+      onsiteEsc(ONSITE_LAYERS[t]?.name || '') + '　/　' + onsiteEsc(unitName) + '　/　' + onsiteEsc(objectName) +
+      '</div></div><button type="button" class="onsite-record-modal-close" title="保存并关闭" onclick="finishOnsiteRecordModal()">×</button></div>' +
+      '<div class="onsite-record-modal-body"><textarea class="onsite-record-modal-editor" id="onsite-record-editor-' + key + '" ' +
+      'data-onsite-record-key="' + key + '" onfocus="focusOnsiteRecordEditor(' + t + ',' + itemIdx + ',' + objIdx + ',this)" ' +
+      'oninput="updateOnsiteExpandedRecord(' + t + ',' + itemIdx + ',' + objIdx + ',this)">' + onsiteEsc(value) + '</textarea></div>' +
+      '<div class="onsite-record-modal-foot"><span class="onsite-record-editor-count" id="onsite-record-editor-count-' + key + '">' + onsiteRecordCharCount(value) + ' 字</span>' +
+      '<div class="evi-record-tools"><span class="evi-hint">在此框按 Ctrl+V 可新建/追加证据</span>' +
+      '<select id="' + selectId + '" data-onsite-layer="' + t + '"><option value="">选择已有证据</option>' + groups.map(function(group) {
+        return '<option value="' + onsiteEsc(group.id) + '">' + onsiteEsc(group.no + (group.name ? ' ' + group.name : '')) + '</option>';
+      }).join('') + '</select><button type="button" class="evi-mini-btn" onclick="insertSelectedOnsiteEvidence(\'' + selectId + '\')">插入编号</button></div>' +
+      '<span class="onsite-record-save-state" id="onsite-record-save-' + key + '">已自动保存 ' + formatOnsiteSaveTime(new Date()) + '</span>' +
+      '<button type="button" class="onsite-record-modal-done" onclick="finishOnsiteRecordModal()">完成并关闭</button></div></div>';
+    onsiteRecordModalTarget = { t: t, itemIdx: itemIdx, objIdx: objIdx, key: key };
+    modal.style.display = 'block';
+    document.body.classList.add('onsite-record-modal-open');
     requestAnimationFrame(function() {
       const editor = document.getElementById('onsite-record-editor-' + key);
-      if (editor) { autoGrowOnsiteRecordEditor(editor); editor.focus(); editor.setSelectionRange(editor.value.length, editor.value.length); }
+      if (editor) { editor.focus(); editor.setSelectionRange(editor.value.length, editor.value.length); }
     });
   }
 
-  function collapseOnsiteRecord(t, itemIdx, objIdx) {
-    const key = onsiteKey(t, itemIdx, objIdx);
-    saveOnsiteRecordNow(key);
-    onsiteExpandedRecordKeys.delete(key);
+  function finishOnsiteRecordModal() {
+    const target = onsiteRecordModalTarget;
+    if (!target) return;
+    toggleOnsiteEvidenceDrawer(false);
+    const modal = document.getElementById('onsite-record-modal');
+    if (modal) modal.style.display = 'none';
+    if (onsiteRecordEditorTarget?.key === target.key) onsiteRecordEditorTarget = null;
+    onsiteRecordModalTarget = null;
+    document.body.classList.remove('onsite-record-modal-open');
     renderOnsiteTables();
+    // 关闭不应被网络或数据库短暂异常阻塞；数据已在页面内存中，关闭后继续尝试后台保存。
+    saveOnsiteRecordNow(target.key);
   }
+
+  function collapseOnsiteRecord() { finishOnsiteRecordModal(); }
+
+  function handleOnsiteRecordModalKeydown(event) {
+    if (event.key !== 'Escape') return;
+    event.preventDefault();
+    event.stopPropagation();
+    const drawer = document.getElementById('onsite-evidence-drawer');
+    if (drawer?.classList.contains('open')) toggleOnsiteEvidenceDrawer(false);
+    else finishOnsiteRecordModal();
+  }
+
+  document.addEventListener('keydown', function(event) {
+    if (event.key === 'Escape' && onsiteRecordModalTarget) handleOnsiteRecordModalKeydown(event);
+  });
 
   function handleOnsiteRecordEditorKeydown(event, t, itemIdx, objIdx) {
     if (event.key !== 'Escape') return;
@@ -4754,6 +5020,57 @@
 
   function onsiteEvidenceLayerGroups(t) {
     return onsiteEvidenceGroups.filter(function(group) { return Number(group.layer) === Number(t); });
+  }
+
+  function onsiteEvidenceImageSrc(image) {
+    if (image && image.dataUrl) return image.dataUrl;
+    if (!image || !image.fileId) return '';
+    return '/api/projects/' + encodeURIComponent(window.bbCurrentProjectId || '') + '/evidence-files/' + encodeURIComponent(image.fileId) +
+      '?access_token=' + encodeURIComponent(window.bbProjectAccessToken || '');
+  }
+
+  function removeStoredOnsiteEvidenceFile(fileId) {
+    if (!fileId) return;
+    window.bbProjectApi('/projects/' + window.bbCurrentProjectId + '/evidence-files/' + encodeURIComponent(fileId), { method: 'DELETE' })
+      .catch(function() { /* 引用已从阶段数据移除，孤立文件可后续清理 */ });
+  }
+
+  function hasLegacyOnsiteEvidenceImages() {
+    return onsiteEvidenceGroups.some(function(group) {
+      return !!group.dataUrl || (group.images || []).some(function(image) { return !!image.dataUrl && !image.fileId; });
+    });
+  }
+
+  async function migrateStoredOnsiteEvidenceImages() {
+    if (!hasLegacyOnsiteEvidenceImages()) return;
+    try {
+      const migrated = await window.bbProjectApi('/projects/' + window.bbCurrentProjectId + '/evidence-files/migrate', { method: 'POST', body: '{}' , timeoutMs: 600000 });
+      const migratedGroups = clone(migrated.onsiteEvidenceGroups || []);
+      const migratedByGroup = new Map(migratedGroups.map(function(group) { return [group.id, group]; }));
+      // 迁移期间用户仍可继续录入；只替换同 ID 的历史图片，不覆盖刚新增或删除的内容。
+      onsiteEvidenceGroups = onsiteEvidenceGroups.map(function(group, groupIndex) {
+        const migratedGroup = migratedByGroup.get(group.id) || migratedGroups[groupIndex];
+        if (!migratedGroup) return group;
+        const migratedImages = new Map((migratedGroup.images || []).map(function(image) { return [image.id, image]; }));
+        const updated = Object.assign({}, group, {
+          images: (group.images || []).map(function(image, index) {
+            return migratedImages.get(image.id) || (!image.fileId && migratedGroup.images?.[index]) || image;
+          })
+        });
+        delete updated.dataUrl;
+        return updated;
+      });
+      const stage = (window.bbGetProjectWorkspace?.()?.stages || []).find(function(item) { return item.stage_key === 'onsite'; });
+      if (stage?.data) stage.data.onsiteEvidenceGroups = clone(onsiteEvidenceGroups);
+      refreshOnsiteEvidenceLibrary(currentOnsiteLayer);
+      showToast('历史证据图片已转为文件存储');
+    } catch (error) {
+      showToast('历史证据图片迁移失败，仍保留原数据：' + (error.message || error), true);
+    }
+  }
+
+  function markOnsiteEvidenceChanged() {
+    window.bbMarkProjectDirty(3, true, 500);
   }
 
   function onsiteEvidenceNumberValue(no) {
@@ -4827,6 +5144,9 @@
     el.setSelectionRange(caret, caret);
     el.focus();
     updateOnsiteField(target.t, target.itemIdx, target.objIdx, 'record', el.value);
+    const count = document.getElementById('onsite-record-editor-count-' + target.key);
+    if (count) count.textContent = onsiteRecordCharCount(el.value) + ' 字';
+    scheduleOnsiteRecordSave(target.key);
     return true;
   }
 
@@ -4869,18 +5189,31 @@
     img.src = dataUrl;
   }
 
-  function addOnsiteEvidenceImage(group, dataUrl) {
+  async function addOnsiteEvidenceImage(group, dataUrl) {
     if (!group) return;
     if (!Array.isArray(group.images)) group.images = [];
-    group.images.push({ id: newOnsiteEvidenceId(), dataUrl: dataUrl });
+    const image = { id: newOnsiteEvidenceId(), dataUrl: dataUrl, uploading: true };
+    group.images.push(image);
     refreshOnsiteEvidenceLibrary(group.layer);
     toggleOnsiteEvidenceDrawer(true);
-    showToast('已加入 ' + group.no + '（共' + group.images.length + '张）');
+    try {
+      const stored = await window.bbProjectApi('/projects/' + window.bbCurrentProjectId + '/evidence-files', {
+        method: 'POST', body: JSON.stringify({ imageId: image.id, dataUrl: dataUrl }), timeoutMs: 180000
+      });
+      Object.assign(image, stored, { uploading: false });
+      delete image.dataUrl;
+      showToast('已加入 ' + group.no + '（共' + group.images.length + '张）');
+    } catch (error) {
+      image.uploading = false;
+      showToast('图片文件化存储暂时失败，已保留在项目数据中：' + (error.message || error), true);
+    }
+    refreshOnsiteEvidenceLibrary(group.layer);
+    markOnsiteEvidenceChanged();
   }
 
   function onsiteEviRename(groupId, value) {
     const group = onsiteEvidenceGroups.find(function(item) { return item.id === groupId; });
-    if (group) group.name = value;
+    if (group) { group.name = value; markOnsiteEvidenceChanged(); }
   }
 
   function activateOnsiteEvidenceGroup(groupId) {
@@ -4912,8 +5245,11 @@
   function deleteOnsiteEvidenceImage(groupId, imageId) {
     const group = onsiteEvidenceGroups.find(function(item) { return item.id === groupId; });
     if (!group) return;
+    const image = (group.images || []).find(function(item) { return item.id === imageId; });
     group.images = (group.images || []).filter(function(image) { return image.id !== imageId; });
+    if (image?.fileId) removeStoredOnsiteEvidenceFile(image.fileId);
     refreshOnsiteEvidenceLibrary(group.layer);
+    markOnsiteEvidenceChanged();
   }
 
   function deleteOnsiteEvidenceGroup(groupId) {
@@ -4925,11 +5261,13 @@
     Object.values(onsiteRecords).forEach(function(rec) {
       if (rec && typeof rec.record === 'string') rec.record = rec.record.split(group.no).join('【证据已删除】');
     });
+    (group.images || []).forEach(function(image) { if (image.fileId) removeStoredOnsiteEvidenceFile(image.fileId); });
     onsiteEvidenceGroups.splice(index, 1);
     if (activeOnsiteEvidenceGroupId === groupId) activeOnsiteEvidenceGroupId = '';
     renumberOnsiteEvidence(group.layer);
     syncOnsiteRecordEditors();
     refreshOnsiteEvidenceLibrary(group.layer);
+    markOnsiteEvidenceChanged();
   }
 
   function readOnsiteEvidenceFiles(files, group) {
@@ -4977,7 +5315,7 @@
     ov.className = 'evi-preview-overlay';
     ov.onclick = function() { ov.remove(); };
     ov.innerHTML = '<span class="close">×</span>' +
-      '<img src="' + image.dataUrl + '" />' +
+      '<img src="' + onsiteEsc(onsiteEvidenceImageSrc(image)) + '" />' +
       '<div class="cap">' + onsiteEsc(group.no) + (group.name ? '　' + onsiteEsc(group.name) : '') + '　（点击任意处关闭）</div>';
     document.body.appendChild(ov);
   }
@@ -4995,7 +5333,8 @@
   }
 
   function onsiteEvidenceLibraryHtml(t) {
-    const groups = onsiteEvidenceLayerGroups(t).sort(function(a, b) { return onsiteEvidenceNumberValue(a.no) - onsiteEvidenceNumberValue(b.no); });
+    // 证据抽屉按编号倒序展示，让最新新增的证据始终位于最上方。
+    const groups = onsiteEvidenceLayerGroups(t).sort(function(a, b) { return onsiteEvidenceNumberValue(b.no) - onsiteEvidenceNumberValue(a.no); });
     const active = groups.find(function(group) { return group.id === activeOnsiteEvidenceGroupId; });
     let html = '<div class="evi-library-head"><div class="evi-library-title">证据列表（与测评对象不强制绑定）</div><div class="evi-library-actions">' +
       '<button type="button" class="evi-mini-btn" onclick="startNewOnsiteEvidenceGroup(' + t + ',true)">新建证据并插入编号</button>' +
@@ -5008,7 +5347,7 @@
         '<input class="evi-name" placeholder="证据名称（可选）" value="' + onsiteEsc(group.name || '') + '" onchange="onsiteEviRename(\'' + group.id + '\',this.value)" />' +
         '<span class="evi-del" title="删除证据组" onclick="deleteOnsiteEvidenceGroup(\'' + group.id + '\')">×</span></div>' +
         '<div class="evi-thumbs">' + (group.images || []).map(function(image) {
-          return '<div class="evi-thumb"><img src="' + image.dataUrl + '" onclick="onsiteEviPreview(\'' + group.id + '\',\'' + image.id + '\')" />' +
+          return '<div class="evi-thumb"><img loading="lazy" src="' + onsiteEsc(onsiteEvidenceImageSrc(image)) + '" onclick="onsiteEviPreview(\'' + group.id + '\',\'' + image.id + '\')" />' +
             '<span class="evi-thumb-del" title="删除本张图片" onclick="deleteOnsiteEvidenceImage(\'' + group.id + '\',\'' + image.id + '\')">×</span></div>';
         }).join('') + ((group.images || []).length ? '' : '<span class="evi-hint">暂无图片</span>') + '</div>' +
         '<div class="evi-group-foot"><button type="button" class="evi-mini-btn" onclick="activateOnsiteEvidenceGroup(\'' + group.id + '\')">继续添加图片</button>' +
@@ -5077,6 +5416,7 @@
     if (!drawer) return;
     const open = typeof force === 'boolean' ? force : !drawer.classList.contains('open');
     drawer.classList.toggle('open', open);
+    document.body.classList.toggle('onsite-evidence-drawer-open', open);
     const host = document.getElementById('step-panel-3');
     if (host) host.classList.toggle('evidence-drawer-open', open);
     const button = document.getElementById('onsite-evidence-fab');
@@ -5095,7 +5435,8 @@
     }
     const groups = onsiteEvidenceLayerGroups(t);
     document.querySelectorAll('select[id^="onsite-evi-select-"]').forEach(function(select) {
-      if (!select.closest('#onsite-panel-' + t)) return;
+      const explicitLayer = select.getAttribute('data-onsite-layer');
+      if (explicitLayer !== null ? Number(explicitLayer) !== Number(t) : !select.closest('#onsite-panel-' + t)) return;
       const selected = select.value;
       select.innerHTML = '<option value="">选择已有证据</option>' + groups.map(function(group) {
         return '<option value="' + onsiteEsc(group.id) + '">' + onsiteEsc(group.no + (group.name ? ' ' + group.name : '')) + '</option>';
@@ -5122,6 +5463,46 @@
     for (let t = 0; t < 8; t++) renumberOnsiteEvidence(t);
   }
 
+  function onsiteClipboardImageFiles(clipboardData) {
+    if (!clipboardData) return [];
+    const files = [];
+    const seen = new Set();
+    function add(file) {
+      if (!file) return;
+      const type = String(file.type || '').toLowerCase();
+      const name = String(file.name || '').toLowerCase();
+      if (!type.startsWith('image/') && !/\.(png|jpe?g|gif|bmp|webp)$/.test(name)) return;
+      const signature = [file.name || '', file.type || '', file.size || 0, file.lastModified || 0].join('|');
+      if (seen.has(signature)) return;
+      seen.add(signature);
+      files.push(file);
+    }
+    Array.from(clipboardData.items || []).forEach(function(item) {
+      if (!item || (item.kind && item.kind !== 'file')) return;
+      if (item.type && !String(item.type).toLowerCase().startsWith('image/')) return;
+      add(typeof item.getAsFile === 'function' ? item.getAsFile() : null);
+    });
+    // 从资源管理器和部分截图工具复制时，Chromium 可能只在 files 中提供图片。
+    Array.from(clipboardData.files || []).forEach(add);
+    return files;
+  }
+
+  function resolveOnsitePasteTarget(event) {
+    const editor = event?.target?.closest?.('textarea[data-onsite-record-key]');
+    if (editor && document.body.contains(editor)) {
+      const key = editor.getAttribute('data-onsite-record-key');
+      const located = locateOnsiteRecordKey(key);
+      if (located && located.objIdx >= 0) {
+        if (onsiteRecordEditorTarget && onsiteRecordEditorTarget.key !== key) activeOnsiteEvidenceGroupId = '';
+        onsiteRecordEditorTarget = {
+          t: located.t, itemIdx: located.itemIdx, objIdx: located.objIdx, key: key, element: editor
+        };
+      }
+    }
+    return onsiteRecordEditorTarget && onsiteRecordEditorTarget.element &&
+      document.body.contains(onsiteRecordEditorTarget.element) ? onsiteRecordEditorTarget : null;
+  }
+
   // 全局 Ctrl+V：结果描述框中粘贴图片时自动建立证据组；后续粘贴追加到当前组。
   document.addEventListener('paste', async function(e) {
     const panel3 = document.getElementById('step-panel-3');
@@ -5129,15 +5510,7 @@
     const in3 = panel3 && panel3.style.display !== 'none';
     const in4 = panel4 && panel4.style.display !== 'none';
     if (!in3 && !in4) return;
-    const items = e.clipboardData && e.clipboardData.items;
-    if (!items) return;
-    const imageFiles = [];
-    for (let i = 0; i < items.length; i++) {
-      if (items[i].type && items[i].type.indexOf('image') === 0) {
-        const imageFile = items[i].getAsFile();
-        if (imageFile) imageFiles.push(imageFile);
-      }
-    }
+    const imageFiles = onsiteClipboardImageFiles(e.clipboardData);
     if (!imageFiles.length) return; // 文本粘贴走默认行为
     if (in4) {
       // 第4步：附录B 证明图片粘贴
@@ -5155,11 +5528,12 @@
       }
       return;
     }
-    if (!onsiteRecordEditorTarget || !onsiteRecordEditorTarget.element || !document.body.contains(onsiteRecordEditorTarget.element)) {
+    const pasteTarget = resolveOnsitePasteTarget(e);
+    if (!pasteTarget) {
       showToast('请先点击需要引用证据的结果描述框', true); return;
     }
     e.preventDefault();
-    const group = activeOnsiteEvidenceGroup(onsiteRecordEditorTarget.t, true);
+    const group = activeOnsiteEvidenceGroup(pasteTarget.t, true);
     if (group) readOnsiteEvidenceFiles(imageFiles, group);
   });
 
@@ -5357,10 +5731,13 @@
     return total == null ? '--' : String(total);
   }
 
-  // 评估结论正文允许编辑，但其中的综合得分始终以量化评估实时结果为准。
+  // 评估结论正文允许编辑，但综合得分和结论必须与量化评估实时结果一致。
   function lockConclusionScore(text) {
-    return String(text || '').replace(/综合得分为[^，。；\n]{0,20}?分/g,
-      '综合得分为' + currentConclusionScoreText() + '分');
+    const conclusion = getReportConclusion(getReportTotalScore().total);
+    return String(text || '')
+      .replace(/综合得分为[^，。；\n]{0,20}?分/g,
+        '综合得分为' + currentConclusionScoreText() + '分')
+      .replace(/(?:基本符合|不符合|符合)(?=\s*GB\/T\s*39786)/g, conclusion);
   }
 
   function saveReportText(id, v, el) {
@@ -5377,15 +5754,24 @@
   }
 
   function protectConclusionScoreEdit(event, el) {
-    const match = /综合得分为([^，。；\n]{0,20}?)分/.exec(String(el && el.value || ''));
-    if (!match) return true;
-    const scoreStart = match.index + '综合得分为'.length;
-    const scoreEnd = scoreStart + match[1].length;
+    const text = String(el && el.value || '');
+    const scoreMatch = /综合得分为([^，。；\n]{0,20}?)分/.exec(text);
+    const conclusionMatch = /(?:基本符合|不符合|符合)(?=\s*GB\/T\s*39786)/.exec(text);
+    const protectedRanges = [];
+    if (scoreMatch) {
+      const scoreStart = scoreMatch.index + '综合得分为'.length;
+      protectedRanges.push([scoreStart, scoreStart + scoreMatch[1].length]);
+    }
+    if (conclusionMatch) protectedRanges.push([conclusionMatch.index, conclusionMatch.index + conclusionMatch[0].length]);
+    if (!protectedRanges.length) return true;
     let start = Number(el.selectionStart || 0);
     let end = Number(el.selectionEnd || start);
     if (event && event.inputType === 'deleteContentBackward' && start === end) start = Math.max(0, start - 1);
     if (event && event.inputType === 'deleteContentForward' && start === end) end++;
-    if (start < scoreEnd && end > scoreStart || (start === end && start >= scoreStart && start <= scoreEnd)) {
+    const touchesProtectedText = protectedRanges.some(function(range) {
+      return start < range[1] && end > range[0] || (start === end && start >= range[0] && start <= range[1]);
+    });
+    if (touchesProtectedText) {
       event.preventDefault();
       return false;
     }
@@ -5727,6 +6113,20 @@
     }
     const scoreLock = id === 'report-conclusion-text' ? ' onbeforeinput="return protectConclusionScoreEdit(event,this)"' : '';
     return '<textarea id="' + id + '" class="report-textarea" style="min-height:' + (minHeight || 200) + 'px;"' + scoreLock + ' oninput="saveReportText(\'' + id + '\',this.value,this)">' + onsiteEsc(v) + '</textarea>';
+  }
+
+  // 结果分析始终可编辑，高度随内容自动增长；导出仍直接读取 reportTexts原文。
+  function autoResizeReportAnalysis(textarea) {
+    if (!textarea) return;
+    textarea.style.height = 'auto';
+    textarea.style.height = Math.max(240, textarea.scrollHeight + 2) + 'px';
+  }
+
+  function reportAnalysisEditor(id, autoText) {
+    const value = reportTexts.hasOwnProperty(id) ? reportTexts[id] : autoText;
+    return '<div class="report-analysis-card">' +
+      '<textarea id="' + id + '" class="report-textarea" oninput="saveReportText(\'' + id + '\',this.value,this);autoResizeReportAnalysis(this)">' + onsiteEsc(value) + '</textarea>' +
+    '</div>';
   }
 
   // ----- Tab 0：单元测评结果分析 -----
@@ -6088,8 +6488,10 @@
     }
     // 结果分析（可编辑，自动草稿）
     html += '<div class="report-section-title" style="margin-top:14px;">' + onsiteEsc(cfg.name) + ' · 结果分析（自动生成自现场测评记录，可编辑）</div>';
-    html += reportTextarea('report-ua-text-' + t, buildLayerAnalysisText(t), 200);
+    const analysisId = 'report-ua-text-' + t;
+    html += reportAnalysisEditor(analysisId, buildLayerAnalysisText(t));
     panel.innerHTML = html;
+    requestAnimationFrame(() => autoResizeReportAnalysis(document.getElementById(analysisId)));
   }
 
   // ----- Tab 1-1：测评结果修正（分值弥补） -----
@@ -6137,7 +6539,7 @@
     if (!panel) return;
     const t = 3;
     const level = evaluationIndicatorLevels[t];
-    let html = '<div class="onsite-table-caption">测评结果修正（分值弥补）</div>';
+    let html = '';
     const rows = [];
     level.items.forEach((item, itemIdx) => {
       if (REPORT_FIX_UNITS.indexOf(item.name) < 0) return;
@@ -6161,13 +6563,18 @@
           '</tr>');
       });
     });
+    html += '<div style="display:flex; align-items:center; justify-content:space-between; gap:16px; margin-bottom:12px;">' +
+      '<div><div class="onsite-table-caption" style="margin-bottom:3px; text-align:left;">测评结果修正（分值弥补）</div>' +
+      '<div style="font-size:12px; color:#7b8798;">填写后仍会自动保存；也可点击右侧按钮立即写入项目数据库。</div></div>' +
+      '<button type="button" class="btn btn-primary" style="width:auto; min-width:132px; padding:0 20px; flex:none;"' +
+      (rows.length ? '' : ' disabled') + ' onclick="bbSaveReportFixes(this)">保存弥补内容</button></div>';
     if (!rows.length) {
       html += '<div class="alert-box"><span class="icon">ℹ️</span><div>应用和数据安全层面的重要数据传输机密性·传输完整性测评单元中，暂无不符合或部分符合的测评对象，无需进行分值弥补。<br/>请先在<strong>第三步「现场测评 → 应用和数据安全」</strong>中完成测评判定。</div></div>';
     } else {
       html += '<table class="onsite-table fix-table"><thead><tr>' +
         '<th style="width:45px;">序号</th><th style="width:110px;">安全层面</th><th style="width:150px;">测评单元</th><th style="width:150px;">测评对象</th>' +
-        '<th style="width:110px;">经弥补前的<br/>测评结果/分值</th><th style="width:230px;">弥补指标（测评对象A）</th>' +
-        '<th style="width:110px;">经弥补后的<br/>测评结果/分值</th><th style="min-width:200px;">弥补原因及相关测评对象</th>' +
+        '<th style="width:110px;">经弥补前的<br/>测评结果/分值</th><th style="width:120px;">弥补指标（测评对象A）</th>' +
+        '<th style="width:110px;">经弥补后的<br/>测评结果/分值</th><th style="min-width:310px;">弥补原因及相关测评对象</th>' +
         '</tr></thead><tbody>' + rows.join('') + '</tbody></table>';
       html += '<div class="onsite-note">弥补分数计算规则：若测评对象A弥补了测评对象B的不足，测评对象A的分值为P<sub>A</sub>，测评对象B的弥补前分值为P<sub>B</sub>，则测评对象B弥补后的分值为 MAX(0.5×P<sub>A</sub>, P<sub>B</sub>)，即 0.5×P<sub>A</sub> 和 P<sub>B</sub> 之间的较大值（四舍五入，取小数点后4位）。弥补指标默认可选网络和通信安全层面的测评对象，亦可选择物理和环境安全、设备和计算安全层面的测评对象；修正后的分值自动应用于「测评结果及量化评估」。</div>';
     }
@@ -6278,11 +6685,12 @@
           ).join('') + '</select>';
       };
       html += '<datalist id="risk-threat-options">' + threatOptions + '</datalist>' +
-        '<table class="onsite-table risk-table"><thead>' +
-        '<tr><th rowspan="2" style="width:45px;">序号</th><th rowspan="2" style="width:110px;">安全层面</th>' +
-        '<th rowspan="2" style="min-width:240px;">问题描述</th><th rowspan="2" style="width:200px;">关联威胁</th>' +
-        '<th rowspan="2" style="min-width:260px;">风险分析</th><th colspan="3" style="width:130px;">风险等级</th></tr>' +
-        '<tr><th style="width:44px;">高</th><th style="width:44px;">中</th><th style="width:44px;">低</th></tr>' +
+        '<table class="onsite-table risk-table">' +
+        '<colgroup><col style="width:50px"><col style="width:130px"><col style="width:34%"><col style="width:112px"><col><col style="width:50px"><col style="width:50px"><col style="width:50px"></colgroup>' +
+        '<thead><tr><th rowspan="2">序号</th><th rowspan="2">安全层面</th>' +
+        '<th rowspan="2">问题描述</th><th rowspan="2">关联威胁</th>' +
+        '<th rowspan="2">风险分析</th><th colspan="3">风险等级</th></tr>' +
+        '<tr><th>高</th><th>中</th><th>低</th></tr>' +
         '</thead><tbody>';
       rows.forEach((r, i) => {
         const lvCell = { '高': 'risk-high', '中': 'risk-mid', '低': 'risk-low' }[r.level];
@@ -6331,7 +6739,7 @@
     const autoText = buildConclusionSentence();
     html += '<div class="report-section-title">评估结论（自动生成，可编辑）</div>';
     html += reportTextarea('report-conclusion-text', autoText, 160);
-    html += '<div class="onsite-note">综合得分由上方量化评估结果自动读取，不允许手动修改；其余文字仍可编辑。</div>';
+    html += '<div class="onsite-note">综合得分和结论由上方量化评估结果自动读取，不允许手动修改；其余文字仍可编辑。</div>';
     html += '<div class="onsite-note">评估结论判定规则如下：' +
       '综合得分100分，结论为符合；' +
       '综合得分小于100分、不低于60分，且系统密码应用无高风险，结论为基本符合；' +
@@ -6399,6 +6807,14 @@
 
   // Word导出功能已按需求移除（原总体评价、安全问题及改进建议导出）
 
+  let activeOverallLayer = 0;
+
+  function switchOverallLayer(t) {
+    if (t < 0 || t >= ONSITE_LAYERS.length) return;
+    activeOverallLayer = t;
+    renderReportOverall();
+  }
+
   function renderReportOverall() {
     const panel = document.getElementById('report-panel-4');
     if (!panel) return;
@@ -6411,24 +6827,28 @@
     if (cnt['未测评']) {
       html += '<div class="alert-box"><span class="icon">⚠️</span><div>当前仍有 <strong>' + cnt['未测评'] + '</strong> 个测评单元未完成现场测评判定，以下统计内容基于已测评结果。</div></div>';
     }
-    html += '<div class="doc-card">';
+    if (activeOverallLayer < 0 || activeOverallLayer >= ONSITE_LAYERS.length) activeOverallLayer = 0;
+    html += '<div class="overall-workspace">';
+    html += '<div class="doc-card overall-summary-card">';
     html += '<div class="doc-title">总体评价</div>';
     html += '<p class="doc-p">本次信息系统商用密码应用安全性评估依据GB/T 39786—2021《信息安全技术 信息系统密码应用基本要求》的第' + assessmentLevelLabel() + '级别要求，' +
       '选取的测评指标总数为' + cnt.total + '项，其中不适用项为' + cnt['不适用'] + '项，特殊指标0项。' +
       '测评结果为：符合项' + cnt['符合'] + '项，部分符合项' + cnt['部分符合'] + '项，不符合项' + cnt['不符合'] + '项。' +
       '其中，在部分符合和不符合项中：高风险项' + high + '项，中风险项' + mid + '项，低风险项' + low + '项。</p>';
+    html += '</div>';
+    html += '<div class="overall-layer-tabs" role="tablist" aria-label="总体评价层面">';
     ONSITE_LAYERS.forEach((cfg, t) => {
-      const lc = getLayerStatCounts(t);
-      const taId = 'report-overall-' + t;
-      html += '<div class="doc-h">（' + (t + 1) + '）' + onsiteEsc(cfg.name) + '</div>';
-      html += '<div class="doc-editor"><textarea oninput="saveReportText(\'' + taId + '\',this.value)" ' +
-        'placeholder="在' + onsiteEsc(cfg.name) + '方面，……（自动生成，可编辑）">' +
-        onsiteEsc(getReportTextVal(taId, buildLayerOverallText(t))) + '</textarea>' +
-        '<div class="doc-meta">↑ 层面描述（自动生成，可编辑）</div></div>';
-      html += '<div class="doc-result-line">测评结果：符合项' + lc['符合'] + '项，部分符合项' + lc['部分符合'] + '项，不符合项' + lc['不符合'] + '项，不适用项' + lc['不适用'] + '项。</div>';
+      html += '<button type="button" role="tab" aria-selected="' + (t === activeOverallLayer) + '" class="overall-layer-tab' + (t === activeOverallLayer ? ' active' : '') + '" onclick="switchOverallLayer(' + t + ')"><span>' + onsiteEsc(cfg.name) + '</span></button>';
     });
-    html += '<div class="doc-h">评估结论</div>';
-    html += '<p class="doc-p">' + onsiteEsc(buildConclusionSentence()) + '</p>';
+    html += '</div>';
+    const cfg = ONSITE_LAYERS[activeOverallLayer];
+    const lc = getLayerStatCounts(activeOverallLayer);
+    const taId = 'report-overall-' + activeOverallLayer;
+    html += '<div class="doc-card overall-editor-card" role="tabpanel">';
+    html += '<div class="overall-editor-head"><div><div class="overall-editor-title">' + onsiteEsc(cfg.name) + '</div><div class="overall-editor-hint">当前仅展示本层面，切换 Tab 时编辑内容会自动保留</div></div><div class="overall-stat">符合 ' + lc['符合'] + ' 项　部分符合 ' + lc['部分符合'] + ' 项　不符合 ' + lc['不符合'] + ' 项　不适用 ' + lc['不适用'] + ' 项</div></div>';
+    html += '<div class="doc-editor"><textarea oninput="saveReportText(\'' + taId + '\',this.value)" aria-label="' + onsiteEsc(cfg.name) + '总体评价" placeholder="在' + onsiteEsc(cfg.name) + '方面，……（自动生成，可编辑）">' + onsiteEsc(getReportTextVal(taId, buildLayerOverallText(activeOverallLayer))) + '</textarea><div class="doc-meta">系统已生成初稿，可直接修改；拖动编辑框右下角可继续增大高度。</div></div>';
+    html += '</div>';
+    html += '<div class="overall-conclusion"><div class="doc-h">评估结论</div><p class="doc-p">' + onsiteEsc(buildConclusionSentence()) + '</p></div>';
     html += '</div>';
     panel.innerHTML = html;
   }
@@ -6479,26 +6899,40 @@
     }).join('\n');
   }
 
+  let activeSuggestionLayer = 0;
+
+  function switchSuggestionLayer(t) {
+    if (t < 0 || t >= ONSITE_LAYERS.length) return;
+    activeSuggestionLayer = t;
+    renderReportSuggestions();
+  }
+
   function renderReportSuggestions() {
     const panel = document.getElementById('report-panel-5');
     if (!panel) return;
-    let html = '<div class="onsite-note" style="margin:0 0 10px;">问题描述与改进建议均自动读取第三步「现场测评」结论生成：不符合/部分符合的测评单元逐条列出问题；测评层面全部符合的直接写「无」。</div>';
+    if (activeSuggestionLayer < 0 || activeSuggestionLayer >= ONSITE_LAYERS.length) activeSuggestionLayer = 0;
+    let html = '<div class="suggestion-workspace">';
+    html += '<div class="onsite-note" style="margin:0;">问题描述与改进建议均自动读取第三步「现场测评」结论生成：不符合/部分符合的测评单元逐条列出问题；测评层面全部符合的直接写「无」。</div>';
+    html += '<div class="suggestion-layer-tabs" role="tablist" aria-label="安全问题及改进建议层面">';
     ONSITE_LAYERS.forEach((cfg, t) => {
-      const probs = getLayerProblemUnits(t);
-      const probId = 'report-sug-prob-' + t;
-      const advId = 'report-sug-adv-' + t;
-      html += '<div class="doc-card">';
-      html += '<div class="doc-h" style="margin-top:0;">' + (t + 1) + '、' + onsiteEsc(cfg.name) + '</div>';
-      if (!probs.length) {
-        html += '<p class="doc-p"><strong>问题描述：</strong>无。</p><p class="doc-p"><strong>改进建议：</strong>无。</p>';
-      } else {
-        html += '<div class="doc-editor"><div class="doc-meta" style="margin:0 0 2px;">问题描述（自动生成，可编辑）</div>' +
-          '<textarea oninput="saveReportText(\'' + probId + '\',this.value)">' + onsiteEsc(getReportTextVal(probId, buildSugProblemText(t))) + '</textarea></div>';
-        html += '<div class="doc-editor"><div class="doc-meta" style="margin:0 0 2px;">改进建议（自动生成，可编辑）</div>' +
-          '<textarea oninput="saveReportText(\'' + advId + '\',this.value)">' + onsiteEsc(getReportTextVal(advId, buildSugAdviceText(t))) + '</textarea></div>';
-      }
-      html += '</div>';
+      html += '<button type="button" role="tab" aria-selected="' + (t === activeSuggestionLayer) + '" class="suggestion-layer-tab' + (t === activeSuggestionLayer ? ' active' : '') + '" onclick="switchSuggestionLayer(' + t + ')">' + (t + 1) + '. ' + onsiteEsc(cfg.name) + '</button>';
     });
+    html += '</div>';
+    const cfg = ONSITE_LAYERS[activeSuggestionLayer];
+    const probs = getLayerProblemUnits(activeSuggestionLayer);
+    const probId = 'report-sug-prob-' + activeSuggestionLayer;
+    const advId = 'report-sug-adv-' + activeSuggestionLayer;
+    html += '<div class="doc-card suggestion-editor-card" role="tabpanel">';
+    html += '<div class="suggestion-editor-head"><div class="suggestion-editor-title">' + (activeSuggestionLayer + 1) + '、' + onsiteEsc(cfg.name) + '</div><div class="suggestion-problem-count">问题项 ' + probs.length + ' 个</div></div>';
+    if (!probs.length) {
+      html += '<div class="suggestion-empty"><strong>问题描述：</strong>无。　<strong>改进建议：</strong>无。</div>';
+    } else {
+      html += '<div class="doc-editor"><div class="doc-meta" style="margin:0 0 5px;">问题描述（自动生成，可编辑）</div>' +
+        '<textarea aria-label="' + onsiteEsc(cfg.name) + '问题描述" oninput="saveReportText(\'' + probId + '\',this.value)">' + onsiteEsc(getReportTextVal(probId, buildSugProblemText(activeSuggestionLayer))) + '</textarea></div>';
+      html += '<div class="doc-editor"><div class="doc-meta" style="margin:0 0 5px;">改进建议（自动生成，可编辑）</div>' +
+        '<textarea aria-label="' + onsiteEsc(cfg.name) + '改进建议" oninput="saveReportText(\'' + advId + '\',this.value)">' + onsiteEsc(getReportTextVal(advId, buildSugAdviceText(activeSuggestionLayer))) + '</textarea></div>';
+    }
+    html += '</div></div>';
     panel.innerHTML = html;
   }
 
@@ -6888,8 +7322,8 @@
       btn.className = 'tab-item' + (i === n ? ' active' : '');
       panel.className = 'tab-panel' + (i === n ? ' active' : '');
     }
-    // 用户目录在项目加载时读取；切入附录B只渲染，避免替换正在操作的下拉框。
-    if (n === 6) renderAppendixB();
+    // 报告内容按需渲染，避免进入第4步时同步生成全部页签。
+    renderReportTab(n);
   }
 
   function switchReportSubTab(which) {
@@ -6903,16 +7337,19 @@
     if (quantPanel) quantPanel.style.display = which === 'quant' ? '' : 'none';
   }
 
-  // 进入第4步时调用：按现场测评（含弥补修正）的最新数据渲染全部报告内容
+  function renderReportTab(n) {
+    if (n === 0) renderReportUnitAnalysis();
+    else if (n === 1) { renderReportFixTab(); renderReportQuant(); }
+    else if (n === 2) renderReportRisk();
+    else if (n === 3) renderReportConclusion();
+    else if (n === 4) renderReportOverall();
+    else if (n === 5) renderReportSuggestions();
+    else if (n === 6) renderAppendixB();
+  }
+
+  // 进入第4步时只渲染当前页签；完整数据在导出时由快照函数统一重算。
   function renderReport() {
-    renderReportUnitAnalysis();
-    renderReportFixTab();
-    renderReportQuant();
-    renderReportRisk();
-    renderReportConclusion();
-    renderReportOverall();
-    renderReportSuggestions();
-    renderAppendixB();
+    renderReportTab(activeReportTab);
   }
 
   // ===== 项目准备 · 被测单位基本信息 =====
@@ -7721,6 +8158,7 @@
   }
 
   let importTargetProjectId = null;
+  let pendingWordImportFile = null;
 
   function importWordTrigger(id) {
     const p = projects.find(function (x) { return x.id === id; });
@@ -7736,35 +8174,283 @@
     const file = input.files && input.files[0];
     if (!file) return;
     if (!/\.docx$/i.test(file.name)) { showToast('请选择 .docx 格式的密评报告', true); return; }
-    // 先进入该项目的测评实施页（复用openImplement的重置逻辑），再导入
-    openImplement(importTargetProjectId);
-    showToast('正在解析Word报告…');
-    file.arrayBuffer().then(function (buf) {
-      let log;
-      try {
+    pendingWordImportFile = file;
+    ['basic', 'planning', 'reporting'].forEach(function(id) {
+      const box = document.getElementById('word-import-' + id);
+      if (box) box.checked = true;
+    });
+    const recordsEnabled = document.getElementById('word-import-records-enabled');
+    const evidenceEnabled = document.getElementById('word-import-evidence-enabled');
+    if (recordsEnabled) recordsEnabled.checked = true;
+    if (evidenceEnabled) evidenceEnabled.checked = false;
+    ['records', 'evidence'].forEach(function(kind) {
+      const layers = document.getElementById('word-import-' + kind + '-layers');
+      if (!layers) return;
+      layers.innerHTML = ONSITE_LAYERS.map(function(layer, index) {
+        return '<label style="display:flex; align-items:center; gap:7px; padding:5px 3px; cursor:pointer;">' +
+          '<input type="checkbox" id="word-import-' + kind + '-layer-' + index + '" class="word-import-' + kind + '-layer" data-layer-index="' + index + '" value="' + index + '" checked onchange="updateWordImportSelectionSummary()" />' +
+          onsiteEsc((index + 1) + '. ' + layer.name) + '</label>';
+      }).join('');
+    });
+    toggleWordImportLayerOptions('records');
+    toggleWordImportLayerOptions('evidence');
+    updateWordImportSelectionSummary();
+    openModal('modal-word-import-options');
+  }
+
+  function toggleWordImportLayerOptions(kind) {
+    const enabled = !!document.getElementById('word-import-' + kind + '-enabled')?.checked;
+    const layers = document.getElementById('word-import-' + kind + '-layers');
+    if (layers) layers.style.opacity = enabled ? '1' : '.5';
+    document.querySelectorAll('.word-import-' + kind + '-layer').forEach(function(box) { box.disabled = !enabled; });
+    updateWordImportSelectionSummary();
+  }
+
+  function getWordImportLayers(kind) {
+    const enabled = !!document.getElementById('word-import-' + kind + '-enabled')?.checked;
+    if (!enabled) return [];
+    return Array.from(document.querySelectorAll('#word-import-' + kind + '-layers input.word-import-' + kind + '-layer:checked'))
+      .map(function(box) { return Number(box.dataset.layerIndex); })
+      .filter(function(index) { return Number.isInteger(index) && index >= 0 && index < 8; })
+      .sort(function(a, b) { return a - b; });
+  }
+
+  function _impLayerSelectionText(layers) {
+    return layers.length ? layers.map(function(index) { return '第' + (index + 1) + '层'; }).join('、') : '不导入';
+  }
+
+  function updateWordImportSelectionSummary() {
+    const summary = document.getElementById('word-import-selection-summary');
+    if (!summary) return;
+    summary.textContent = '现场文字：' + _impLayerSelectionText(getWordImportLayers('records')) +
+      '；证据图片：' + _impLayerSelectionText(getWordImportLayers('evidence')) + '。未选择的层面保留原数据。';
+  }
+
+  function syncWordImportEvidenceLayers() {
+    const evidenceEnabled = document.getElementById('word-import-evidence-enabled');
+    if (evidenceEnabled) evidenceEnabled.checked = true;
+    const recordLayers = new Set(Array.from(document.querySelectorAll('.word-import-records-layer:checked')).map(function(box) { return box.value; }));
+    document.querySelectorAll('.word-import-evidence-layer').forEach(function(box) { box.checked = recordLayers.has(box.value); });
+    toggleWordImportLayerOptions('evidence');
+    updateWordImportSelectionSummary();
+  }
+
+  function cancelWordImportOptions() {
+    pendingWordImportFile = null;
+    closeModal('modal-word-import-options');
+  }
+
+  function confirmWordImportOptions() {
+    const file = pendingWordImportFile;
+    if (!file) { closeModal('modal-word-import-options'); return; }
+    function layers(kind) {
+      return getWordImportLayers(kind);
+    }
+    const options = {
+      basic: !!document.getElementById('word-import-basic')?.checked,
+      planning: !!document.getElementById('word-import-planning')?.checked,
+      reporting: !!document.getElementById('word-import-reporting')?.checked,
+      recordLayers: layers('records'),
+      evidenceLayers: layers('evidence')
+    };
+    if (!options.basic && !options.planning && !options.reporting && !options.recordLayers.length && !options.evidenceLayers.length) {
+      showToast('请至少选择一项要从 Word 导入的内容', true);
+      return;
+    }
+    if (options.recordLayers.length && !options.evidenceLayers.length && !window.confirm('当前只选择了现场测评文字记录，没有选择任何证据图片层面。\n\n继续后：Word 图片不会导入，当前项目的原图片会保留。是否继续？')) return;
+    const scopeMessage = '请确认本次 Word 导入范围：\n\n现场文字：' + _impLayerSelectionText(options.recordLayers) +
+      '\n证据图片：' + _impLayerSelectionText(options.evidenceLayers) +
+      '\n\n未选择的层面将保留当前项目原数据。';
+    if (!window.confirm(scopeMessage)) return;
+    pendingWordImportFile = null;
+    closeModal('modal-word-import-options');
+    runWordImport(file, options);
+  }
+
+  function _impNormalizeZipPath(pathname) {
+    const out = [];
+    String(pathname || '').replace(/\\/g, '/').split('/').forEach(function(part) {
+      if (!part || part === '.') return;
+      if (part === '..') out.pop();
+      else out.push(part);
+    });
+    return out.join('/');
+  }
+
+  function _impImageMime(pathname) {
+    const ext = (/(?:\.)(png|jpe?g|gif)$/i.exec(pathname || '') || [])[1];
+    if (!ext) return '';
+    return /^jpe?g$/i.test(ext) ? 'image/jpeg' : 'image/' + ext.toLowerCase();
+  }
+
+  function _impBytesToDataUrl(bytes, mime) {
+    let binary = '';
+    const step = 0x8000;
+    for (let i = 0; i < bytes.length; i += step) {
+      binary += String.fromCharCode.apply(null, bytes.subarray(i, Math.min(i + step, bytes.length)));
+    }
+    return 'data:' + mime + ';base64,' + btoa(binary);
+  }
+
+  function _impProcessEvidenceImage(dataUrl) {
+    return new Promise(function(resolve) { onsiteEviProcessImage(dataUrl, resolve); });
+  }
+
+  async function _impReadOnsiteEvidence(blocks, buf8, relsXml, selectedLayers) {
+    const selected = new Set(selectedLayers || []);
+    const relationMap = {};
+    (relsXml.match(/<Relationship\b[^>]*\/?\s*>/g) || []).forEach(function(tag) {
+      const id = (/\bId="([^"]+)"/.exec(tag) || [])[1];
+      const target = (/\bTarget="([^"]+)"/.exec(tag) || [])[1];
+      const type = (/\bType="([^"]+)"/.exec(tag) || [])[1];
+      if (!id || !target || !/\/image$/i.test(type || '') || /\bTargetMode="External"/i.test(tag)) return;
+      let decodedTarget = _impXmlUnescape(target);
+      try { decodedTarget = decodeURIComponent(decodedTarget); } catch (e) { /* 保留原路径 */ }
+      relationMap[id] = _impNormalizeZipPath(decodedTarget.charAt(0) === '/' ? decodedTarget.slice(1) : 'word/' + decodedTarget);
+    });
+    const result = { groups: [], layerCounts: new Array(8).fill(0), skipped: 0 };
+    for (let layer = 0; layer < 8; layer++) {
+      if (!selected.has(layer)) continue;
+      const expectedName = ONSITE_LAYERS[layer].name + '测评结果记录';
+      let startCaption = blocks.findIndex(function(block) {
+        const text = String(block.text || '').replace(/\s/g, '');
+        return block.type === 'p' && /^表A[-－—.]/.test(text) && text.indexOf(expectedName) >= 0;
+      });
+      if (startCaption < 0) {
+        const tableCaption = new RegExp('^表A[-－—.]' + (layer + 1) + '.*测评结果记录$');
+        startCaption = blocks.findIndex(function(block) {
+          return block.type === 'p' && tableCaption.test(String(block.text || '').replace(/\s/g, ''));
+        });
+      }
+      if (startCaption < 0) continue;
+      const nextCaption = blocks.findIndex(function(block, index) {
+        return index > startCaption && block.type === 'p' && /^表A[-－—.]\d+.*测评结果记录$/.test(String(block.text || '').replace(/\s/g, ''));
+      });
+      const end = nextCaption < 0 ? blocks.length : nextCaption;
+      let pendingImageIds = [];
+      for (let i = startCaption + 1; i < end; i++) {
+        const block = blocks[i];
+        if (block.type !== 'p') continue;
+        (block.imageIds || []).forEach(function(id) { if (relationMap[id]) pendingImageIds.push(id); });
+        const compactText = String(block.text || '').replace(/\s/g, '');
+        const caption = new RegExp('^图A[-－—]' + (layer + 1) + '[.．](\\d+)(.*)$').exec(compactText);
+        if (!caption || !pendingImageIds.length) continue;
+        const images = [];
+        for (const relationId of pendingImageIds) {
+          const mediaPath = relationMap[relationId];
+          const mime = _impImageMime(mediaPath);
+          if (!mime) { result.skipped++; continue; }
+          try {
+            const bytes = _impZipRead(buf8, mediaPath);
+            const dataUrl = await _impProcessEvidenceImage(_impBytesToDataUrl(bytes, mime));
+            images.push({ id: newOnsiteEvidenceId(), dataUrl: dataUrl });
+          } catch (e) { result.skipped++; }
+        }
+        pendingImageIds = [];
+        if (!images.length) continue;
+        const no = '图A-' + (layer + 1) + '.' + caption[1];
+        result.groups.push({ id: newOnsiteEvidenceId(), layer: layer, no: no, name: caption[2] || '', images: images });
+        result.layerCounts[layer] += images.length;
+      }
+    }
+    return result;
+  }
+
+  function _impMergeLayerMap(imported, retained, selectedLayers, keyLayer) {
+    const selected = new Set(selectedLayers || []);
+    const result = {};
+    Object.entries(imported || {}).forEach(function(entry) {
+      const layer = keyLayer(entry[0]);
+      if (layer == null || selected.has(layer)) result[entry[0]] = entry[1];
+    });
+    Object.entries(retained || {}).forEach(function(entry) {
+      const layer = keyLayer(entry[0]);
+      if (layer == null || !selected.has(layer)) result[entry[0]] = cloneOnsiteValue(entry[1]);
+    });
+    return result;
+  }
+
+  function _impRecordKeyLayer(key) {
+    for (let layer = 0; layer < 8; layer++) if (onsiteKeyBelongsToLayer(key, layer)) return layer;
+    return null;
+  }
+
+  function _impPrefixedKeyLayer(key) {
+    const match = /^(\d+)\|/.exec(String(key || ''));
+    return match && Number(match[1]) >= 0 && Number(match[1]) < 8 ? Number(match[1]) : null;
+  }
+
+  function _impRestoreUnselected(retained, options) {
+    const hydrateStage = window.bbHydrateStage;
+    if (typeof hydrateStage !== 'function') throw new Error('项目阶段恢复组件尚未就绪，请刷新页面后重试');
+    if (!options.basic) hydrateStage(1, retained[1]);
+    if (!options.planning) hydrateStage(2, retained[2]);
+    const saved = retained[3] || {};
+    onsiteRecords = _impMergeLayerMap(onsiteRecords, saved.onsiteRecords, options.recordLayers, _impRecordKeyLayer);
+    onsiteImportedObjects = _impMergeLayerMap(onsiteImportedObjects, saved.onsiteImportedObjects, options.recordLayers, _impPrefixedKeyLayer);
+    onsiteObjectBindings = _impMergeLayerMap(onsiteObjectBindings, saved.onsiteObjectBindings, options.recordLayers, _impPrefixedKeyLayer);
+    onsiteUnmatchedObjects = _impMergeLayerMap(onsiteUnmatchedObjects, saved.onsiteUnmatchedObjects, options.recordLayers, _impPrefixedKeyLayer);
+    const evidenceLayers = new Set(options.evidenceLayers || []);
+    onsiteEvidenceGroups = (onsiteEvidenceGroups || []).filter(function(group) { return evidenceLayers.has(Number(group.layer)); })
+      .concat(cloneOnsiteValue(saved.onsiteEvidenceGroups || []).filter(function(group) { return !evidenceLayers.has(Number(group.layer)); }));
+    activeOnsiteEvidenceGroupId = '';
+    onsiteRecordEditorTarget = null;
+    onsiteExpandedRecordKeys.clear();
+    reconcileAllOnsiteObjectBindings();
+    renderOnsiteTables();
+    if (!options.reporting) hydrateStage(4, retained[4]);
+  }
+
+  async function runWordImport(file, options) {
+    options = options || { basic: true, planning: true, reporting: true, recordLayers: [0,1,2,3,4,5,6,7], evidenceLayers: [] };
+    let retained = null;
+    try {
+      if (typeof window.bbSnapshotStage !== 'function') throw new Error('项目数据采集组件尚未就绪，请刷新页面后重试');
+      retained = { 1: window.bbSnapshotStage(1), 2: window.bbSnapshotStage(2), 3: window.bbSnapshotStage(3), 4: window.bbSnapshotStage(4) };
+      // 先进入该项目的测评实施页（复用openImplement的重置逻辑），再导入
+      openImplement(importTargetProjectId);
+      showToast('正在解析Word报告，请稍候…');
+      const buf = await file.arrayBuffer();
         const buf8 = new Uint8Array(buf);
         const dec8 = new TextDecoder('utf-8');
         const docXml = dec8.decode(_impZipRead(buf8, 'word/document.xml'));
         _impLvlMap = null;
         try { _impBuildLvlMap(dec8.decode(_impZipRead(buf8, 'word/styles.xml'))); } catch (e2) { /* 无styles.xml时退回启发式 */ }
         const blocks = _impExtractBlocks(docXml);
-        log = applyWordImport(blocks, file.name);
+        let evidenceImport = { groups: [], layerCounts: new Array(8).fill(0), skipped: 0, selectedLayers: options.evidenceLayers };
+        if (options.evidenceLayers.length) {
+          const relsXml = dec8.decode(_impZipRead(buf8, 'word/_rels/document.xml.rels'));
+          evidenceImport = Object.assign(evidenceImport, await _impReadOnsiteEvidence(blocks, buf8, relsXml, options.evidenceLayers));
+        }
+        const log = applyWordImport(blocks, file.name, evidenceImport);
+        _impRestoreUnselected(retained, options);
+        log.sections.unshift({ title: '本次导入范围', lines: [
+          { msg: '项目准备与基本信息：' + (options.basic ? 'Word 覆盖' : '保留原值'), warn: false },
+          { msg: '测评准备与方案：' + (options.planning ? 'Word 覆盖' : '保留原值'), warn: false },
+          { msg: '现场测评记录：覆盖 ' + options.recordLayers.length + ' 个层面，其余保留', warn: false },
+          { msg: '现场证据图片：覆盖 ' + options.evidenceLayers.length + ' 个层面，其余保留', warn: false },
+          { msg: '报告编制：' + (options.reporting ? 'Word 覆盖' : '保留原值'), warn: false }
+        ] });
         normalizeParagraphTextareas(document.getElementById('page-implement'));
         syncTopologyCaption();
-      } catch (e) {
-        showToast('导入失败：' + (e && e.message ? e.message : e), true);
-        return;
-      }
       showImportLog(log);
-      if (window.bbStoreImportedTemplate) window.bbStoreImportedTemplate(file, log);
+      if (window.bbStoreImportedTemplate) await window.bbStoreImportedTemplate(file, log);
+      if (typeof window.bbPersistAllStages !== 'function') throw new Error('项目保存组件尚未就绪，请刷新页面后重试');
+      await window.bbPersistAllStages();
       renderProjects();
       updateProjectStats();
       try {
         const totals = getReportTotalScore();
         updateConclusion(totals.total, getRiskLevelCount('高'));
       } catch (e) { /* 评分重算失败不影响导入结果 */ }
-      showToast('Word报告导入完成');
-    });
+      showToast('Word报告导入完成：证据图片已按确认的层面保存');
+    } catch (e) {
+      if (retained && typeof window.bbHydrateStage === 'function') {
+        try { window.bbHydrateStage(1, retained[1]); window.bbHydrateStage(2, retained[2]); window.bbHydrateStage(3, retained[3]); window.bbHydrateStage(4, retained[4]); } catch (restoreError) { /* 保留原导入错误 */ }
+      }
+      showToast('导入失败：' + (e && e.message ? e.message : e), true);
+      window.alert('Word 导入失败：' + (e && e.message ? e.message : e));
+    }
   }
 
   function showImportLog(log) {
@@ -7783,7 +8469,7 @@
   }
 
   // ===== 导入主流程 =====
-  function applyWordImport(blocks, fileName) {
+  function applyWordImport(blocks, fileName, evidenceImport) {
     const sections = [];
     function sec(title) { const s = { title: title, lines: [] }; sections.push(s); return s; }
     function add(s, msg, warn) { s.lines.push({ msg: msg, warn: !!warn }); }
@@ -7973,7 +8659,7 @@
         add(s1, '基本信息表数值字段（等保级别/S-A-G、备案编号、测评情况、用户数量、密码产品数量等）已定向回填');
       }
     }
-    add(s1, '说明：报告封面、声明、密评机构信息、网络拓扑图片及现场证据截图不导入；网络拓扑描述正文正常导入');
+    add(s1, '说明：报告封面、声明、密评机构信息和网络拓扑图片不导入；现场证据图片按导入前勾选的层面处理；网络拓扑描述正文正常导入');
 
     // ============ 2. 系统资产 / 测评对象 / 测评指标 ============
     const s2 = sec('步骤2 · 测评准备与方案编制');
@@ -8413,7 +9099,7 @@
         }
       }
     } else if (dataTableFound) {
-      // 按表2-10原样导入；安全需求为空、少于四项或使用自定义文字时均保持 Word 实际内容。
+      // 按表2-10导入；概括性的“机密性、完整（性）”自动展开，其他自定义文字保持 Word 原值。
       const tbody = document.getElementById('asset-tbody-data');
       if (tbody) {
         tbody.innerHTML = '';
@@ -8427,7 +9113,7 @@
             '<td><input type="text" class="full-input" value="' + onsiteEsc(d.pos) + '" /></td>' +
             '<td class="req-cell">' + chips + '</td></tr>');
         });
-        add(s3, '重要数据：按表2-10导入 ' + dataRows210.length + ' 行（安全需求按Word原值保留）');
+        add(s3, '重要数据：按表2-10导入 ' + dataRows210.length + ' 行（概括性安全需求已展开为传输/存储要求）');
       }
     }
     // 8个层面结果记录
@@ -8460,7 +9146,17 @@
     }
     ensureObjDataIds();
     reconcileAllOnsiteObjectBindings();
-    add(s3, '证据截图不导入：报告中截图为图片，请通过 Ctrl+V 粘贴或本机导入补充');
+    onsiteEvidenceGroups = Array.isArray(evidenceImport?.groups) ? evidenceImport.groups : [];
+    if (evidenceImport?.selectedLayers?.length) {
+      evidenceImport.selectedLayers.forEach(function(layer) {
+        const imageCount = evidenceImport.layerCounts[layer] || 0;
+        const groupCount = onsiteEvidenceGroups.filter(function(group) { return Number(group.layer) === Number(layer); }).length;
+        add(s3, ONSITE_LAYERS[layer].name + '证据图片：导入 ' + imageCount + ' 张（' + groupCount + ' 组）', imageCount < 1);
+      });
+      if (evidenceImport.skipped) add(s3, '证据图片：跳过 ' + evidenceImport.skipped + ' 张不支持或无法读取的图片', true);
+    } else {
+      add(s3, '证据图片：本次未选择导入');
+    }
 
     // ============ 4. 报告编制 ============
     const s4 = sec('步骤4 · 报告编制（测评结果及量化评估自动重算，不导入）');
@@ -8528,7 +9224,7 @@
         const prob = v[2] || '';
         const sep = prob.search(/[：:]/);
         const unitName = sep > 0 ? prob.slice(0, sep) : prob;
-        const desc = sep > 0 ? prob.slice(sep + 1) : prob;
+        const desc = (sep > 0 ? prob.slice(sep + 1) : prob).replace(/^[\s\u3000]+/, '');
         const itemIdx = impMatchUnitItem(t, unitName);
         if (itemIdx < 0) { miss++; return; }
         const level = v[5] === '1' ? '高' : (v[6] === '1' ? '中' : (v[7] === '1' ? '低' : (t < 4 ? '中' : '低')));
@@ -8538,9 +9234,9 @@
           t: t, itemIdx: itemIdx, key: k, layer: ONSITE_LAYERS[t].name,
           unit: evaluationIndicatorLevels[t].items[itemIdx].name,
           score: score, cls: reportClassify(score), desc: desc,
-          threat: v[3] || defaultThreatFor(t, unitName), analysis: v[4] || '', level: level
+          threat: v[3] || defaultThreatFor(t, unitName), analysis: (v[4] || '').replace(/^[\s\u3000]+/, ''), level: level
         });
-        reportRiskStore[k] = { desc: desc, threat: v[3] || defaultThreatFor(t, unitName), analysis: v[4] || '', level: level };
+        reportRiskStore[k] = { desc: desc, threat: v[3] || defaultThreatFor(t, unitName), analysis: (v[4] || '').replace(/^[\s\u3000]+/, ''), level: level };
         cnt++;
       });
       add(s4, '风险分析：导入 ' + cnt + ' 条风险记录，同一测评单元将合并展示' + (miss ? '（' + miss + ' 条未匹配）' : ''), miss > 0 || cnt === 0);
@@ -9224,6 +9920,17 @@
       throw error;
     }).finally(function () { clearTimeout(timeout); });
   }
+  // 证据图片组件定义在页面主脚本中，而项目 API 封装位于当前隔离作用域。
+  // 显式暴露受控桥接，避免打开旧项目触发图片迁移时出现“api is not defined”。
+  window.bbProjectApi = api;
+  window.bbCurrentProjectId = projectId;
+  window.bbProjectAccessToken = token;
+  window.bbPersistProjectStage = persist;
+  window.bbMarkProjectDirty = function (step, quiet, delay) {
+    bbDirty = true;
+    schedulePersist(step, quiet, delay);
+  };
+  window.bbGetProjectWorkspace = function () { return bbProject; };
 
   function fileToBase64(file) {
     return new Promise(function (resolve, reject) {
@@ -9525,7 +10232,7 @@
       }
       const targetCount = Math.max(type === 'person' ? PERSON_ASSET_DEFAULTS.length : 1, rows.length);
       while (tbody.children.length < targetCount) addAssetRow(type, type !== 'data');
-      while (tbody.children.length > targetCount) deleteAssetRow(type);
+      while (tbody.children.length > targetCount) deleteAssetRow(type, true);
       fillRowValues(tbody, rows);
       Array.from(tbody.rows).forEach(function(row, index) {
         row.dataset.assetId = saved.assetIds?.[type]?.[index] || row.dataset.assetId || newAssetRowId('asset');
@@ -9542,7 +10249,7 @@
     const appBody = document.getElementById('app-user-tbody');
     if (appBody) {
       while (appBody.children.length < appRows.length) addAppUserRow();
-      while (appBody.children.length > Math.max(1, appRows.length)) deleteAppUserRow();
+      while (appBody.children.length > Math.max(1, appRows.length)) deleteAppUserRow(true);
       fillRowValues(appBody, appRows);
       Array.from(appBody.rows).forEach(function(row, index) {
         row.dataset.appUserId = saved.appUserIds?.[index] || row.dataset.appUserId || newAssetRowId('appuser');
@@ -9917,7 +10624,7 @@
     // 表6-1：风险记录数量可变，统计行单独写入。
     const risks = getRiskRows();
     const riskRows = risks.map(function (risk, index) {
-      return [String(index + 1), risk.layer, risk.unit + '：' + (risk.desc || ''), risk.threat || '', String(risk.analysis || '').replace(/^[\\s\\u3000]+/, ''),
+      return [String(index + 1), risk.layer, risk.unit + '：' + String(risk.desc || '').replace(/^[\s\u3000]+/, ''), risk.threat || '', String(risk.analysis || '').replace(/^[\s\u3000]+/, ''),
         risk.level === '高' ? '1' : '0', risk.level === '中' ? '1' : '0', risk.level === '低' ? '1' : '0'];
     });
     tables.push({
@@ -10125,7 +10832,16 @@
         body: JSON.stringify({ data: snapshot(step), completion: completion })
       });
       if (stage) Object.assign(stage, updated);
+      if (step === 3 && Array.isArray(updated?.data?.onsiteEvidenceGroups)) {
+        onsiteEvidenceGroups = clone(updated.data.onsiteEvidenceGroups);
+      }
       bbDirty = false;
+      // 项目管理页通常保留在另一个标签页；报告分数落库后通知它立即重取项目摘要。
+      if (step === 4) {
+        try {
+          localStorage.setItem('bb-project-updated', JSON.stringify({ projectId: projectId, stage: 'reporting', updatedAt: Date.now() }));
+        } catch (error) { /* 跨标签通知失败不影响本次保存 */ }
+      }
       setImplementationSaveState('saved', '已自动保存 ' + formatSaveTime(new Date()));
       updateImplementationNavState();
       if (!quiet) showToast('已保存到项目数据库');
@@ -10144,11 +10860,39 @@
     bbSaveTimer = setTimeout(function () { persist(step, quiet); }, delay == null ? 1000 : delay);
   }
 
-  async function persistAll(strict) {
+  window.bbSaveReportFixes = async function (button) {
+    clearTimeout(bbSaveTimer);
+    const originalLabel = button ? button.textContent : '保存弥补内容';
+    if (button) {
+      button.disabled = true;
+      button.textContent = '保存中…';
+    }
+    try {
+      await persist(4, true, true);
+      showToast('弥补内容已保存到项目数据库');
+      if (button) button.textContent = '已保存';
+    } catch (error) {
+      if (button) button.textContent = '保存失败，请重试';
+    } finally {
+      if (button) {
+        setTimeout(function () {
+          button.disabled = false;
+          button.textContent = originalLabel;
+        }, 1200);
+      }
+    }
+  };
+
+  async function persistAll(strict, successMessage) {
     clearTimeout(bbSaveTimer);
     for (let step = 1; step <= 4; step += 1) await persist(step, true, strict === true);
-    if (strict === true) showToast('最新编辑已保存，正在导出报告');
+    if (strict === true) showToast(successMessage || '最新编辑已保存，正在导出报告');
   }
+
+  // Word 选择性导入逻辑位于主脚本中；通过命名桥接暴露阶段快照、恢复和保存能力。
+  window.bbSnapshotStage = snapshot;
+  window.bbHydrateStage = hydrate;
+  window.bbPersistAllStages = persistAll;
 
   async function markReportExported(format) {
     const stage = (bbProject?.stages || []).find(function(item) { return item.stage_key === 'review'; });
@@ -10178,7 +10922,6 @@
       '<button type="button" onclick="closeGlobalReplace()">取消</button>' +
       '<button id="global-replace-run" type="button" class="primary" onclick="runGlobalReplace()">执行替换</button>' +
       '</div></div>';
-    mask.addEventListener('click', function (event) { if (event.target === mask) window.closeGlobalReplace(); });
     document.body.appendChild(mask);
     return mask;
   }
@@ -10196,6 +10939,47 @@
     const mask = document.getElementById('global-replace-mask');
     if (mask) mask.style.display = 'none';
   };
+
+  const globalReplaceUiStateKey = 'bbGlobalReplaceUiState:' + projectId;
+
+  function saveGlobalReplaceUiState() {
+    try {
+      const activeRecordTarget = onsiteRecordModalTarget || onsiteRecordEditorTarget;
+      const recordTarget = activeRecordTarget ? {
+        t: activeRecordTarget.t,
+        itemIdx: activeRecordTarget.itemIdx,
+        objIdx: activeRecordTarget.objIdx
+      } : null;
+      sessionStorage.setItem(globalReplaceUiStateKey, JSON.stringify({
+        step: bbCurrentStep,
+        onsiteLayer: currentOnsiteLayer,
+        recordTarget: recordTarget,
+        scrollY: window.scrollY
+      }));
+    } catch (error) { /* 临时状态保存失败时仍允许完成替换 */ }
+  }
+
+  function restoreGlobalReplaceUiState() {
+    let state = null;
+    try {
+      const raw = sessionStorage.getItem(globalReplaceUiStateKey);
+      sessionStorage.removeItem(globalReplaceUiStateKey);
+      if (raw) state = JSON.parse(raw);
+    } catch (error) { /* 无可恢复状态时使用默认界面 */ }
+    if (!state || Number(state.step) !== Number(bbCurrentStep)) return;
+    if (bbCurrentStep === 3) {
+      const layer = Math.min(7, Math.max(0, Number(state.onsiteLayer) || 0));
+      switchOnsiteTab(layer);
+      const target = state.recordTarget;
+      if (target && [target.t, target.itemIdx, target.objIdx].every(Number.isFinite)) {
+        requestAnimationFrame(function () {
+          expandOnsiteRecord(Number(target.t), Number(target.itemIdx), Number(target.objIdx));
+        });
+        return;
+      }
+    }
+    requestAnimationFrame(function () { window.scrollTo(0, Number(state.scrollY) || 0); });
+  }
 
   function replaceImplementationText(value, key, findText, replacement, counter) {
     const skippedKeys = new Set(['id', 'nodeId', 'type', 'index', 'checked', 'src', 'dataUrl', 'display', 'prototypeVersion', 'version', 'methods']);
@@ -10225,7 +11009,7 @@
     if (!confirm('确定在当前项目全部实施内容中替换“' + findText + '”吗？')) return;
     if (button) { button.disabled = true; button.textContent = '替换中…'; }
     try {
-      await persistAll(true);
+      await persistAll(true, '最新编辑已保存');
       const project = await api('/projects/' + projectId);
       const counter = { count: 0 };
       let changedStages = 0;
@@ -10263,9 +11047,14 @@
         });
       }
       if (!counter.count) { showToast('未找到“' + findText + '”', true); return; }
+      saveGlobalReplaceUiState();
       window.closeGlobalReplace();
-      showToast('已替换 ' + counter.count + ' 处，正在刷新项目');
-      setTimeout(function () { location.reload(); }, 700);
+      showToast('已替换 ' + counter.count + ' 处，正在刷新当前阶段');
+      const refreshUrl = new URL(location.href);
+      refreshUrl.searchParams.set('step', String(bbCurrentStep));
+      refreshUrl.searchParams.delete('import');
+      refreshUrl.searchParams.delete('importStored');
+      setTimeout(function () { location.replace(refreshUrl.toString()); }, 700);
     } catch (error) {
       showToast(error.message || '全局替换失败', true);
     } finally {
@@ -10273,8 +11062,15 @@
     }
   };
   const originalSwitchStep = switchStep;
-  switchStep = function (step) {
+  switchStep = async function (step) {
+    const previousStep = bbCurrentStep;
+    const savePreviousStepInBackground = step === 4 && previousStep !== 4 && bbDirty && !bbSaving;
+    // 先切换页面，再在后台保存上一步。证据图片较多时，不再用整个现场快照的上传阻塞页面响应。
+    if (savePreviousStepInBackground) clearTimeout(bbSaveTimer);
     bbCurrentStep = step;
+    const currentUrl = new URL(location.href);
+    currentUrl.searchParams.set('step', String(step));
+    history.replaceState(null, '', currentUrl.toString());
     originalSwitchStep(step);
     for (let number = 1; number <= 5; number += 1) {
       const item = document.getElementById('step-' + number);
@@ -10284,6 +11080,9 @@
       circle.textContent = number < step ? '✓' : String(number);
     }
     if (step === 2) initImplementationUi();
+    if (savePreviousStepInBackground) {
+      setTimeout(function () { persist(previousStep, true); }, 0);
+    }
   };
 
   const originalSwitchPlanTab = switchPlanTab;
@@ -10333,8 +11132,13 @@
   };
 
   const originalShowPage = showPage;
-  showPage = function (id) {
+  showPage = async function (id) {
     if (id === 'page-projects') {
+      clearTimeout(bbSaveTimer);
+      try {
+        // 项目复制从数据库读取源项目；离开实施页前先落库，避免刚导入的证据图片未被复制。
+        await persist(3, true, true);
+      } catch (error) { return; }
       location.href = '/?page=projects';
       return;
     }
@@ -10397,6 +11201,11 @@
     }
   });
   document.addEventListener('keydown', function (event) {
+    if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'h') {
+      event.preventDefault();
+      window.openGlobalReplace();
+      return;
+    }
     if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 's') {
       event.preventDefault();
       clearTimeout(bbSaveTimer);
@@ -10480,9 +11289,10 @@
     bbHydrating = false;
     bbDirty = false;
     clearTimeout(bbSaveTimer);
+    migrateStoredOnsiteEvidenceImages();
 
     const meta = document.getElementById('implement-page-meta');
-    if (meta) meta.textContent = project.system_name + ' · 测评年度 ' + project.assessment_year + ' · 等级 ' + project.system_level + '级 · 报告编号 ' + (project.report_code || '未填写');
+    if (meta) meta.textContent = project.system_name + ' · 项目编号 ' + project.code + ' · 测评年度 ' + project.assessment_year + ' · 等级 ' + project.system_level + '级 · 报告编号 ' + (project.report_code || '未填写');
     initImplementationUi();
     setImplementationSaveState('saved', '已自动保存 ' + formatSaveTime(new Date()));
 
@@ -10508,6 +11318,7 @@
     const initialStep = isImporting ? 1 : (requestedStep ? Math.min(5, Math.max(1, requestedStep)) : Math.min(5, Math.max(1, Number(project.current_stage || 1))));
     switchStep(initialStep);
     loading.remove();
+    restoreGlobalReplaceUiState();
     if (params.get('importStored') === '1') {
       showToast('正在读取并解析已选择的 Word 报告…');
       fetch('/api/projects/' + projectId + '/report-template', { headers: { Authorization: 'Bearer ' + token } })

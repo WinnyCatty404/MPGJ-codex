@@ -115,6 +115,11 @@ function imageParagraph(rid: string, id: number, width: number, height: number, 
   return `<w:p><w:pPr><w:jc w:val="center"/>${keepNext}<w:spacing w:after="120"/></w:pPr>${imageRun(rid, id, width, height, description, targetWidth, maxHeight)}</w:p>`;
 }
 
+function imageRowParagraph(runs: string[], keepWithCaption = false): string {
+  const keepNext = keepWithCaption ? '<w:keepNext/>' : '';
+  return `<w:p><w:pPr><w:jc w:val="center"/>${keepNext}<w:spacing w:after="120"/></w:pPr>${runs.join('')}</w:p>`;
+}
+
 function evidenceCaptionParagraph(description: string): string {
   return `<w:p><w:pPr><w:jc w:val="center"/><w:keepLines/><w:widowControl/><w:spacing w:before="0" w:after="120"/></w:pPr><w:r><w:t>${xmlEscape(description)}</w:t></w:r></w:p>`;
 }
@@ -224,14 +229,18 @@ export async function appendRawRecordEvidence(xml: string, zip: JSZip, records: 
     const group = evidenceGroups[groupIndex];
     const description = [group.no || `图A-${layer + 1}.${groupIndex + 1}`, group.name || ''].filter(Boolean).join(' ');
     const images = (group.images || []).filter(image => image.dataUrl);
+    const imageRuns: string[] = [];
+    // 同一图片编号下的照片共用正式报告的 13cm 图片宽度上限，并均分这一行的可用宽度。
+    // 所有图片作为同一段落中的连续内嵌对象写入，Word 会优先在一行展示，空间不足时再自动换行。
+    const imageWidth = Math.max(1, Math.floor(REPORT_IMAGE_WIDTH_EMU / Math.max(1, images.length)));
     for (let imageIndex = 0; imageIndex < images.length; imageIndex++) {
       const { bytes, ext, size } = await exportImage(images[imageIndex].dataUrl || '', `${description}第${imageIndex + 1}张`);
       const filename = `raw-evidence-${layer + 1}-${groupIndex + 1}-${imageIndex + 1}.${ext === 'jpeg' ? 'jpg' : ext}`;
       zip.file(`word/media/${filename}`, bytes);
       const relationId = `rId${rid++}`;
       rels = rels.replace('</Relationships>', `<Relationship Id="${relationId}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" Target="media/${filename}"/></Relationships>`);
-      paragraphs.push(imageParagraph(relationId, drawingId++, size.width, size.height, description,
-        REPORT_IMAGE_WIDTH_EMU, imageIndex === images.length - 1, REPORT_IMAGE_MAX_HEIGHT_EMU));
+      imageRuns.push(imageRun(relationId, drawingId++, size.width, size.height, description,
+        imageWidth, REPORT_IMAGE_MAX_HEIGHT_EMU));
       const mime = ext === 'jpeg' ? 'image/jpeg' : `image/${ext}`;
       const suffix = ext === 'jpeg' ? 'jpg' : ext;
       if (!new RegExp(`<Default\\b[^>]*Extension="${suffix}"`, 'i').test(types)) {
@@ -239,6 +248,7 @@ export async function appendRawRecordEvidence(xml: string, zip: JSZip, records: 
       }
     }
     if (images.length) {
+      paragraphs.push(imageRowParagraph(imageRuns, true));
       paragraphs.push(evidenceCaptionParagraph(description));
     }
   }

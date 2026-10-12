@@ -41,6 +41,7 @@ const defaultReportTemplate = path.join(storageRoot, 'templates', 'report', 'def
 const levelTwoReportTemplate = path.join(storageRoot, 'templates', 'report', 'level-2', 'default-report-template.docx');
 const reportTemplateForLevel = (level: number) => level === 2 ? levelTwoReportTemplate : defaultReportTemplate;
 const rawTemplateRoot = path.join(storageRoot, 'templates', 'records');
+const projectEvidenceRoot = (projectId: string) => path.join(storageRoot, 'projects', projectId, 'evidence');
 const pool = new Pool({
   connectionString:
     process.env.DATABASE_URL ||
@@ -48,6 +49,91 @@ const pool = new Pool({
 });
 
 type AuthRequest = Request & { user?: { id: string; username: string; role: string } };
+
+type EvidenceImageRef = {
+  id?: string;
+  dataUrl?: string;
+  fileId?: string;
+  mimeType?: string;
+  fileSize?: number;
+};
+type EvidenceGroupRef = {
+  id?: string;
+  layer?: number;
+  no?: string;
+  name?: string;
+  dataUrl?: string;
+  images?: EvidenceImageRef[];
+};
+
+function decodeEvidenceDataUrl(dataUrl: string) {
+  const match = /^data:image\/(png|jpe?g|gif);base64,([A-Za-z0-9+/=]+)$/.exec(String(dataUrl || ''));
+  if (!match) throw new Error('证据图片格式不支持，请使用 PNG、JPEG 或 GIF');
+  const type = match[1].toLowerCase() === 'jpg' ? 'jpeg' : match[1].toLowerCase();
+  const bytes = Buffer.from(match[2], 'base64');
+  if (!bytes.length || bytes.length > 15 * 1024 * 1024) throw new Error('单张证据图片必须小于15 MB');
+  return { bytes, extension: type === 'jpeg' ? 'jpg' : type, mimeType: type === 'jpeg' ? 'image/jpeg' : `image/${type}` };
+}
+
+async function storeEvidenceDataUrl(client: pg.PoolClient, projectId: string, dataUrl: string,
+  imageId: string | undefined, uploadedBy: string | undefined): Promise<EvidenceImageRef> {
+  const decoded = decodeEvidenceDataUrl(dataUrl);
+  const fileId = randomUUID();
+  const resolvedImageId = imageId || `evi-${randomUUID()}`;
+  const relativePath = path.posix.join('projects', projectId, 'evidence', `${fileId}.${decoded.extension}`);
+  const destination = path.join(storageRoot, ...relativePath.split('/'));
+  await fs.mkdir(path.dirname(destination), { recursive: true });
+  await fs.writeFile(destination, decoded.bytes);
+  await client.query(
+    `INSERT INTO evidence_files(id,project_id,stage_key,evidence_type,original_name,storage_path,mime_type,file_size,uploaded_by)
+     VALUES($1,$2,'onsite','onsite-image',$3,$4,$5,$6,$7)`,
+    [fileId, projectId, `${resolvedImageId}.${decoded.extension}`, relativePath, decoded.mimeType, decoded.bytes.length, uploadedBy || null],
+  );
+  return { id: resolvedImageId, fileId, mimeType: decoded.mimeType, fileSize: decoded.bytes.length };
+}
+
+async function materializeEvidenceGroups(client: pg.PoolClient, projectId: string, groups: unknown,
+  uploadedBy: string | undefined): Promise<EvidenceGroupRef[]> {
+  if (!Array.isArray(groups)) return [];
+  const output: EvidenceGroupRef[] = [];
+  for (const rawGroup of groups as EvidenceGroupRef[]) {
+    const group: EvidenceGroupRef = { ...rawGroup };
+    if (!group.id) group.id = `evi-group-${randomUUID()}`;
+    const sourceImages = Array.isArray(group.images) ? group.images : (group.dataUrl ? [{ dataUrl: group.dataUrl }] : []);
+    const images: EvidenceImageRef[] = [];
+    for (const rawImage of sourceImages) {
+      if (rawImage?.fileId) {
+        images.push({ id: rawImage.id, fileId: rawImage.fileId, mimeType: rawImage.mimeType, fileSize: rawImage.fileSize });
+      } else if (rawImage?.dataUrl) {
+        images.push(await storeEvidenceDataUrl(client, projectId, rawImage.dataUrl, rawImage.id, uploadedBy));
+      }
+    }
+    delete group.dataUrl;
+    group.images = images;
+    output.push(group);
+  }
+  return output;
+}
+
+async function hydrateEvidenceGroups(projectId: string, groups: unknown): Promise<EvidenceGroupRef[]> {
+  if (!Array.isArray(groups)) return [];
+  const cloned = structuredClone(groups) as EvidenceGroupRef[];
+  const fileIds = Array.from(new Set(cloned.flatMap(group => (group.images || []).map(image => image.fileId).filter(Boolean)))) as string[];
+  if (!fileIds.length) return cloned;
+  const rows = await pool.query(
+    'SELECT id,storage_path,mime_type FROM evidence_files WHERE project_id=$1 AND id=ANY($2::uuid[])',
+    [projectId, fileIds],
+  );
+  const files = new Map(rows.rows.map(row => [String(row.id), row]));
+  await Promise.all(cloned.flatMap(group => (group.images || []).map(async image => {
+    if (!image.fileId || image.dataUrl) return;
+    const file = files.get(image.fileId);
+    if (!file) throw new Error('证据图片文件不存在：' + image.fileId);
+    const bytes = await fs.readFile(path.join(storageRoot, ...String(file.storage_path).split('/')));
+    image.dataUrl = `data:${file.mime_type || image.mimeType || 'image/jpeg'};base64,${bytes.toString('base64')}`;
+  })));
+  return cloned;
+}
 
 const app = express();
 app.use(cors({ origin: ['http://localhost:5173', 'http://127.0.0.1:5173', 'http://localhost:5174', 'http://127.0.0.1:5174'] }));
@@ -116,6 +202,7 @@ async function buildProjectDocx(projectId: string) {
   const previousAssessment = generatePreviousAssessment(stageData.planning || {});
   const content = stageData.reporting?.exportContent;
   const savedValues = stageData.reporting?.templateValues as Record<string, string> | undefined;
+  const reportEvidenceGroups = await hydrateEvidenceGroups(projectId, stageData.onsite?.onsiteEvidenceGroups || []);
   if (stageData.reporting?.assessmentLevel && Number(stageData.reporting.assessmentLevel) !== Number(project.system_level)) throw new Error('项目等级已变更，请重新打开实施页面并保存后导出');
   if (!content || !savedValues) throw new Error('请刷新项目实施页面并重新导出，以保存最新报告字段');
   const institution = institutionResult.rows[0]?.setting_value || defaultInstitution;
@@ -175,7 +262,7 @@ async function buildProjectDocx(projectId: string) {
         planningImages['topology-image'], values['被测系统情况_网络拓扑图及描述_描述'], project.system_name);
       xml = await writePlanningImages(xml, zip, planningImages);
       xml = await writeReportEvidence(xml, zip, stageData.onsite?.onsiteRecords || {},
-        stageData.onsite?.onsiteEvidenceGroups || []);
+        reportEvidenceGroups);
       xml = await writeAppendixBImages(xml, zip, stageData.reporting?.appendixBImages || {});
     }
     xml = replaceReportSlots(xml, replacements);
@@ -310,6 +397,19 @@ function auth(req: AuthRequest, res: Response, next: NextFunction) {
   }
 }
 
+// <img> 标签无法携带 Authorization 请求头，仅证据图片读取接口允许查询参数中的令牌。
+function evidenceReadAuth(req: AuthRequest, res: Response, next: NextFunction) {
+  const queryToken = typeof req.query.access_token === 'string' ? req.query.access_token : '';
+  const tokenValue = req.headers.authorization?.replace(/^Bearer\s+/i, '') || queryToken;
+  if (!tokenValue) return res.status(401).json({ message: '请先登录' });
+  try {
+    req.user = jwt.verify(tokenValue, jwtSecret) as AuthRequest['user'];
+    next();
+  } catch {
+    res.status(401).json({ message: '登录状态已失效' });
+  }
+}
+
 app.get('/api/health', asyncRoute(async (_req, res) => {
   const result = await pool.query('SELECT current_database() AS database, now() AS time');
   res.json({ ok: true, ...result.rows[0] });
@@ -406,6 +506,91 @@ app.get('/api/projects/:id', auth, asyncRoute(async (req, res) => {
   ]);
   if (!project.rows[0]) return res.status(404).json({ message: '项目不存在' });
   res.json({ ...project.rows[0], stages: stages.rows, risks: risks.rows, assets: assets.rows, user_directory: userDirectory.rows });
+}));
+
+app.get('/api/projects/:id/evidence-files/:fileId', evidenceReadAuth, asyncRoute(async (req, res) => {
+  const result = await pool.query(
+    'SELECT storage_path,mime_type FROM evidence_files WHERE id=$1 AND project_id=$2 AND evidence_type=$3',
+    [req.params.fileId, req.params.id, 'onsite-image'],
+  );
+  const file = result.rows[0];
+  if (!file) return res.status(404).json({ message: '证据图片不存在' });
+  const absolute = path.resolve(storageRoot, ...String(file.storage_path).split('/'));
+  const evidenceRoot = path.resolve(projectEvidenceRoot(String(req.params.id)));
+  if (absolute !== evidenceRoot && !absolute.startsWith(evidenceRoot + path.sep)) {
+    return res.status(400).json({ message: '证据图片路径无效' });
+  }
+  const bytes = await fs.readFile(absolute).catch((error: NodeJS.ErrnoException) => {
+    if (error.code === 'ENOENT') return null;
+    throw error;
+  });
+  if (!bytes) return res.status(404).json({ message: '证据图片文件已丢失' });
+  res.type(file.mime_type || 'application/octet-stream');
+  res.setHeader('Cache-Control', 'private, max-age=31536000, immutable');
+  res.send(bytes);
+}));
+
+app.post('/api/projects/:id/evidence-files', auth, asyncRoute(async (req, res) => {
+  const input = z.object({ imageId: z.string().max(100).optional(), dataUrl: z.string().min(20).max(22 * 1024 * 1024) }).parse(req.body);
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    const project = await client.query('SELECT id FROM projects WHERE id=$1 FOR SHARE', [req.params.id]);
+    if (!project.rows[0]) {
+      await client.query('ROLLBACK');
+      return res.status(404).json({ message: '项目不存在' });
+    }
+    const image = await storeEvidenceDataUrl(client, String(req.params.id), input.dataUrl, input.imageId, req.user!.id);
+    await client.query('COMMIT');
+    res.status(201).json(image);
+  } catch (error) {
+    await client.query('ROLLBACK');
+    throw error;
+  } finally {
+    client.release();
+  }
+}));
+
+app.post('/api/projects/:id/evidence-files/migrate', auth, asyncRoute(async (req, res) => {
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    const current = await client.query(
+      `SELECT data FROM project_stage_records WHERE project_id=$1 AND stage_key='onsite' FOR UPDATE`,
+      [req.params.id],
+    );
+    if (!current.rows[0]) {
+      await client.query('ROLLBACK');
+      return res.status(404).json({ message: '现场测评数据不存在' });
+    }
+    const data = structuredClone(current.rows[0].data || {});
+    data.onsiteEvidenceGroups = await materializeEvidenceGroups(client, String(req.params.id), data.onsiteEvidenceGroups, req.user!.id);
+    await client.query(
+      `UPDATE project_stage_records SET data=$1,updated_at=now(),updated_by=$2 WHERE project_id=$3 AND stage_key='onsite'`,
+      [data, req.user!.id, req.params.id],
+    );
+    await client.query('COMMIT');
+    res.json({ onsiteEvidenceGroups: data.onsiteEvidenceGroups });
+  } catch (error) {
+    await client.query('ROLLBACK');
+    throw error;
+  } finally {
+    client.release();
+  }
+}));
+
+app.delete('/api/projects/:id/evidence-files/:fileId', auth, asyncRoute(async (req, res) => {
+  const result = await pool.query(
+    'DELETE FROM evidence_files WHERE id=$1 AND project_id=$2 AND evidence_type=$3 RETURNING storage_path',
+    [req.params.fileId, req.params.id, 'onsite-image'],
+  );
+  const relativePath = result.rows[0]?.storage_path;
+  if (relativePath) {
+    const absolute = path.resolve(storageRoot, ...String(relativePath).split('/'));
+    const evidenceRoot = path.resolve(projectEvidenceRoot(String(req.params.id)));
+    if (absolute.startsWith(evidenceRoot + path.sep)) await fs.rm(absolute, { force: true });
+  }
+  res.json({ deleted: Boolean(relativePath) });
 }));
 
 app.post('/api/projects', auth, asyncRoute(async (req, res) => {
@@ -533,13 +718,48 @@ app.post('/api/projects/:id/copy', auth, asyncRoute(async (req, res) => {
       [code, input.reportCode || null, input.systemName, input.assessmentYear, input.startDate, input.endDate, req.user!.id, projectId],
     );
     const newId = copied.rows[0].id;
-    const stageRows = await client.query('SELECT stage_key,title,data FROM project_stage_records WHERE project_id=$1 ORDER BY created_at', [projectId]);
+    const evidenceIdMap = new Map<string, string>();
+    const sourceEvidence = await client.query(
+      `SELECT id,stage_key,evidence_type,original_name,storage_path,mime_type,file_size
+       FROM evidence_files WHERE project_id=$1 AND evidence_type='onsite-image'`,
+      [projectId],
+    );
+    for (const evidence of sourceEvidence.rows) {
+      const newEvidenceId = randomUUID();
+      const extension = path.extname(String(evidence.storage_path || '')) || '.jpg';
+      const relativePath = path.posix.join('projects', newId, 'evidence', newEvidenceId + extension);
+      const sourcePath = path.join(storageRoot, ...String(evidence.storage_path).split('/'));
+      const targetPath = path.join(storageRoot, ...relativePath.split('/'));
+      await fs.mkdir(path.dirname(targetPath), { recursive: true });
+      await fs.copyFile(sourcePath, targetPath);
+      await client.query(
+        `INSERT INTO evidence_files(id,project_id,stage_key,evidence_type,original_name,storage_path,mime_type,file_size,uploaded_by)
+         VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9)`,
+        [newEvidenceId, newId, evidence.stage_key, evidence.evidence_type, evidence.original_name,
+          relativePath, evidence.mime_type, evidence.file_size, req.user!.id],
+      );
+      evidenceIdMap.set(String(evidence.id), newEvidenceId);
+    }
+    const stageRows = await client.query(
+      'SELECT stage_key,title,data FROM project_stage_records WHERE project_id=$1 ORDER BY updated_at,stage_key',
+      [projectId],
+    );
     const oldStart = source.start_date ? String(source.start_date).slice(0, 10) : '';
     const oldEnd = source.end_date ? String(source.end_date).slice(0, 10) : '';
     for (const stage of stageRows.rows) {
       let data = syncProjectDatesInStageData(structuredClone(stage.data || {}), oldStart, input.startDate, oldEnd, input.endDate);
       data = replaceProjectTextInStageData(data, source.system_name, input.systemName);
       data = replaceProjectTextInStageData(data, source.report_code || '', input.reportCode || '');
+      if (stage.stage_key === 'onsite') {
+        // 现场测评证据列表是复测项目的基础材料：保留证据组、标题、层面及全部图片数据。
+        data.onsiteEvidenceGroups = Array.isArray(data.onsiteEvidenceGroups)
+          ? data.onsiteEvidenceGroups : [];
+        data.onsiteEvidenceGroups.forEach((group: EvidenceGroupRef) => {
+          (group.images || []).forEach(image => {
+            if (image.fileId && evidenceIdMap.has(image.fileId)) image.fileId = evidenceIdMap.get(image.fileId);
+          });
+        });
+      }
       if (stage.stage_key === 'reporting') {
         // 复测保留第三、四步已整理的文字，但附录B材料属于本次活动，必须重新录入。
         data.appendixBData = {};
@@ -559,7 +779,9 @@ app.post('/api/projects/:id/copy', auth, asyncRoute(async (req, res) => {
     await client.query(`INSERT INTO asset_items(project_id,category,name,importance,details,sort_order) SELECT $1,category,name,importance,details,sort_order FROM asset_items WHERE project_id=$2`, [newId, projectId]);
     await client.query(`INSERT INTO assessment_records(project_id,domain,indicator_code,indicator_name,target_name,applicable,result,score,evidence,analysis,risk_level,updated_by) SELECT $1,domain,indicator_code,indicator_name,target_name,applicable,result,score,evidence,analysis,risk_level,$3 FROM assessment_records WHERE project_id=$2`, [newId, projectId, req.user!.id]);
     await client.query(`INSERT INTO risks(project_id,domain,issue_description,threat_code,risk_analysis,risk_level,recommendation,status) SELECT $1,domain,issue_description,threat_code,risk_analysis,risk_level,recommendation,status FROM risks WHERE project_id=$2`, [newId, projectId]);
-    await client.query(`INSERT INTO evidence_files(project_id,stage_key,evidence_type,original_name,storage_path,mime_type,file_size,uploaded_by) SELECT $1,stage_key,evidence_type,original_name,storage_path,mime_type,file_size,$3 FROM evidence_files WHERE project_id=$2`, [newId, projectId, req.user!.id]);
+    await client.query(`INSERT INTO evidence_files(project_id,stage_key,evidence_type,original_name,storage_path,mime_type,file_size,uploaded_by)
+      SELECT $1,stage_key,evidence_type,original_name,storage_path,mime_type,file_size,$3 FROM evidence_files
+      WHERE project_id=$2 AND evidence_type<>'onsite-image'`, [newId, projectId, req.user!.id]);
     const sourceTemplate = path.join(storageRoot, 'projects', projectId, 'report-template.docx');
     const copiedTemplate = path.join(storageRoot, 'projects', newId, 'report-template.docx');
     try { await fs.mkdir(path.dirname(copiedTemplate), { recursive: true }); await fs.copyFile(sourceTemplate, copiedTemplate); } catch { /* source project may use the global template */ }
@@ -651,6 +873,9 @@ app.put('/api/projects/:id/stages/:stageKey', auth, asyncRoute(async (req, res) 
     const sourceDates = (input.data.projectDates || {}) as Record<string, unknown>;
     const data = syncProjectDatesInStageData(input.data,
       sourceDates.startDate ?? currentStart, currentStart, sourceDates.endDate ?? currentEnd, currentEnd);
+    if (String(req.params.stageKey) === 'onsite') {
+      data.onsiteEvidenceGroups = await materializeEvidenceGroups(client, String(req.params.id), data.onsiteEvidenceGroups, req.user!.id);
+    }
     const existingStage = await client.query(
       'SELECT completion FROM project_stage_records WHERE project_id=$1 AND stage_key=$2',
       [req.params.id, req.params.stageKey],
@@ -961,6 +1186,11 @@ app.post('/api/projects/:id/original-records', auth, asyncRoute(async (req, res)
   ]);
   const project = projectResult.rows[0];
   if (!project) return res.status(404).json({ message: '项目不存在' });
+  const onsiteStage = stagesResult.rows.find(stage => stage.stage_key === 'onsite');
+  if (onsiteStage?.data) {
+    onsiteStage.data = structuredClone(onsiteStage.data);
+    onsiteStage.data.onsiteEvidenceGroups = await hydrateEvidenceGroups(projectId, onsiteStage.data.onsiteEvidenceGroups || []);
+  }
   const files = await generateRawRecords(rawTemplateRoot, {
     project,
     stages: stagesResult.rows,

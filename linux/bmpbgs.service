@@ -1,0 +1,21 @@
+[Unit]
+Description=BMPBGS 密评工具箱
+Documentation=file:///opt/BMPBGS/README.md
+After=network.target
+
+[Service]
+Type=simple
+User=bmpbgs
+Group=bmpbgs
+WorkingDirectory=__INSTALL__
+# 前台模式：pg/前端后台启动，后端以本进程前台运行，成为 systemd 主进程
+ExecStart=__INSTALL__/bin/bb-start.sh --foreground
+ExecStop=__INSTALL__/bin/bb-stop.sh
+Restart=on-failure
+RestartSec=5
+# 资源限制（按需调整）；不修改系统环境，所需变量由启动脚本注入
+NoNewPrivileges=true
+ProtectSystem=false
+
+[Install]
+WantedBy=multi-user.target

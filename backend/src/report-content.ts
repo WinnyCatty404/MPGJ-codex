@@ -23,6 +23,31 @@ function writeText(xml: string, value: string): string {
   return xml.replace(/<w:p\b([^>]*)\/>/, '<w:p$1>' + run + '</w:p>');
 }
 
+// 表6-1的“问题描述”和“风险分析”是表格叙述文本：不使用首行缩进，并按报告格式两端对齐。
+function formatRiskNarrativeCell(cell: string): string {
+  return cell.replace(/<w:p\b[^>]*>[\s\S]*?<\/w:p>/g, paragraph => {
+    const indent = '<w:ind w:firstLine="0" w:firstLineChars="0"/>';
+    const justify = '<w:jc w:val="both"/>';
+    let properties = /<w:pPr\b[^>]*>[\s\S]*?<\/w:pPr>/.exec(paragraph)?.[0];
+    if (!properties) {
+      const selfClosing = /<w:pPr\b([^>]*)\/>/.exec(paragraph);
+      if (selfClosing) {
+        return paragraph.replace(selfClosing[0], `<w:pPr${selfClosing[1]}>${indent}${justify}</w:pPr>`);
+      }
+      return paragraph.replace(/<w:p\b[^>]*>/, match => match + `<w:pPr>${indent}${justify}</w:pPr>`);
+    }
+    properties = properties
+      .replace(/<w:jc\b[^>]*\/>|<w:jc\b[^>]*>[\s\S]*?<\/w:jc>/g, '')
+      .replace(/<w:ind\b([^>]*?)(?:\/>|>[\s\S]*?<\/w:ind>)/g, (_match, attrs: string) => {
+        const clean = attrs.replace(/\s+w:(?:firstLine|firstLineChars|hanging|hangingChars)="[^"]*"/g, '');
+        return `<w:ind${clean} w:firstLine="0" w:firstLineChars="0"/>`;
+      });
+    if (!/<w:ind\b/.test(properties)) properties = properties.replace('</w:pPr>', indent + '</w:pPr>');
+    properties = properties.replace('</w:pPr>', justify + '</w:pPr>');
+    return paragraph.replace(/<w:pPr\b[^>]*>[\s\S]*?<\/w:pPr>/, properties);
+  });
+}
+
 export function writeReportContent(xml: string, styles: string, content: ReportContent): string {
   const tables = content.tables || [];
   const seen = new Set<string>();
@@ -121,7 +146,9 @@ export function writeReportContent(xml: string, styles: string, content: ReportC
           return cell;
         }
         merged[index] = value;
-        return writeText(cell, value);
+        const isRiskNarrative = norm(patch.caption) === '风险分析' && (index === 2 || index === 4);
+        const written = writeText(cell, isRiskNarrative ? value.replace(/^[\s\u3000]+/, '') : value);
+        return isRiskNarrative ? formatRiskNarrativeCell(written) : written;
       });
     };
     if (repeatable) {

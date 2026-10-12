@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, reactive, ref } from 'vue';
+import { computed, onBeforeUnmount, onMounted, reactive, ref, type ObjectDirective } from 'vue';
 
 type Page = 'dashboard' | 'projects' | 'workspace' | 'users' | 'templates' | 'risk-analysis' | 'institution';
 const restorablePages: Page[] = ['dashboard', 'projects', 'users', 'templates', 'risk-analysis', 'institution'];
@@ -27,6 +27,7 @@ const activeStage = ref(0);
 const showProjectModal = ref(false);
 const editingProjectId = ref('');
 const copySourceProject = ref<Project | null>(null);
+const copyingProject = ref(false);
 const projectToDelete = ref<Project | null>(null);
 const showUserModal = ref(false);
 const editingUserId = ref('');
@@ -100,6 +101,16 @@ const importTargetProject = ref<Project | null>(null);
 const institutionForm = reactive({ name: '', address: '', postalCode: '', contact: '', title: '', department: '', telephone: '', mobile: '', email: '' });
 const activePlanningModule = ref<PlanningModule | null>(null);
 const planningForm = reactive<Record<string, string>>({});
+
+function resizePlanningTextarea(element: HTMLTextAreaElement) {
+  element.style.height = 'auto';
+  element.style.height = `${element.scrollHeight}px`;
+}
+
+const vAutoResize: ObjectDirective<HTMLTextAreaElement> = {
+  mounted: resizePlanningTextarea,
+  updated: resizePlanningTextarea,
+};
 
 function indentEveryParagraph(value: string) {
   return String(value || '').replace(/\r\n?/g, '\n').split('\n').map(line =>
@@ -290,6 +301,29 @@ async function loadProjects() {
   projects.value = await api(`/projects?${query}`);
 }
 
+let projectRefreshPromise: Promise<void> | null = null;
+
+function refreshProjectsIfVisible() {
+  if (!token.value || page.value !== 'projects' || document.hidden) return;
+  if (projectRefreshPromise) return projectRefreshPromise;
+  projectRefreshPromise = loadProjects()
+    .catch(error => notify((error as Error).message || '项目列表刷新失败'))
+    .finally(() => { projectRefreshPromise = null; });
+  return projectRefreshPromise;
+}
+
+function handleProjectListFocus() {
+  void refreshProjectsIfVisible();
+}
+
+function handleProjectListVisibility() {
+  if (document.visibilityState === 'visible') void refreshProjectsIfVisible();
+}
+
+function handleProjectDataUpdated(event: StorageEvent) {
+  if (event.key === 'bb-project-updated') void refreshProjectsIfVisible();
+}
+
 async function openProject(project: Project) {
   const link = document.createElement('a');
   link.href = `/prototype.html?project=${encodeURIComponent(project.id)}&step=1`;
@@ -344,13 +378,15 @@ function openCopyProjectModal(project: Project) {
 
 async function copyProject() {
   const project = copySourceProject.value;
-  if (!project) return;
+  if (!project || copyingProject.value) return;
+  copyingProject.value = true;
   try {
     const copied = await api(`/projects/${project.id}/copy`, { method: 'POST', body: JSON.stringify(copyForm) });
     copySourceProject.value = null;
     notify(`已复制为新项目 ${copied.code}`);
     await loadProjects();
   } catch (error) { notify((error as Error).message); }
+  finally { copyingProject.value = false; }
 }
 
 async function createProject() {
@@ -736,6 +772,9 @@ function fmtDate(value?: string) {
 }
 
 onMounted(async () => {
+  window.addEventListener('focus', handleProjectListFocus);
+  window.addEventListener('storage', handleProjectDataUpdated);
+  document.addEventListener('visibilitychange', handleProjectListVisibility);
   if (!token.value) return;
   try {
     currentUser.value = await api('/auth/me');
@@ -746,6 +785,12 @@ onMounted(async () => {
     await openPage(canRestore ? requestedPage : 'dashboard');
   }
   catch { logout(); }
+});
+
+onBeforeUnmount(() => {
+  window.removeEventListener('focus', handleProjectListFocus);
+  window.removeEventListener('storage', handleProjectDataUpdated);
+  document.removeEventListener('visibilitychange', handleProjectListVisibility);
 });
 </script>
 
@@ -879,9 +924,9 @@ onMounted(async () => {
   </div>
 
   <div v-if="showRiskTemplateModal" class="modal-mask" @click.self="showRiskTemplateModal=false"><form class="modal risk-template-modal" @submit.prevent="saveRiskTemplateForm"><div class="modal-head"><div><small>RISK TEMPLATE</small><h2>{{ editingRiskTemplateId ? '编辑风险模板' : '新增风险模板' }}</h2><p>每个安全层面下的每个测评单元保留一条模板。</p></div><button type="button" @click="showRiskTemplateModal=false">×</button></div><div class="risk-template-modal-grid"><label>安全层面<select v-model="riskTemplateForm.layer" :disabled="!!editingRiskTemplateId" @change="changeRiskTemplateLayer"><option v-for="layer in riskLayers" :key="layer" :value="layer">{{ layer }}</option></select></label><label>测评单元<select v-model="riskTemplateForm.unit" :disabled="!!editingRiskTemplateId" @change="changeRiskTemplateLayer"><option v-for="unit in riskUnits(riskTemplateForm.layer)" :key="unit" :value="unit">{{ unit }}</option></select></label><label>关联威胁<input v-model="riskTemplateForm.threat" placeholder="如 TP1、TN2" /></label><label>默认风险等级<select v-model="riskTemplateForm.defaultLevel"><option>高</option><option>中</option><option>低</option></select></label><label class="span-2">风险分析<textarea v-model="riskTemplateForm.analysis" rows="6" required placeholder="支持 {系统名称}、{安全层面}、{测评单元} 占位符"></textarea></label><label class="span-2">整改建议<textarea v-model="riskTemplateForm.advice" rows="6" required placeholder="请输入该测评单元对应的整改建议"></textarea></label><label class="risk-enabled"><input v-model="riskTemplateForm.enabled" type="checkbox" />启用此模板</label></div><div class="modal-foot"><button type="button" class="secondary" @click="showRiskTemplateModal=false">取消</button><button class="primary">保存模板</button></div></form></div>
-  <div v-if="activePlanningModule" class="modal-mask" @click.self="activePlanningModule=null"><form class="modal planning-modal" @submit.prevent="savePlanningModule"><div class="modal-head"><div><small>方案编制</small><h2>{{ activePlanningModule.title }}</h2><p>{{ activePlanningModule.note }}</p></div><button type="button" @click="activePlanningModule=null">×</button></div><div class="planning-form"><label v-for="field in activePlanningModule.fields" v-show="activePlanningModule.key !== 'previousAssessment' || field.key === 'assessmentCount' || field.key === 'assessmentContent' || Number(planningForm.assessmentCount || 1) > 1" :key="field.key">{{ field.label }}<textarea v-if="field.multiline" v-model="planningForm[field.key]" :placeholder="field.placeholder" rows="4" @keydown.enter="handleParagraphEnter" @blur="normalizePlanningParagraph(field.key)"></textarea><input v-else v-model="planningForm[field.key]" :type="field.key === 'assessmentCount' ? 'number' : 'text'" :min="field.key === 'assessmentCount' ? 1 : undefined" :step="field.key === 'assessmentCount' ? 1 : undefined" :placeholder="field.placeholder" /></label></div><div class="modal-foot"><button type="button" class="secondary" @click="activePlanningModule=null">取消</button><button class="primary">保存模块内容</button></div></form></div>
-  <div v-if="showProjectModal" class="modal-mask" @click.self="showProjectModal=false"><form class="modal" @submit.prevent="createProject"><div class="modal-head"><div><small>PROJECT</small><h2>{{ editingProjectId ? '编辑密评项目' : '新建密评项目' }}</h2></div><button type="button" @click="showProjectModal=false">×</button></div><div class="form-grid"><label>项目编号<input :value="editingProjectId ? projectForm.code : `MP-${projectForm.assessmentYear}-自动编号`" readonly class="readonly-input" /></label><label>报告编号<input v-model="projectForm.reportCode" placeholder="可稍后补充或从Word导入" /></label><label class="span-2">系统名称<input v-model="projectForm.systemName" required placeholder="请输入被测系统全称" /></label><label class="span-2">责任单位<input v-model="projectForm.orgName" required placeholder="请输入责任单位全称" /></label><label>测评年度<input v-model.number="projectForm.assessmentYear" type="number" /></label><label>系统等级<select v-model.number="projectForm.systemLevel"><option :value="2">二级</option><option :value="3">三级</option></select></label><label>开始日期<input v-model="projectForm.startDate" type="date" /></label><label>结束日期<input v-model="projectForm.endDate" type="date" /></label></div><div class="modal-foot"><button type="button" class="secondary" @click="showProjectModal=false">取消</button><button class="primary">{{ editingProjectId ? '保存修改' : '创建并进入项目' }}</button></div></form></div>
-  <div v-if="copySourceProject" class="modal-mask" @click.self="copySourceProject=null"><form class="modal small" @submit.prevent="copyProject"><div class="modal-head"><div><small>RETEST COPY</small><h2>复制为复测项目</h2><p>保留现场测评记录和证据，附录 B 的独立材料将清空。</p></div><button type="button" @click="copySourceProject=null">×</button></div><div class="form-grid"><label class="span-2">系统名称<input v-model="copyForm.systemName" required placeholder="请输入被测系统全称" /></label><label>报告编号<input v-model="copyForm.reportCode" placeholder="请输入新报告编号" /></label><label>测评年度<input v-model.number="copyForm.assessmentYear" type="number" min="2000" max="2100" required /></label><label>开始时间<input v-model="copyForm.startDate" type="date" required /></label><label>结束时间<input v-model="copyForm.endDate" type="date" required /></label></div><div class="modal-foot"><button type="button" class="secondary" @click="copySourceProject=null">取消</button><button class="primary">确认复制</button></div></form></div>
+  <div v-if="activePlanningModule" class="modal-mask" @click.self="activePlanningModule=null"><form class="modal planning-modal" @submit.prevent="savePlanningModule"><div class="modal-head"><div><small>方案编制</small><h2>{{ activePlanningModule.title }}</h2><p>{{ activePlanningModule.note }}</p></div><button type="button" @click="activePlanningModule=null">×</button></div><div class="planning-form"><label v-for="field in activePlanningModule.fields" v-show="activePlanningModule.key !== 'previousAssessment' || field.key === 'assessmentCount' || field.key === 'assessmentContent' || Number(planningForm.assessmentCount || 1) > 1" :key="field.key">{{ field.label }}<textarea v-if="field.multiline" v-auto-resize v-model="planningForm[field.key]" :placeholder="field.placeholder" rows="4" @keydown.enter="handleParagraphEnter" @blur="normalizePlanningParagraph(field.key)"></textarea><input v-else v-model="planningForm[field.key]" :type="field.key === 'assessmentCount' ? 'number' : 'text'" :min="field.key === 'assessmentCount' ? 1 : undefined" :step="field.key === 'assessmentCount' ? 1 : undefined" :placeholder="field.placeholder" /></label></div><div class="modal-foot"><button type="button" class="secondary" @click="activePlanningModule=null">取消</button><button class="primary">保存模块内容</button></div></form></div>
+  <div v-if="showProjectModal" class="modal-mask"><form class="modal" @submit.prevent="createProject"><div class="modal-head"><div><small>PROJECT</small><h2>{{ editingProjectId ? '编辑密评项目' : '新建密评项目' }}</h2></div><button type="button" @click="showProjectModal=false">×</button></div><div class="form-grid"><label>项目编号<input :value="editingProjectId ? projectForm.code : `MP-${projectForm.assessmentYear}-自动编号`" readonly class="readonly-input" /></label><label>报告编号<input v-model="projectForm.reportCode" placeholder="可稍后补充或从Word导入" /></label><label class="span-2">系统名称<input v-model="projectForm.systemName" required placeholder="请输入被测系统全称" /></label><label class="span-2">责任单位<input v-model="projectForm.orgName" required placeholder="请输入责任单位全称" /></label><label>测评年度<input v-model.number="projectForm.assessmentYear" type="number" /></label><label>系统等级<select v-model.number="projectForm.systemLevel"><option :value="2">二级</option><option :value="3">三级</option></select></label><label>开始日期<input v-model="projectForm.startDate" type="date" /></label><label>结束日期<input v-model="projectForm.endDate" type="date" /></label></div><div class="modal-foot"><button type="button" class="secondary" @click="showProjectModal=false">取消</button><button class="primary">{{ editingProjectId ? '保存修改' : '创建并进入项目' }}</button></div></form></div>
+  <div v-if="copySourceProject" class="modal-mask"><form class="modal small" :aria-busy="copyingProject" @submit.prevent="copyProject"><div class="modal-head"><div><small>RETEST COPY</small><h2>复制为复测项目</h2><p>保留现场测评记录、8个层面的证据列表及全部证据图片，附录 B 的独立材料将清空。</p></div><button type="button" :disabled="copyingProject" @click="copySourceProject=null">×</button></div><div class="form-grid"><label class="span-2">系统名称<input v-model="copyForm.systemName" :disabled="copyingProject" required placeholder="请输入被测系统全称" /></label><label>报告编号<input v-model="copyForm.reportCode" :disabled="copyingProject" placeholder="请输入新报告编号" /></label><label>测评年度<input v-model.number="copyForm.assessmentYear" :disabled="copyingProject" type="number" min="2000" max="2100" required /></label><label>开始时间<input v-model="copyForm.startDate" :disabled="copyingProject" type="date" required /></label><label>结束时间<input v-model="copyForm.endDate" :disabled="copyingProject" type="date" required /></label></div><div class="modal-foot"><button type="button" class="secondary" :disabled="copyingProject" @click="copySourceProject=null">取消</button><button class="primary" :disabled="copyingProject">{{ copyingProject ? '正在复制…' : '确认复制' }}</button></div></form></div>
   <div v-if="projectToDelete" class="modal-mask" @click.self="projectToDelete=null"><div class="modal confirm-dialog"><div class="confirm-symbol">!</div><h2>确认删除该项目？</h2><p>将删除“{{ projectToDelete.system_name }}”及其阶段数据、资产、测评记录、风险和证据文件记录。此操作不可恢复。</p><div class="modal-foot"><button class="secondary" @click="projectToDelete=null">取消</button><button class="primary danger-button" @click="deleteProject">确认删除</button></div></div></div>
   <div v-if="showUserModal" class="modal-mask" @click.self="showUserModal=false"><form class="modal small" @submit.prevent="createUser"><div class="modal-head"><div><small>USER</small><h2>{{ editingUserId ? '编辑用户信息' : '添加系统用户' }}</h2></div><button type="button" @click="showUserModal=false">×</button></div><div class="form-grid"><label>用户名<input v-model="userForm.username" required :readonly="!!editingUserId" placeholder="英文、数字或下划线" /></label><label>姓名<input v-model="userForm.displayName" required placeholder="真实姓名" /></label><label>系统角色<select v-model="userForm.role"><option value="evaluator">测评人员</option><option value="manager">项目负责人</option><option value="reviewer">审核人员</option><option value="admin">系统管理员</option></select></label><label>密评考试通过时间<input v-model="userForm.certificateDate" type="date" /></label><label class="span-2">密评证书<input type="file" accept="image/*,.pdf" @change="chooseCertificate" /><small>{{ userForm.certificateFileName || '支持图片或 PDF' }}</small></label></div><div class="modal-foot"><button type="button" class="secondary" @click="showUserModal=false">取消</button><button class="primary">{{ editingUserId ? '保存修改' : '确认添加' }}</button></div></form></div>
   <div v-if="showUserImportResult" class="modal-mask" @click.self="showUserImportResult=false"><div class="modal user-import-result-modal"><div class="modal-head"><div><small>IMPORT COMPLETE</small><h2>成功导入 {{ userImportResults.length }} 名用户</h2><p>所有账号首次登录均需修改密码，请妥善保存以下初始密码。</p></div><button type="button" @click="showUserImportResult=false">×</button></div><div class="user-import-result-table"><div class="result-head"><span>用户名</span><span>姓名</span><span>初始密码</span></div><div v-for="user in userImportResults" :key="user.username" class="result-row"><b>{{ user.username }}</b><span>{{ user.display_name }}</span><code>{{ user.defaultPassword }}</code></div></div><div class="modal-foot"><button class="secondary" @click="showUserImportResult=false">关闭</button><button class="primary" @click="downloadUserPasswordList">下载初始密码清单</button></div></div></div>
