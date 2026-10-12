@@ -7044,6 +7044,7 @@
     { key: 'b7-reviewer', role: '密评报告审核人' },
     { key: 'b7-approver', role: '密评报告批准人' }
   ];
+  const APPENDIX_B_FIELD_DEFAULTS = { 'b1-type': '政府采购合同' };
 
   function getAppendixBPersonnel() {
     const members = getPlanMembers();
@@ -7213,7 +7214,7 @@
     html += apbSectionOpen(0);
     html += '<div class="ua-caption">表B-1 委托证明文件</div>';
     html += '<table class="onsite-table apb-form-table"><tbody>' +
-      '<tr><th style="width:130px;">文件类型</th><td>' + apbInput('b1-type', '政府采购合同', '如：政府采购合同') + '</td><th style="width:110px;">签订时间</th><td>' + apbInput('b1-date', '', '如：2025年9月16日') + '</td></tr>' +
+      '<tr><th style="width:130px;">文件类型</th><td>' + apbInput('b1-type', APPENDIX_B_FIELD_DEFAULTS['b1-type'], '如：政府采购合同') + '</td><th style="width:110px;">签订时间</th><td>' + apbInput('b1-date', '', '如：2025年9月16日') + '</td></tr>' +
       '<tr><th>委托单位</th><td colspan="3">' + apbInput('b1-org', org, '被测单位全称', 420) + '</td></tr>' +
       '<tr><th>委托金额</th><td>' + apbInput('b1-amount', '', '如：912000元') + '</td><th>系统密评单价</th><td>' + apbInput('b1-price', '', '如：40000元') + '</td></tr>' +
       '<tr><th>委托证明文件</th><td colspan="3">' + apbImgSlot('b1-file', '政府采购合同/委托协议扫描件') + '</td></tr>' +
@@ -10465,11 +10466,11 @@
       put('安全问题及改进建议_' + name + '_问题描述', getReportTextVal('report-sug-prob-' + index, buildSugProblemText(index)));
       put('安全问题及改进建议_' + name + '_改进建议', getReportTextVal('report-sug-adv-' + index, buildSugAdviceText(index)));
     });
-    [['委托证明文件_文件类型','b1-type','政府采购合同'], ['委托证明文件_签订时间','b1-date',''],
-      ['委托证明文件_委托金额','b1-amount',''], ['委托证明文件_系统密评单价','b1-price',''],
-      ['现场测评实施地点','b3-loc',''], ['等保定级备案时间','b9-date','']]
-      .forEach(([name, key, defaultValue]) => {
-        const current = apbVal(key, defaultValue);
+    [['委托证明文件_文件类型','b1-type'], ['委托证明文件_签订时间','b1-date'],
+      ['委托证明文件_委托金额','b1-amount'], ['委托证明文件_系统密评单价','b1-price'],
+      ['现场测评实施地点','b3-loc'], ['等保定级备案时间','b9-date']]
+      .forEach(([name, key]) => {
+        const current = apbVal(key, APPENDIX_B_FIELD_DEFAULTS[key] || '');
         put(name, current && (key === 'b1-date' || key === 'b9-date') ? formatCnDate(current) : current);
       });
     put('B1委托单位', apbVal('b1-org', values['被测单位名称']));
