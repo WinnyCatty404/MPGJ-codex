@@ -10480,6 +10480,10 @@
     put('测评人员', members.filter(member => !/负责人/.test(member.role)).map(member => member.name).join('、'));
     put('现场测评人员名单', members.map(member => member.name).join('、'));
     put('密评人员考试通过时间', members.map(member => apbCertDate(member.name)).join('、'));
+    const reportReviewer = apbVal('b7-reviewer', '');
+    const reportApprover = apbVal('b7-approver', '');
+    put('密评报告审核人考试通过时间', reportReviewer ? apbCertDate(reportReviewer) : '');
+    put('密评报告批准人考试通过时间', reportApprover ? apbCertDate(reportApprover) : '');
 
     const score = getReportTotalScore().total;
     const counts = getReportStatCounts();
