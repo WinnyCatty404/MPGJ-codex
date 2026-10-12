@@ -258,9 +258,15 @@ async function buildProjectDocx(projectId: string) {
         ? content.sections.filter((section: { heading: string }) => section.heading !== '现场测评方法')
         : [];
       xml = writeReportContent(xml, await zip.file('word/styles.xml')!.async('string'), { ...content, sections: reportSections });
+      const topologyBlocks = Array.isArray(stageData.planning?.topologyBlocks)
+        ? stageData.planning.topologyBlocks.filter((block: { type?: string }) => block && (block.type === 'text' || block.type === 'image'))
+        : [];
+      const topologyImageCount = topologyBlocks.length
+        ? topologyBlocks.filter((block: { type?: string; dataUrl?: string }) => block.type === 'image' && block.dataUrl).length
+        : (planningImages['topology-image'] ? 1 : 0);
       xml = await writeTopologyBlocks(xml, zip, stageData.planning?.topologyBlocks,
         planningImages['topology-image'], values['被测系统情况_网络拓扑图及描述_描述'], project.system_name);
-      xml = await writePlanningImages(xml, zip, planningImages);
+      xml = await writePlanningImages(xml, zip, planningImages, topologyImageCount);
       xml = await writeReportEvidence(xml, zip, stageData.onsite?.onsiteRecords || {},
         reportEvidenceGroups);
       xml = await writeAppendixBImages(xml, zip, stageData.reporting?.appendixBImages || {});

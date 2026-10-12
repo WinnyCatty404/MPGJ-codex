@@ -377,6 +377,11 @@ const planningImageSlots: Record<string, string> = {
   '被测系统情况_密码应用情况_应用和数据安全_密码应用情况图片': 'application-crypto-image',
 };
 
+const planningImageCaptionLabels: Record<string, string> = {
+  '被测系统情况_密码应用情况_设备和计算安全_密码应用情况图片': '设备和计算安全密码应用情况',
+  '被测系统情况_密码应用情况_应用和数据安全_密码应用情况图片': '应用和数据安全密码应用情况',
+};
+
 type TopologyBlock = { type?: string; content?: string; dataUrl?: string; caption?: string };
 
 function topologyTextParagraph(content: string) {
@@ -435,33 +440,47 @@ export async function writeTopologyBlocks(xml: string, zip: JSZip, blocks: Topol
   return xml.slice(0, start) + (output.join('') || '<w:p/>') + xml.slice(end);
 }
 
-export async function writePlanningImages(xml: string, zip: JSZip, images: Record<string, string>): Promise<string> {
+export async function writePlanningImages(xml: string, zip: JSZip, images: Record<string, string>,
+  topologyImageCount = 0): Promise<string> {
   const relPath = 'word/_rels/document.xml.rels';
   let rels = await zip.file(relPath)?.async('string');
   let types = await zip.file('[Content_Types].xml')?.async('string');
   if (!rels || !types) throw new Error('报告模板缺少图片关系或内容类型定义');
   let rid = Math.max(0, ...[...rels.matchAll(/\bId="rId(\d+)"/g)].map(match => Number(match[1]))) + 1;
   let drawingId = Math.max(0, ...[...xml.matchAll(/<wp:docPr\b[^>]*\bid="(\d+)"/g)].map(match => Number(match[1]))) + 1;
+  let cryptoImageNumber = Math.max(0, Number(topologyImageCount) || 0);
   for (const [slot, imageId] of Object.entries(planningImageSlots)) {
     const paragraphs = [...xml.matchAll(/<w:p\b[^>]*>[\s\S]*?<\/w:p>/g)]
       .filter(match => paragraphText(match[0]).trim() === `{{${slot}}}`);
     if (paragraphs.length !== 1) throw new Error(`Word模板中的 {{${slot}}} 必须恰好出现一次`);
     const paragraph = paragraphs[0];
+    const captionLabel = planningImageCaptionLabels[slot];
+    const captionParagraph = captionLabel
+      ? [...xml.matchAll(/<w:p\b[^>]*>[\s\S]*?<\/w:p>/g)].find(match => {
+        const text = paragraphText(match[0]).trim();
+        return match.index! > paragraph.index! && /^\u56fe\s*2[-－—]\s*\d+/.test(text) && text.endsWith(captionLabel);
+      })
+      : undefined;
+    if (captionLabel && !captionParagraph) throw new Error(`Word模板中缺少“${captionLabel}”图片标题`);
     const dataUrl = images[imageId];
     let replacement = '<w:p/>';
     if (dataUrl) {
+      const description = captionLabel ? `图 2-${++cryptoImageNumber} ${captionLabel}` : slot;
       const { bytes, ext, size } = await exportImage(dataUrl, slot);
       const suffix = ext === 'jpeg' ? 'jpg' : ext;
       const filename = `bb-planning-${imageId}.${suffix}`;
       zip.file(`word/media/${filename}`, bytes);
       const relationId = `rId${rid++}`;
       rels = rels.replace('</Relationships>', `<Relationship Id="${relationId}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" Target="media/${filename}"/></Relationships>`);
-      replacement = imageParagraph(relationId, drawingId++, size.width, size.height, slot);
+      replacement = imageParagraph(relationId, drawingId++, size.width, size.height, description,
+        REPORT_IMAGE_WIDTH_EMU, !!captionLabel, REPORT_IMAGE_MAX_HEIGHT_EMU);
+      if (captionLabel) replacement += evidenceCaptionParagraph(description);
       if (!new RegExp(`<Default\\b[^>]*Extension="${suffix}"`, 'i').test(types)) {
         types = types.replace('</Types>', `<Default Extension="${suffix}" ContentType="${ext === 'jpeg' ? 'image/jpeg' : `image/${ext}`}"/></Types>`);
       }
     }
-    xml = xml.slice(0, paragraph.index!) + replacement + xml.slice(paragraph.index! + paragraph[0].length);
+    const end = captionParagraph ? captionParagraph.index! + captionParagraph[0].length : paragraph.index! + paragraph[0].length;
+    xml = xml.slice(0, paragraph.index!) + replacement + xml.slice(end);
   }
   zip.file(relPath, rels);
   zip.file('[Content_Types].xml', types);
