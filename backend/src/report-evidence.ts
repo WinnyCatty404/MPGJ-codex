@@ -168,6 +168,11 @@ function evidenceCaptionParagraph(description: string): string {
   return `<w:p><w:pPr><w:jc w:val="center"/><w:keepLines/><w:widowControl/><w:spacing w:before="0" w:after="120"/></w:pPr><w:r><w:t>${xmlEscape(description)}</w:t></w:r></w:p>`;
 }
 
+function rawEvidenceCaptionParagraph(description: string): string {
+  const font = '<w:rFonts w:ascii="宋体" w:hAnsi="宋体" w:eastAsia="宋体" w:cs="宋体"/>';
+  return `<w:p><w:pPr><w:jc w:val="center"/><w:keepLines/><w:widowControl/><w:spacing w:before="0" w:after="120" w:line="240" w:lineRule="auto"/></w:pPr><w:r><w:rPr>${font}</w:rPr><w:t>${xmlEscape(description)}</w:t></w:r></w:p>`;
+}
+
 export async function writeReportEvidence(xml: string, zip: JSZip, records: Record<string, OnsiteRecord>,
   groups: EvidenceGroup[] = []): Promise<string> {
   const relPath = 'word/_rels/document.xml.rels';
@@ -295,7 +300,7 @@ export async function appendRawRecordEvidence(xml: string, zip: JSZip, records: 
     }
     if (images.length) {
       paragraphs.push(imageRowParagraph(imageRuns, true));
-      paragraphs.push(evidenceCaptionParagraph(description));
+      paragraphs.push(rawEvidenceCaptionParagraph(description));
     }
   }
   if (!paragraphs.length) return xml;

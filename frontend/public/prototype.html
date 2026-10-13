@@ -1572,7 +1572,7 @@
             <div class="tab-item" id="plan-tab-btn-11" onclick="switchPlanTab(11)">网络拓扑图及描述</div>
             <div class="tab-item" id="plan-tab-btn-12" onclick="switchPlanTab(12)">密码应用情况</div>
             <div class="tab-item" id="plan-tab-btn-10" onclick="switchPlanTab(10)" data-page-node-id="ZpIUKAy3QrYVAUZxwLehLa">系统资产</div>
-            <div class="tab-item" id="plan-tab-btn-7" onclick="switchPlanTab(7)" data-page-node-id="m70wdovIfd1vF9Bz3X5a7b">测评计划</div>
+            <div class="tab-item" id="plan-tab-btn-7" onclick="switchPlanTab(7)" data-page-node-id="m70wdovIfd1vF9Bz3X5a7b">测评过程</div>
             <div class="tab-item" id="plan-tab-btn-2" onclick="switchPlanTab(2)" data-page-node-id="ZLL0GG23eF1NVHdPpJE6W6">测评对象</div>
             <div class="tab-item" id="plan-tab-btn-3" onclick="switchPlanTab(3)" data-page-node-id="2yWHslb3VfnfGuWrdgvhjK">测评指标</div>
             <div class="tab-item" id="plan-tab-btn-4" onclick="switchPlanTab(4)" data-page-node-id="DnDxoQ4gaP1snaLxgi9zrz">测评方法及工具</div>
@@ -2248,10 +2248,10 @@
               </div>
             </div>
 
-            <!-- 测评计划 -->
+            <!-- 测评过程 -->
             <div id="plan-tab-7" class="tab-panel" data-page-node-id="EhtqfmkhAnCdXbWy05sl3x">
               <div class="section-header" style="margin-bottom:20px;" data-page-node-id="CUsBpk7xvz2Nkug8sGKb6N">
-                <span class="section-name" data-page-node-id="C9IoRuQ2dcwChbULd7y9Of">测评计划</span>
+                <span class="section-name" data-page-node-id="C9IoRuQ2dcwChbULd7y9Of">测评过程</span>
                 <span style="font-size:12px; color:#999; margin-left:8px;" data-page-node-id="7mvFiBFaBzSV5oq05vXmlb">各阶段工作内容及时间安排已自动填入，可直接修改</span>
               </div>
 
@@ -2368,7 +2368,7 @@
 
               <div class="form-actions" data-page-node-id="qOSFmGObTVxdEbN1MN5P2E">
                 <button class="btn btn-secondary" style="width:auto; padding:0 20px;" onclick="resetPlanPhase()" data-page-node-id="VR3kkub2B1CtdGo5Ljgv6o">恢复默认模板</button>
-                <button class="btn btn-primary" style="width:auto; padding:0 28px;" onclick="savePlanPhase()" data-page-node-id="sXaq3O4owGsYbPtzZ92KmB">保存测评计划</button>
+                <button class="btn btn-primary" style="width:auto; padding:0 28px;" onclick="savePlanPhase()" data-page-node-id="sXaq3O4owGsYbPtzZ92KmB">保存测评过程</button>
               </div>
             </div>
 
@@ -3241,7 +3241,7 @@
     fillPlanIntroTemplates(p);
     // 测评准备与方案编制 · 测评依据：填充默认模板
     fillPlanBasisTemplates(p);
-    // 测评准备与方案编制 · 测评计划：填充默认模板
+    // 测评准备与方案编制 · 测评过程：填充默认模板
     fillPlanPhaseTemplates(p);
     // 测评准备与方案编制 · 测评指标：渲染指标表格
     renderIndicatorTables();
@@ -3484,7 +3484,7 @@
     showToast('测评依据已保存');
   }
 
-  // ===== 测评准备与方案编制 · 测评计划 =====
+  // ===== 测评准备与方案编制 · 测评过程 =====
   function fillPlanPhaseTemplates(p) {
     const startDate = p.startDate || '';
     const endDate = p.endDate || '';
@@ -3533,11 +3533,11 @@
   function resetPlanPhase() {
     if (!currentImplementProject) { showToast('暂无关联项目信息', true); return; }
     fillPlanPhaseTemplates(currentImplementProject);
-    showToast('已恢复默认测评计划');
+    showToast('已恢复默认测评过程');
   }
 
   function savePlanPhase() {
-    showToast('测评计划已保存');
+    showToast('测评过程已保存');
   }
 
   // ===== 测评准备与方案编制 · 测评指标 =====
@@ -7095,7 +7095,7 @@
     return '<span class="apb-auto" style="display:inline-block; padding:6px 10px; border-radius:4px; min-width:120px; text-align:center;">' + onsiteEsc(v || '——') + '</span>';
   }
 
-  // 测评项目组成员（读取第二步「测评计划」人员表：项目负责人 + 测评项目组成员）
+  // 测评项目组成员（读取第二步「测评过程」人员表：项目负责人 + 测评项目组成员）
   function getPlanMembers() {
     const out = [];
     document.querySelectorAll('#plan-tab-7 table.mi-table tbody tr').forEach(tr => {
@@ -7349,7 +7349,7 @@
     // 固定顺序：项目负责人、逐人展开的测评人员、报告审核人、报告批准人。
     const b7Rows = getAppendixBPersonnel();
     if (!b7Rows.length) {
-      html += '<div class="alert-box"><span class="icon">ℹ️</span><div>暂无测评人员，请先在第二步「测评计划 → 测评项目组成员」中维护。</div></div>';
+      html += '<div class="alert-box"><span class="icon">ℹ️</span><div>暂无测评人员，请先在第二步「测评过程 → 测评项目组成员」中维护。</div></div>';
     } else {
       html += '<table class="onsite-table"><thead><tr>' +
         '<th style="width:45px;">序号</th><th style="width:110px;">姓名</th><th style="width:150px;">角色</th>' +

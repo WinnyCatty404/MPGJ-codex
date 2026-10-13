@@ -186,7 +186,7 @@ const planningModules: PlanningModule[] = [
     { key: 'assetSummary', label: '资产汇总', placeholder: '填写物理环境、密码产品、服务器、网络设备、数据库、应用、数据、文档和人员等资产概况', multiline: true },
     { key: 'importantAssets', label: '重要资产说明', placeholder: '说明非常重要或关键资产及理由', multiline: true },
   ] },
-  { key: 'schedule', title: '测评计划', note: '维护各阶段日期、任务和责任人员', fields: [
+  { key: 'schedule', title: '测评过程', note: '维护各阶段日期、任务和责任人员', fields: [
     { key: 'preparationPlan', label: '项目准备安排', placeholder: '日期、工作内容和责任人', multiline: true },
     { key: 'onsitePlan', label: '现场测评安排', placeholder: '日期、地点、工作内容和参与人员', multiline: true },
     { key: 'reportPlan', label: '报告编制与审核安排', placeholder: '计划完成时间和审核安排', multiline: true },
