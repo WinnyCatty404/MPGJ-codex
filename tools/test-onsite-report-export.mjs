@@ -60,12 +60,20 @@ const tallPngBytes = await sharp({
   create: { width: 500, height: 1800, channels: 3, background: { r: 245, g: 247, b: 250 } },
 }).png().toBuffer();
 const tallPng = 'data:image/png;base64,' + tallPngBytes.toString('base64');
+// 该比例会产生非整数 EMU 高度，用于防止将小数 cx/cy 写入 DOCX。
+const fractionalPngBytes = await sharp({
+  create: { width: 1379, height: 800, channels: 3, background: { r: 242, g: 246, b: 250 } },
+}).png().toBuffer();
+const fractionalPng = 'data:image/png;base64,' + fractionalPngBytes.toString('base64');
 const beforeEvidenceXml = xml;
 xml = await writeReportEvidence(xml, zip, {
   '0|0|0': { evidence: [{ no: '图A-1.1', name: '测试截图', dataUrl: png }] },
   '1|0|0': { evidence: [{ no: '图A-2.1', name: '高清截图', dataUrl: hdPng }] },
   '7|0|0': { evidence: [{ no: '图A-8.1', name: '应急截图', dataUrl: tallPng }] },
-}, [{ layer: 2, no: '图A-3.1', name: '多张并排测试', images: [widePng, widePng, widePng].map(dataUrl => ({ dataUrl })) }]);
+}, [
+  { layer: 2, no: '图A-3.1', name: '多张并排测试', images: [widePng, widePng, widePng].map(dataUrl => ({ dataUrl })) },
+  { layer: 3, no: '图A-4.1', name: '非整数比例测试', images: [{ dataUrl: fractionalPng }] },
+]);
 assert.ok(xml.includes('图A-1.1 测试截图'));
 assert.ok(xml.includes('图A-8.1 应急截图'));
 const evidenceParagraphs = [...xml.matchAll(/<w:p\b[^>]*>[\s\S]*?<\/w:p>/g)].map(match => match[0]);
@@ -84,6 +92,10 @@ for (const paragraph of multiImageRows) {
   assert.ok(widths.reduce((sum, width) => sum + width, 0) <= 13 * 360000,
     '同一行图片总宽度不能超过报告可用宽度');
 }
+const drawingExtents = [...xml.matchAll(/<(?:wp:extent|a:ext)\b[^>]*\bcx="([^"]+)"[^>]*\bcy="([^"]+)"/g)];
+assert.ok(drawingExtents.length > 0, '应生成图片尺寸属性');
+assert.ok(drawingExtents.every(match => /^\d+$/.test(match[1]) && /^\d+$/.test(match[2])),
+  'DOCX 图片的 cx/cy 必须为整数，否则 Microsoft Word 会拒绝打开文件');
 assert.ok(!xml.includes('门禁控制器实物图'));
 assert.ok(!xml.includes('密码安全事件上报'));
 assert.ok(xml.includes('<w:vMerge w:val="restart"/>'));

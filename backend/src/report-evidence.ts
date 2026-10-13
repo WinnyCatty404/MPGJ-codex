@@ -103,11 +103,14 @@ async function exportImage(dataUrl: string, label: string) {
 function imageRun(rid: string, id: number, width: number, height: number, description: string,
   targetWidth = REPORT_IMAGE_WIDTH_EMU, maxHeight = 0): string {
   // Word 中以目标宽度为上限，高度按原图比例计算；超高图片再按最大高度等比例缩小。
-  let cx = targetWidth;
-  let cy = Math.max(1, Math.round(targetWidth * height / width));
-  if (maxHeight > 0 && cy > maxHeight) {
-    cx = Math.max(1, Math.round(cx * maxHeight / cy));
-    cy = maxHeight;
+  // OOXML 的 wp:extent/a:ext 要求 cx、cy 为整数；并排图片计算可能产生小数，
+  // 因此在统一出口处取整，避免 Word 将整个 DOCX 判定为损坏。
+  let cx = Math.max(1, Math.round(targetWidth));
+  let cy = Math.max(1, Math.round(cx * height / width));
+  const integerMaxHeight = maxHeight > 0 ? Math.max(1, Math.round(maxHeight)) : 0;
+  if (integerMaxHeight > 0 && cy > integerMaxHeight) {
+    cx = Math.max(1, Math.round(cx * integerMaxHeight / cy));
+    cy = integerMaxHeight;
   }
   const label = xmlEscape(description);
   return `<w:r><w:drawing><wp:inline xmlns:wp="http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing" distT="0" distB="0" distL="0" distR="0"><wp:extent cx="${cx}" cy="${cy}"/><wp:docPr id="${id}" name="${label}" descr="${label}"/><wp:cNvGraphicFramePr><a:graphicFrameLocks xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" noChangeAspect="1"/></wp:cNvGraphicFramePr><a:graphic xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"><a:graphicData uri="http://schemas.openxmlformats.org/drawingml/2006/picture"><pic:pic xmlns:pic="http://schemas.openxmlformats.org/drawingml/2006/picture"><pic:nvPicPr><pic:cNvPr id="0" name="${label}"/><pic:cNvPicPr/></pic:nvPicPr><pic:blipFill><a:blip xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" r:embed="${rid}"/><a:stretch><a:fillRect/></a:stretch></pic:blipFill><pic:spPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="${cx}" cy="${cy}"/></a:xfrm><a:prstGeom prst="rect"><a:avLst/></a:prstGeom></pic:spPr></pic:pic></a:graphicData></a:graphic></wp:inline></w:drawing></w:r>`;
@@ -150,7 +153,7 @@ function evidenceImageRows(images: SizedEvidenceImage[]): SizedEvidenceImage[][]
 function evidenceImageRowParagraph(row: SizedEvidenceImage[], description: string, keepWithCaption: boolean): string {
   const availableWidth = REPORT_IMAGE_WIDTH_EMU - EVIDENCE_IMAGE_GAP_EMU * (row.length - 1);
   const ratioSum = row.reduce((sum, image) => sum + image.width / image.height, 0);
-  const height = Math.min(REPORT_IMAGE_MAX_HEIGHT_EMU, availableWidth / ratioSum);
+  const height = Math.max(1, Math.round(Math.min(REPORT_IMAGE_MAX_HEIGHT_EMU, availableWidth / ratioSum)));
   const runs = row.flatMap((image, index) => {
     const width = Math.floor(height * image.width / image.height);
     const drawing = imageRun(image.relationId, image.drawingId, image.width, image.height, description, width, height);
