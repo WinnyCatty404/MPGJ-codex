@@ -359,6 +359,7 @@ html[data-theme="dark"] .apb-section .ua-caption { background: var(--dark-surfac
 html[data-theme="dark"] .form-sheet-title,
 html[data-theme="dark"] .form-label,
 html[data-theme="dark"] .report-sub-tabs,
+html[data-theme="dark"] .asset-sub-tabs,
 html[data-theme="dark"] .overall-layer-tabs,
 html[data-theme="dark"] .suggestion-layer-tabs,
 html[data-theme="dark"] .overall-conclusion,
@@ -406,6 +407,26 @@ html[data-theme="dark"] .doc-meta,
 html[data-theme="dark"] .overall-editor-hint { color: var(--dark-text-muted); }
 html[data-theme="dark"] .report-export-progress { background: #35443e; }
 html[data-theme="dark"] .report-export-progress span { background: var(--dark-primary); }
+
+/* 测评准备与方案编制：左侧分组、系统资产子页签和测评接入点。 */
+html[data-theme="dark"] body.bb-embedded #page-implement .nav-group {
+  color: #c5d2cc;
+}
+html[data-theme="dark"] body.bb-embedded #page-implement .nav-group::before {
+  background: var(--dark-primary);
+}
+html[data-theme="dark"] body.bb-embedded #page-implement .asset-sub-tabs {
+  background: #293630;
+  border: 1px solid var(--dark-border);
+}
+html[data-theme="dark"] body.bb-embedded #page-implement #method-sub-panel-2 .obj-table-caption {
+  color: #d8e3de;
+}
+html[data-theme="dark"] body.bb-embedded #page-implement #access-point-list > div > span {
+  background: var(--dark-surface-raised) !important;
+  border-color: #52645c !important;
+  color: #d7e2dc !important;
+}
 
 /* Word 导入选项弹窗：覆盖写在标签上的浅色内联样式。 */
 html[data-theme="dark"] #modal-word-import-options .modal-header,
