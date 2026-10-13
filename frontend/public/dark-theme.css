@@ -252,6 +252,16 @@ html[data-theme="dark"] .login-card input { background: var(--dark-surface); col
   font-size: 12px;
   cursor: pointer;
 }
+.bb-theme-floating {
+  position: fixed;
+  left: 18px;
+  bottom: 18px;
+  z-index: 3500;
+  min-width: 86px;
+  background: #315f52;
+  border-color: #6f9d8e;
+  box-shadow: 0 8px 24px rgba(5,18,14,.28);
+}
 
 html[data-theme="dark"] body.bb-embedded {
   --primary: #62a892;
@@ -295,6 +305,12 @@ html[data-theme="dark"] body.bb-embedded #page-implement .info-subrow { border-c
 html[data-theme="dark"] body.bb-embedded #page-implement .info-label,
 html[data-theme="dark"] body.bb-embedded #page-implement .info-group-label { background: #293630; color: #b9c6bf; border-color: var(--dark-border); }
 html[data-theme="dark"] body.bb-embedded #page-implement .info-value { color: var(--dark-text); }
+html[data-theme="dark"] body.bb-embedded #page-implement .onsite-table-caption,
+html[data-theme="dark"] body.bb-embedded #page-implement .report-section-title,
+html[data-theme="dark"] body.bb-embedded #page-implement #report-panel-2 .onsite-table-caption { color: #cfe0d8; }
+html[data-theme="dark"] body.bb-embedded #page-implement .onsite-note,
+html[data-theme="dark"] body.bb-embedded #page-implement .topology-placeholder,
+html[data-theme="dark"] body.bb-embedded #page-implement .asset-sub-title { color: var(--dark-text-muted); }
 html[data-theme="dark"] body.bb-embedded #page-implement .page-header .btn,
 html[data-theme="dark"] body.bb-embedded #page-implement .indicator-ui-toolbar button,
 html[data-theme="dark"] body.bb-embedded #page-implement .crypto-add-row,
