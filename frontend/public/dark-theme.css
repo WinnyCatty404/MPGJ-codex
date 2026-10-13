@@ -178,6 +178,9 @@ html[data-theme="dark"] .project-actions button:hover,
 html[data-theme="dark"] .project-action-label:hover,
 html[data-theme="dark"] .user-actions button:hover { background: var(--dark-primary-soft); color: #a8d8c8; }
 html[data-theme="dark"] .project-actions .danger { color: var(--dark-danger); border-color: #6b4548; }
+html[data-theme="dark"] .project-table .project-row > span:first-child > b {
+  color: #e4eae5;
+}
 html[data-theme="dark"] .progress,
 html[data-theme="dark"] .mini-progress,
 html[data-theme="dark"] .stage-bars > div > div { background: #35443e; }
