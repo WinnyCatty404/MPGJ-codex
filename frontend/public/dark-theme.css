@@ -408,6 +408,16 @@ html[data-theme="dark"] .overall-editor-hint { color: var(--dark-text-muted); }
 html[data-theme="dark"] .report-export-progress { background: #35443e; }
 html[data-theme="dark"] .report-export-progress span { background: var(--dark-primary); }
 
+/* 附录 B：自动带入字段和表单行悬浮状态保持深色。 */
+html[data-theme="dark"] body.bb-embedded #page-implement .apb-form-table tbody > tr:hover {
+  background: #27352f;
+}
+html[data-theme="dark"] body.bb-embedded #page-implement .apb-auto {
+  background: #25312d !important;
+  border-color: #42534c !important;
+  color: #d7e2dc !important;
+}
+
 /* 测评准备与方案编制：左侧分组、系统资产子页签和测评接入点。 */
 html[data-theme="dark"] body.bb-embedded #page-implement .nav-group {
   color: #c5d2cc;
