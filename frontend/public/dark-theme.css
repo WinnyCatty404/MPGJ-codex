@@ -1,0 +1,405 @@
+/* 深色护眼模式：保留现有浅色主题，仅在 data-theme="dark" 时覆盖。 */
+html[data-theme="dark"] {
+  --dark-page: #18211e;
+  --dark-surface: #202b27;
+  --dark-surface-raised: #26332e;
+  --dark-surface-soft: #2b3933;
+  --dark-sidebar: #142d27;
+  --dark-primary: #62a892;
+  --dark-primary-strong: #76bba5;
+  --dark-primary-soft: #29483f;
+  --dark-text: #e4eae5;
+  --dark-text-muted: #aab6af;
+  --dark-text-subtle: #87968e;
+  --dark-border: #34433d;
+  --dark-danger: #ee8b91;
+  --dark-danger-soft: #4c2f32;
+  --dark-warning: #e2b45e;
+  --dark-warning-soft: #493d28;
+  --dark-success: #73c69c;
+  --dark-success-soft: #26483a;
+  background: var(--dark-page);
+  color: var(--dark-text);
+}
+
+html[data-theme="dark"] body {
+  background: var(--dark-page);
+  color: var(--dark-text);
+}
+
+html[data-theme="dark"] ::selection { background: #477a6b; color: #fff; }
+
+/* Vue 管理端 */
+html[data-theme="dark"] {
+  --navy: var(--dark-sidebar);
+  --blue: var(--dark-primary);
+  --line: var(--dark-border);
+  --muted: var(--dark-text-muted);
+  --danger: var(--dark-danger);
+  --green: var(--dark-success);
+  --amber: var(--dark-warning);
+}
+
+html[data-theme="dark"] .app-shell,
+html[data-theme="dark"] .main,
+html[data-theme="dark"] .content,
+html[data-theme="dark"] .workspace { background: var(--dark-page); color: var(--dark-text); }
+html[data-theme="dark"] .sidebar { background: var(--dark-sidebar); color: #d7e4de; }
+html[data-theme="dark"] .side-brand small { color: #91aaa0; }
+html[data-theme="dark"] .sidebar nav button,
+html[data-theme="dark"] .side-bottom button { color: #b9cbc3; }
+html[data-theme="dark"] .sidebar nav button:hover,
+html[data-theme="dark"] .side-bottom button:hover { background: #203f36; color: #f1f6f3; }
+html[data-theme="dark"] .sidebar nav button.active {
+  background: #2f6f5f;
+  color: #fff;
+  box-shadow: none;
+}
+html[data-theme="dark"] .brand-mark { background: #3d8a75; box-shadow: none; }
+
+html[data-theme="dark"] .topbar,
+html[data-theme="dark"] .panel,
+html[data-theme="dark"] .metric-grid article,
+html[data-theme="dark"] .project-strip,
+html[data-theme="dark"] .stage-nav,
+html[data-theme="dark"] .work-head,
+html[data-theme="dark"] .modal,
+html[data-theme="dark"] .settings-card,
+html[data-theme="dark"] .template-card { background: var(--dark-surface); border-color: var(--dark-border); color: var(--dark-text); box-shadow: none; }
+html[data-theme="dark"] .topbar { border-bottom-color: var(--dark-border); }
+html[data-theme="dark"] .top-code,
+html[data-theme="dark"] .icon-btn,
+html[data-theme="dark"] .avatar { background: var(--dark-surface-soft); color: var(--dark-primary-strong); }
+html[data-theme="dark"] .text-btn,
+html[data-theme="dark"] .logout,
+html[data-theme="dark"] .module-grid button,
+html[data-theme="dark"] .domain-grid button,
+html[data-theme="dark"] .aside-head button { color: var(--dark-primary-strong); }
+html[data-theme="dark"] .user-block small,
+html[data-theme="dark"] .welcome-row span,
+html[data-theme="dark"] .welcome-row p,
+html[data-theme="dark"] .page-title p,
+html[data-theme="dark"] .panel-head p,
+html[data-theme="dark"] .metric-grid small,
+html[data-theme="dark"] .metric-grid article > span,
+html[data-theme="dark"] .table-row small,
+html[data-theme="dark"] .tr small,
+html[data-theme="dark"] .project-identity p,
+html[data-theme="dark"] .project-kpis small,
+html[data-theme="dark"] .stage-nav small,
+html[data-theme="dark"] .work-head p,
+html[data-theme="dark"] .section-title p,
+html[data-theme="dark"] .info-grid small,
+html[data-theme="dark"] .module-grid small,
+html[data-theme="dark"] .domain-grid p,
+html[data-theme="dark"] .work-aside li,
+html[data-theme="dark"] .review-flow p { color: var(--dark-text-muted); }
+html[data-theme="dark"] .welcome-row h1,
+html[data-theme="dark"] .page-title h1,
+html[data-theme="dark"] .panel h2,
+html[data-theme="dark"] .panel h3,
+html[data-theme="dark"] .tr b,
+html[data-theme="dark"] .table-row b,
+html[data-theme="dark"] .project-identity h2,
+html[data-theme="dark"] .section-title h3 { color: var(--dark-text); }
+
+html[data-theme="dark"] .primary {
+  background: #3f806e;
+  color: #fff;
+  box-shadow: none;
+}
+html[data-theme="dark"] .primary:hover { background: #4d927e; filter: none; }
+html[data-theme="dark"] .secondary,
+html[data-theme="dark"] .back-btn {
+  background: var(--dark-surface-raised);
+  border-color: var(--dark-border);
+  color: var(--dark-text);
+}
+html[data-theme="dark"] .theme-toggle,
+html[data-theme="dark"] .bb-theme-toggle {
+  min-height: 32px;
+  padding: 0 12px;
+  border: 1px solid #466057;
+  border-radius: 16px;
+  background: #294039;
+  color: #dce8e2;
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+.theme-toggle {
+  min-height: 32px;
+  padding: 0 12px;
+  border: 1px solid #d7e0e9;
+  border-radius: 16px;
+  background: #f5f7f9;
+  color: #40516a;
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+html[data-theme="dark"] input,
+html[data-theme="dark"] select,
+html[data-theme="dark"] textarea {
+  background: var(--dark-surface-raised);
+  border-color: #42534c;
+  color: var(--dark-text);
+}
+html[data-theme="dark"] input::placeholder,
+html[data-theme="dark"] textarea::placeholder { color: #78877f; }
+html[data-theme="dark"] input:focus,
+html[data-theme="dark"] select:focus,
+html[data-theme="dark"] textarea:focus {
+  border-color: var(--dark-primary);
+  box-shadow: 0 0 0 3px rgba(98,168,146,.16);
+}
+html[data-theme="dark"] select { color-scheme: dark; }
+
+html[data-theme="dark"] .panel-head,
+html[data-theme="dark"] .aside-head,
+html[data-theme="dark"] .modal-head,
+html[data-theme="dark"] .modal-foot,
+html[data-theme="dark"] .work-head { border-color: var(--dark-border); }
+html[data-theme="dark"] .compact-table .tr,
+html[data-theme="dark"] .table-row { background: var(--dark-surface); color: var(--dark-text-muted); border-color: var(--dark-border); }
+html[data-theme="dark"] .compact-table .th,
+html[data-theme="dark"] .table-head { background: #25312d; color: #aebbb4; border-color: var(--dark-border); }
+html[data-theme="dark"] .compact-table button.tr:hover,
+html[data-theme="dark"] .table-row:hover { background: var(--dark-surface-raised); }
+html[data-theme="dark"] .project-actions button,
+html[data-theme="dark"] .project-action-label,
+html[data-theme="dark"] .user-actions button {
+  background: var(--dark-surface-raised);
+  border-color: #465850;
+  color: #bcd0c6;
+}
+html[data-theme="dark"] .project-actions button:hover,
+html[data-theme="dark"] .project-action-label:hover,
+html[data-theme="dark"] .user-actions button:hover { background: var(--dark-primary-soft); color: #a8d8c8; }
+html[data-theme="dark"] .project-actions .danger { color: var(--dark-danger); border-color: #6b4548; }
+html[data-theme="dark"] .progress,
+html[data-theme="dark"] .mini-progress,
+html[data-theme="dark"] .stage-bars > div > div { background: #35443e; }
+html[data-theme="dark"] .progress i,
+html[data-theme="dark"] .mini-progress i,
+html[data-theme="dark"] .stage-bars i { background: var(--dark-primary); }
+
+html[data-theme="dark"] .metric-icon.blue,
+html[data-theme="dark"] .metric-icon.cyan { background: var(--dark-primary-soft); color: #8dccb9; }
+html[data-theme="dark"] .metric-icon.amber { background: var(--dark-warning-soft); color: var(--dark-warning); }
+html[data-theme="dark"] .metric-icon.green { background: var(--dark-success-soft); color: var(--dark-success); }
+html[data-theme="dark"] .status-pill { background: #344039; color: #c0ccc5; }
+html[data-theme="dark"] .status-pill.in_progress,
+html[data-theme="dark"] .status-pill.active { background: var(--dark-primary-soft); color: #8dccb9; }
+html[data-theme="dark"] .status-pill.reviewing,
+html[data-theme="dark"] .status-pill.pending { background: var(--dark-warning-soft); color: var(--dark-warning); }
+html[data-theme="dark"] .status-pill.completed { background: var(--dark-success-soft); color: var(--dark-success); }
+html[data-theme="dark"] .status-pill.disabled { background: var(--dark-danger-soft); color: var(--dark-danger); }
+html[data-theme="dark"] .risk-callout { background: var(--dark-warning-soft); }
+html[data-theme="dark"] .risk-callout p { color: #cdbb91; }
+
+html[data-theme="dark"] .filter-panel select,
+html[data-theme="dark"] .search input { background: var(--dark-surface-raised); border-color: var(--dark-border); color: var(--dark-text); }
+html[data-theme="dark"] .project-identity small,
+html[data-theme="dark"] .login-card > small,
+html[data-theme="dark"] .page-title small,
+html[data-theme="dark"] .modal-head small,
+html[data-theme="dark"] .work-head small { color: var(--dark-primary-strong); }
+html[data-theme="dark"] .project-kpis span,
+html[data-theme="dark"] .info-grid,
+html[data-theme="dark"] .info-grid span { border-color: var(--dark-border); }
+html[data-theme="dark"] .stage-nav button { background: transparent; color: var(--dark-text-muted); border-color: var(--dark-border); }
+html[data-theme="dark"] .stage-nav button:hover { background: var(--dark-surface-raised); }
+html[data-theme="dark"] .stage-nav button.active { background: var(--dark-primary-soft); color: #8dccb9; }
+html[data-theme="dark"] .stage-nav button > i { border-color: #52635b; }
+html[data-theme="dark"] .section-title > span { background: var(--dark-primary-soft); color: #8dccb9; }
+html[data-theme="dark"] .module-grid article,
+html[data-theme="dark"] .domain-grid article,
+html[data-theme="dark"] .check-list,
+html[data-theme="dark"] .check-list span,
+html[data-theme="dark"] .review-flow article { background: var(--dark-surface-raised); border-color: var(--dark-border); }
+html[data-theme="dark"] .review-flow .active { background: var(--dark-primary-soft); border-color: #527f70; }
+html[data-theme="dark"] .ring { background: conic-gradient(var(--dark-primary) var(--p),#35443e 0); }
+html[data-theme="dark"] .ring::after { background: var(--dark-surface); }
+html[data-theme="dark"] .score-card { background: #24473d; }
+html[data-theme="dark"] .score-card .primary { background: #dcebe5; color: #245748; }
+html[data-theme="dark"] .modal-mask { background: rgba(7,13,11,.78); }
+html[data-theme="dark"] .modal-head button { background: var(--dark-surface-raised); color: var(--dark-text-muted); }
+html[data-theme="dark"] .planning-form textarea,
+html[data-theme="dark"] .planning-form input,
+html[data-theme="dark"] .risk-template-modal-grid textarea,
+html[data-theme="dark"] .risk-template-modal-grid input,
+html[data-theme="dark"] .risk-template-modal-grid select { background: var(--dark-surface-raised); color: var(--dark-text); border-color: var(--dark-border); }
+html[data-theme="dark"] .toast { background: #29473e; color: #edf5f1; }
+
+html[data-theme="dark"] .login-shell,
+html[data-theme="dark"] .login-panel { background: var(--dark-page); }
+html[data-theme="dark"] .login-brand { background: #173a32; }
+html[data-theme="dark"] .login-card h2 { color: var(--dark-text); }
+html[data-theme="dark"] .login-card label { color: #bac8c1; }
+html[data-theme="dark"] .login-card input { background: var(--dark-surface); color: var(--dark-text); border-color: var(--dark-border); }
+
+/* 独立报告编制页 */
+.bb-theme-toggle {
+  height: 30px;
+  padding: 0 11px;
+  border: 1px solid rgba(255,255,255,.28);
+  border-radius: 15px;
+  background: rgba(255,255,255,.1);
+  color: #fff;
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+html[data-theme="dark"] body.bb-embedded {
+  --primary: #62a892;
+  --primary-hover: #76bba5;
+  --primary-bg: #29483f;
+  --success: #73c69c;
+  --success-bg: #26483a;
+  --warning: #e2b45e;
+  --warning-bg: #493d28;
+  --danger: #ee8b91;
+  --danger-bg: #4c2f32;
+  --text-1: #e4eae5;
+  --text-2: #b6c2bb;
+  --text-3: #91a098;
+  --border: #34433d;
+  --bg-page: #18211e;
+  --bg-card: #202b27;
+  --bg-nav: #1c2723;
+  background: var(--bg-page);
+  color: var(--text-1);
+}
+html[data-theme="dark"] body.bb-embedded #bb-prototype-loading { background: var(--dark-page); color: var(--dark-text); }
+html[data-theme="dark"] body.bb-embedded #bb-prototype-loading span,
+html[data-theme="dark"] body.bb-embedded #page-implement .page-header,
+html[data-theme="dark"] body.bb-embedded #page-implement .tab-content,
+html[data-theme="dark"] body.bb-embedded #page-implement #step-panel-2 .tab-content,
+html[data-theme="dark"] body.bb-embedded #page-implement #step-panel-5 .page-container,
+html[data-theme="dark"] body.bb-embedded #page-implement .step-panel { background: var(--dark-surface); color: var(--dark-text); border-color: var(--dark-border); }
+html[data-theme="dark"] body.bb-embedded #page-implement .steps,
+html[data-theme="dark"] body.bb-embedded #page-implement .tab-sidebar,
+html[data-theme="dark"] body.bb-embedded #page-implement #step-panel-2 .tab-sidebar { background: var(--bg-nav); border-color: var(--dark-border); }
+html[data-theme="dark"] body.bb-embedded #page-implement .step-circle { background: var(--dark-surface-raised); border-color: #53645c; color: var(--dark-text-muted); }
+html[data-theme="dark"] body.bb-embedded #page-implement .step-line { background: #405048; }
+html[data-theme="dark"] body.bb-embedded #page-implement .form-group label,
+html[data-theme="dark"] body.bb-embedded #page-implement .sub-title,
+html[data-theme="dark"] body.bb-embedded #page-implement .section-name { color: #d7e1dc; }
+html[data-theme="dark"] body.bb-embedded #page-implement .form-actions { border-color: var(--dark-border); }
+html[data-theme="dark"] body.bb-embedded #page-implement .info-table,
+html[data-theme="dark"] body.bb-embedded #page-implement .info-row,
+html[data-theme="dark"] body.bb-embedded #page-implement .info-subrow { border-color: var(--dark-border); }
+html[data-theme="dark"] body.bb-embedded #page-implement .info-label,
+html[data-theme="dark"] body.bb-embedded #page-implement .info-group-label { background: #293630; color: #b9c6bf; border-color: var(--dark-border); }
+html[data-theme="dark"] body.bb-embedded #page-implement .info-value { color: var(--dark-text); }
+html[data-theme="dark"] body.bb-embedded #page-implement .page-header .btn,
+html[data-theme="dark"] body.bb-embedded #page-implement .indicator-ui-toolbar button,
+html[data-theme="dark"] body.bb-embedded #page-implement .crypto-add-row,
+html[data-theme="dark"] .global-replace-actions button { background: var(--dark-surface-raised); border-color: var(--dark-border); color: var(--dark-text-muted); }
+
+html[data-theme="dark"] body.bb-embedded #page-implement input:not([type="checkbox"]):not([type="radio"]),
+html[data-theme="dark"] body.bb-embedded #page-implement select,
+html[data-theme="dark"] body.bb-embedded #page-implement textarea,
+html[data-theme="dark"] .global-replace-fields input {
+  background: #25312d;
+  border-color: #42534c;
+  color: var(--dark-text);
+}
+html[data-theme="dark"] body.bb-embedded #page-implement input::placeholder,
+html[data-theme="dark"] body.bb-embedded #page-implement textarea::placeholder { color: #78877f; }
+html[data-theme="dark"] body.bb-embedded #page-implement input:focus,
+html[data-theme="dark"] body.bb-embedded #page-implement select:focus,
+html[data-theme="dark"] body.bb-embedded #page-implement textarea:focus { border-color: var(--dark-primary); box-shadow: 0 0 0 3px rgba(98,168,146,.14); }
+
+html[data-theme="dark"] body.bb-embedded #page-implement table,
+html[data-theme="dark"] body.bb-embedded #page-implement tbody,
+html[data-theme="dark"] body.bb-embedded #page-implement td { background: var(--dark-surface); color: var(--dark-text); border-color: #46554e; }
+html[data-theme="dark"] body.bb-embedded #page-implement table th { background: #2c3934; color: #d4ded8; border-color: #526159; }
+html[data-theme="dark"] body.bb-embedded #page-implement table tbody tr:hover > td { background: #27352f; }
+html[data-theme="dark"] body.bb-embedded #page-implement .indicator-table .ind-name,
+html[data-theme="dark"] body.bb-embedded #page-implement .mi-table .label-cell,
+html[data-theme="dark"] body.bb-embedded #page-implement .mi-table .sub-label,
+html[data-theme="dark"] body.bb-embedded #page-implement .onsite-table .unit-cell,
+html[data-theme="dark"] body.bb-embedded #page-implement .onsite-table .unit-score-cell { background: #293630; color: #d5dfda; }
+
+html[data-theme="dark"] .form-sheet,
+html[data-theme="dark"] .doc-card,
+html[data-theme="dark"] .report-hero-card,
+html[data-theme="dark"] .report-analysis-card,
+html[data-theme="dark"] .report-export-card,
+html[data-theme="dark"] .report-export-task,
+html[data-theme="dark"] .evi-group,
+html[data-theme="dark"] .evi-library,
+html[data-theme="dark"] .topology-block,
+html[data-theme="dark"] .crypto-key-card,
+html[data-theme="dark"] .global-replace-dialog,
+html[data-theme="dark"] .onsite-record-modal-shell,
+html[data-theme="dark"] .onsite-evidence-drawer,
+html[data-theme="dark"] .apb-section .onsite-table,
+html[data-theme="dark"] .apb-section .ua-caption { background: var(--dark-surface-raised); color: var(--dark-text); border-color: var(--dark-border); box-shadow: none; }
+html[data-theme="dark"] .form-sheet-title,
+html[data-theme="dark"] .form-label,
+html[data-theme="dark"] .report-sub-tabs,
+html[data-theme="dark"] .overall-layer-tabs,
+html[data-theme="dark"] .suggestion-layer-tabs,
+html[data-theme="dark"] .overall-conclusion,
+html[data-theme="dark"] .object-match-panel,
+html[data-theme="dark"] .onsite-record-modal-heading,
+html[data-theme="dark"] .onsite-record-modal-foot,
+html[data-theme="dark"] .onsite-evidence-drawer-head { background: #293630; color: var(--dark-text); border-color: var(--dark-border); }
+html[data-theme="dark"] .report-sub-tab,
+html[data-theme="dark"] .obj-layer-tab,
+html[data-theme="dark"] .asset-sub-tab,
+html[data-theme="dark"] .overall-layer-tab,
+html[data-theme="dark"] .suggestion-layer-tab,
+html[data-theme="dark"] .apb-section-nav button,
+html[data-theme="dark"] .evi-mini-btn,
+html[data-theme="dark"] .topology-block-actions button { background: #25312d; color: var(--dark-text-muted); border-color: var(--dark-border); }
+html[data-theme="dark"] .report-sub-tab:hover,
+html[data-theme="dark"] .obj-layer-tab:hover,
+html[data-theme="dark"] .asset-sub-tab:hover,
+html[data-theme="dark"] .overall-layer-tab:hover,
+html[data-theme="dark"] .suggestion-layer-tab:hover { background: var(--dark-primary-soft); color: var(--dark-primary-strong); }
+html[data-theme="dark"] .report-sub-tab.active,
+html[data-theme="dark"] .obj-layer-tab.active,
+html[data-theme="dark"] .asset-sub-tab.active,
+html[data-theme="dark"] .overall-layer-tab.active,
+html[data-theme="dark"] .suggestion-layer-tab.active { background: #3f806e; border-color: #5fa78f; color: #fff; box-shadow: none; }
+html[data-theme="dark"] .topology-upload,
+html[data-theme="dark"] .apb-img-slot,
+html[data-theme="dark"] .apb-cert-grid-table td,
+html[data-theme="dark"] .suggestion-empty { background: #222e29 !important; color: var(--dark-text-muted); border-color: #4c6157 !important; }
+html[data-theme="dark"] .evi-active-bar,
+html[data-theme="dark"] .onsite-record-row.is-editing td,
+html[data-theme="dark"] .onsite-record-editor-row td { background: var(--dark-primary-soft) !important; border-color: #5a8d7c; }
+html[data-theme="dark"] .onsite-record-modal-body { background: var(--dark-surface); }
+html[data-theme="dark"] .risk-callout,
+html[data-theme="dark"] .object-match-panel { background: var(--dark-warning-soft); }
+html[data-theme="dark"] .report-export-card strong,
+html[data-theme="dark"] .report-export-task-name,
+html[data-theme="dark"] .doc-h,
+html[data-theme="dark"] .doc-title,
+html[data-theme="dark"] .overall-editor-title,
+html[data-theme="dark"] .suggestion-editor-title { color: var(--dark-text); }
+html[data-theme="dark"] .report-export-card p,
+html[data-theme="dark"] .doc-p,
+html[data-theme="dark"] .doc-meta,
+html[data-theme="dark"] .overall-editor-hint { color: var(--dark-text-muted); }
+html[data-theme="dark"] .report-export-progress { background: #35443e; }
+html[data-theme="dark"] .report-export-progress span { background: var(--dark-primary); }
+
+/* 打印与正式报告输出不继承屏幕深色主题。 */
+@media print {
+  html[data-theme="dark"],
+  html[data-theme="dark"] body { color-scheme: light; background: #fff !important; color: #000 !important; }
+  html[data-theme="dark"] #page-implement,
+  html[data-theme="dark"] #page-implement .step-panel,
+  html[data-theme="dark"] #page-implement .tab-content,
+  html[data-theme="dark"] #page-implement table,
+  html[data-theme="dark"] #page-implement th,
+  html[data-theme="dark"] #page-implement td { background: #fff !important; color: #000 !important; border-color: #777 !important; }
+  .bb-theme-toggle { display: none !important; }
+}

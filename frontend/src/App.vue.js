@@ -1,6 +1,7 @@
 import { computed, onBeforeUnmount, onMounted, reactive, ref } from 'vue';
 const restorablePages = ['dashboard', 'projects', 'users', 'templates', 'risk-analysis', 'institution'];
 const apiBase = '/api';
+const darkMode = ref(document.documentElement.dataset.theme === 'dark');
 const token = ref(localStorage.getItem('bb-token') || '');
 const currentUser = ref(null);
 const page = ref(token.value ? 'dashboard' : 'dashboard');
@@ -116,6 +117,19 @@ const dashboard = ref({ summary: {}, stages: [], recent: [], risks: [] });
 const projectForm = reactive({ code: '', reportCode: '', systemName: '', orgName: '', assessmentYear: 2026, systemLevel: 3, startDate: '', endDate: '' });
 const copyForm = reactive({ systemName: '', reportCode: '', assessmentYear: new Date().getFullYear(), startDate: '', endDate: '' });
 const userForm = reactive({ username: '', displayName: '', role: 'evaluator', certificateDate: '', certificateFileName: '' });
+function toggleTheme() {
+    const themeApi = window.bbTheme;
+    const next = themeApi?.toggle() || (darkMode.value ? 'light' : 'dark');
+    if (!themeApi) {
+        document.documentElement.dataset.theme = next;
+        document.documentElement.style.colorScheme = next;
+        localStorage.setItem('bb-theme', next);
+    }
+    darkMode.value = next === 'dark';
+}
+function handleThemeChange(event) {
+    darkMode.value = event.detail?.theme === 'dark';
+}
 const stageMeta = [
     { key: 'preparation', short: '项目准备', icon: '01', hint: '单位与项目基础资料' },
     { key: 'planning', short: '方案编制', icon: '02', hint: '资产、对象、指标和计划' },
@@ -814,6 +828,7 @@ function fmtDate(value) {
 onMounted(async () => {
     window.addEventListener('focus', handleProjectListFocus);
     window.addEventListener('storage', handleProjectDataUpdated);
+    window.addEventListener('bb-theme-change', handleThemeChange);
     document.addEventListener('visibilitychange', handleProjectListVisibility);
     if (!token.value)
         return;
@@ -832,6 +847,7 @@ onMounted(async () => {
 onBeforeUnmount(() => {
     window.removeEventListener('focus', handleProjectListFocus);
     window.removeEventListener('storage', handleProjectDataUpdated);
+    window.removeEventListener('bb-theme-change', handleThemeChange);
     document.removeEventListener('visibilitychange', handleProjectListVisibility);
 });
 const __VLS_ctx = {
@@ -1083,6 +1099,14 @@ else {
     });
     /** @type {__VLS_StyleScopedClasses['text-btn']} */ ;
     __VLS_asFunctionalElement1(__VLS_intrinsics.button, __VLS_intrinsics.button)({
+        ...{ onClick: (__VLS_ctx.toggleTheme) },
+        ...{ class: "theme-toggle" },
+        type: "button",
+        'aria-pressed': (__VLS_ctx.darkMode),
+    });
+    /** @type {__VLS_StyleScopedClasses['theme-toggle']} */ ;
+    (__VLS_ctx.darkMode ? '浅色模式' : '深色模式');
+    __VLS_asFunctionalElement1(__VLS_intrinsics.button, __VLS_intrinsics.button)({
         ...{ class: "icon-btn" },
         title: "通知",
     });
@@ -1202,7 +1226,7 @@ else {
                         throw 0;
                     return (__VLS_ctx.openPage('projects'));
                     // @ts-ignore
-                    [openPage, page, currentUser, currentUser, currentUser, currentUser, roleMap, logout, openAddProjectModal, dashboard, dashboard, dashboard, dashboard,];
+                    [openPage, page, currentUser, currentUser, currentUser, currentUser, toggleTheme, darkMode, darkMode, roleMap, logout, openAddProjectModal, dashboard, dashboard, dashboard, dashboard,];
                 } },
             ...{ class: "text-btn" },
         });

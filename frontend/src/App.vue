@@ -13,6 +13,7 @@ type PlanningField = { key: string; label: string; placeholder: string; multilin
 type PlanningModule = { key: string; title: string; note: string; fields: PlanningField[] };
 
 const apiBase = '/api';
+const darkMode = ref(document.documentElement.dataset.theme === 'dark');
 const token = ref(localStorage.getItem('bb-token') || '');
 const currentUser = ref<User | null>(null);
 const page = ref<Page>(token.value ? 'dashboard' : 'dashboard');
@@ -132,6 +133,21 @@ const dashboard = ref<any>({ summary: {}, stages: [], recent: [], risks: [] });
 const projectForm = reactive({ code: '', reportCode: '', systemName: '', orgName: '', assessmentYear: 2026, systemLevel: 3, startDate: '', endDate: '' });
 const copyForm = reactive({ systemName: '', reportCode: '', assessmentYear: new Date().getFullYear(), startDate: '', endDate: '' });
 const userForm = reactive({ username: '', displayName: '', role: 'evaluator', certificateDate: '', certificateFileName: '' });
+
+function toggleTheme() {
+  const themeApi = (window as typeof window & { bbTheme?: { toggle: () => string } }).bbTheme;
+  const next = themeApi?.toggle() || (darkMode.value ? 'light' : 'dark');
+  if (!themeApi) {
+    document.documentElement.dataset.theme = next;
+    document.documentElement.style.colorScheme = next;
+    localStorage.setItem('bb-theme', next);
+  }
+  darkMode.value = next === 'dark';
+}
+
+function handleThemeChange(event: Event) {
+  darkMode.value = (event as CustomEvent<{ theme?: string }>).detail?.theme === 'dark';
+}
 
 const stageMeta = [
   { key: 'preparation', short: '项目准备', icon: '01', hint: '单位与项目基础资料' },
@@ -774,6 +790,7 @@ function fmtDate(value?: string) {
 onMounted(async () => {
   window.addEventListener('focus', handleProjectListFocus);
   window.addEventListener('storage', handleProjectDataUpdated);
+  window.addEventListener('bb-theme-change', handleThemeChange);
   document.addEventListener('visibilitychange', handleProjectListVisibility);
   if (!token.value) return;
   try {
@@ -790,6 +807,7 @@ onMounted(async () => {
 onBeforeUnmount(() => {
   window.removeEventListener('focus', handleProjectListFocus);
   window.removeEventListener('storage', handleProjectDataUpdated);
+  window.removeEventListener('bb-theme-change', handleThemeChange);
   document.removeEventListener('visibilitychange', handleProjectListVisibility);
 });
 </script>
@@ -833,7 +851,7 @@ onBeforeUnmount(() => {
     <main class="main">
       <header class="topbar">
         <div><b>{{ page==='dashboard'?'工作台':page==='projects'?'项目管理':page==='users'?'用户管理':page==='templates'?'模板设置':page==='risk-analysis'?'风险分析':page==='institution'?'测评机构管理':selectedProject?.system_name }}</b><span v-if="page==='workspace'" class="top-code">{{ selectedProject?.code }}</span></div>
-        <div class="top-actions"><button class="text-btn" @click="showPasswordModal=true">修改密码</button><button class="icon-btn" title="通知">◔<span class="dot"></span></button><div class="avatar">{{ currentUser?.display_name?.slice(0,1) }}</div><div class="user-block"><b>{{ currentUser?.display_name }}</b><small>{{ roleMap[currentUser?.role || ''] }}</small></div><button class="logout" @click="logout">退出</button></div>
+        <div class="top-actions"><button class="text-btn" @click="showPasswordModal=true">修改密码</button><button class="theme-toggle" type="button" :aria-pressed="darkMode" @click="toggleTheme">{{ darkMode ? '浅色模式' : '深色模式' }}</button><button class="icon-btn" title="通知">◔<span class="dot"></span></button><div class="avatar">{{ currentUser?.display_name?.slice(0,1) }}</div><div class="user-block"><b>{{ currentUser?.display_name }}</b><small>{{ roleMap[currentUser?.role || ''] }}</small></div><button class="logout" @click="logout">退出</button></div>
       </header>
 
       <div v-if="page==='dashboard'" class="content dashboard">
