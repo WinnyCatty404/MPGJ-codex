@@ -682,6 +682,17 @@
       color:#fff; font-size:13px; font-weight:700; cursor:pointer;
     }
     .onsite-record-modal-done:hover { background:#194889; }
+    /* 深色模式：结果记录编辑弹窗整体转深色，避免头/体露出白色横条 */
+    html[data-theme="dark"] .onsite-record-modal-shell { background:#26332e; border-color:#34433d; box-shadow:0 18px 54px rgba(0,0,0,.5); }
+    html[data-theme="dark"] .onsite-record-modal-head { background:#293630; border-bottom-color:#34433d; }
+    html[data-theme="dark"] .onsite-record-modal-heading strong { color:#e4eae5; }
+    html[data-theme="dark"] .onsite-record-modal-context { color:#b6c2bb; }
+    html[data-theme="dark"] .onsite-record-modal-close { background:#26332e; color:#b6c2bb; }
+    html[data-theme="dark"] .onsite-record-modal-close:hover { background:#29483f; color:#e4eae5; }
+    html[data-theme="dark"] .onsite-record-modal-body { background:#26332e; }
+    html[data-theme="dark"] .onsite-record-modal-editor { background:#25312d; border-color:#42534c; color:#e4eae5; }
+    html[data-theme="dark"] .onsite-record-modal-editor:focus { border-color:#62a892; box-shadow:0 0 0 3px rgba(98,168,146,.14); }
+    html[data-theme="dark"] .onsite-record-modal-foot { background:#293630; border-top-color:#34433d; }
     body.onsite-record-modal-open .onsite-evidence-fab { z-index:1210; }
     body.onsite-record-modal-open .onsite-evidence-drawer { z-index:1220; }
     @media (max-width:760px) {
@@ -1073,6 +1084,9 @@
 
   /* ===== 测评实施页：与首页统一的蓝灰卡片风格 ===== */
   #page-implement { background: #f3f6fa; color: #17243a; }
+  /* 深色模式：页面背景同步为深色，避免步骤条两侧露出浅色角落 */
+  html[data-theme="dark"] body.bb-embedded #page-implement { background: #18211e; color: #e4eae5; }
+  html[data-theme="dark"] body.bb-embedded #page-implement .detail-card { background: transparent; border-color: transparent; }
   #page-implement .detail-card,
   #page-implement .tab-sidebar,
   #page-implement .tab-content {
@@ -1130,6 +1144,17 @@
   #page-implement .sub-title { color: #0b3768; }
   #page-implement .section-header .section-name { font-size: 16px; }
   #page-implement .sub-title { border-left-color: #1467c9; }
+  /* 深色模式：蓝色/深蓝标题字统一改为表格表头同色，保证深色背景可读性 */
+  html[data-theme="dark"] .onsite-evidence-drawer-head strong,
+  html[data-theme="dark"] .evi-library-title,
+  html[data-theme="dark"] .apb-cert-head,
+  html[data-theme="dark"] #page-implement .section-header .section-name,
+  html[data-theme="dark"] #page-implement .detail-card .detail-title,
+  html[data-theme="dark"] #page-implement .sub-title { color: #d4ded8 !important; }
+  html[data-theme="dark"] #page-implement [style*="color:#1a3a6c"] { color: #d4ded8 !important; }
+  /* 深色模式：风险分析面板说明框与表标题转深色 */
+  html[data-theme="dark"] #report-panel-2 > .onsite-note { background: #26332e; border-color: #34433d; color: #b6c2bb; }
+  html[data-theme="dark"] #report-panel-2 .onsite-table-caption { color: #d4ded8 !important; }
   #page-implement .indicator-sub-tabs {
     gap: 6px; padding: 5px; background: #f3f6fa;
     border: 1px solid #e2e8f0; border-radius: 9px;
