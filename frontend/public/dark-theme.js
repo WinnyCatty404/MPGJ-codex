@@ -49,6 +49,14 @@
       button.addEventListener('click', toggleTheme);
       container.insertBefore(button, container.firstChild);
     });
+    if (document.body.classList.contains('bb-embedded') && !document.querySelector('.bb-theme-floating')) {
+      const button = document.createElement('button');
+      button.type = 'button';
+      button.className = 'bb-theme-toggle bb-theme-floating';
+      button.setAttribute('data-bb-theme-toggle', '');
+      button.addEventListener('click', toggleTheme);
+      document.body.appendChild(button);
+    }
     updateButtons(document.documentElement.dataset.theme || LIGHT);
   });
 
