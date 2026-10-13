@@ -2611,6 +2611,7 @@
         </div>
       </div>
       <div id="step-panel-4" class="step-panel" style="display:none;">
+        <div style="display:flex;justify-content:flex-end;padding:12px 0;"><button type="button" class="btn btn-primary" onclick="runReportReview(null)">开始审核</button></div>
         <div class="tab-layout">
           <div class="tab-sidebar">
             <div class="tab-item active" id="report-tab-btn-0" onclick="switchReportTab(0)">单元测评结果分析</div>
@@ -2620,6 +2621,7 @@
             <div class="tab-item" id="report-tab-btn-4" onclick="switchReportTab(4)">总体评价</div>
             <div class="tab-item" id="report-tab-btn-5" onclick="switchReportTab(5)">安全问题及改进建议</div>
             <div class="tab-item" id="report-tab-btn-6" onclick="switchReportTab(6)">附录B证明记录</div>
+            <div class="tab-item" id="report-tab-btn-7" onclick="switchReportTab(7)">报告审核</div>
           </div>
           <div class="tab-content">
             <div id="report-panel-0" class="tab-panel active"></div>
@@ -2636,6 +2638,7 @@
             <div id="report-panel-4" class="tab-panel"></div>
             <div id="report-panel-5" class="tab-panel"></div>
             <div id="report-panel-6" class="tab-panel"></div>
+            <div id="report-panel-7" class="tab-panel"></div>
           </div>
         </div>
       </div>
@@ -7410,7 +7413,7 @@
   let activeReportTab = 0;
   function switchReportTab(n) {
     activeReportTab = n;
-    for (let i = 0; i < 7; i++) {
+    for (let i = 0; i < 8; i++) {
       const btn = document.getElementById('report-tab-btn-' + i);
       const panel = document.getElementById('report-panel-' + i);
       if (!btn || !panel) continue;
@@ -7440,6 +7443,17 @@
     else if (n === 4) renderReportOverall();
     else if (n === 5) renderReportSuggestions();
     else if (n === 6) renderAppendixB();
+    else if (n === 7) renderReportReview();
+    if (n >= 0 && n <= 5) {
+      const panel = document.getElementById('report-panel-' + n);
+      if (panel && !panel.querySelector('.report-review-section-action')) {
+        const action = document.createElement('button');
+        action.type = 'button'; action.className = 'btn report-review-section-action';
+        action.textContent = '审核本节'; action.style.marginBottom = '12px';
+        action.onclick = function() { runReportReview(n); };
+        panel.prepend(action);
+      }
+    }
   }
 
   // 进入第4步时只渲染当前页签；完整数据在导出时由快照函数统一重算。
@@ -10407,6 +10421,7 @@
       data.templateValues = collectReportTemplateValues();
       data.reportFixes = clone(reportFixes);
       data.reportTexts = clone(reportTexts);
+      data.reportReview = clone(reportReviewState);
       data.reportRiskStore = clone(reportRiskStore);
       data.reportImportedRiskRows = clone(reportImportedRiskRows);
       data.appendixBData = clone(appendixBData);
@@ -10894,6 +10909,7 @@
     if (step === 4) {
       if (saved.reportFixes) reportFixes = migrateLegacyStableKeyMap(saved.reportFixes, onsiteImportedObjects, onsiteObjectBindings, true);
       if (saved.reportTexts) reportTexts = clone(saved.reportTexts);
+      reportReviewState = clone(saved.reportReview || { findings: [], ranAt: '', scope: null, signature: '' });
       if (saved.reportRiskStore) reportRiskStore = clone(saved.reportRiskStore);
       if (saved.reportImportedRiskRows) reportImportedRiskRows = clone(saved.reportImportedRiskRows);
       if (saved.appendixBData) appendixBData = clone(saved.appendixBData);
@@ -11498,6 +11514,8 @@ document.addEventListener('keydown', function(event) {
 });
 </script>
 
+<script src="/report-review-engine.js"></script>
+<script src="/report-review.js"></script>
 </body>
 </html>
 
