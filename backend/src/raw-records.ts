@@ -334,6 +334,78 @@ async function appendOnsiteRecords(buffer: Buffer, table: JsonRecord | undefined
   return Buffer.from(await zip.generateAsync({ type: 'nodebuffer', compression: 'DEFLATE' }));
 }
 
+// 追加进第一个文档的正文可能引用第二个文档的关系部件（嵌入对象、图片、超链接等）。
+// 合并时必须把这些部件拷入第一个包、在 rels 中登记新编号并重写正文引用，
+// 否则 Word 会因关系缺失或撞号（如 rId12 同时指向页眉与 OLE 对象）报“无法读取的内容”。
+async function adoptAppendedBodyRelationships(firstZip: JSZip, secondZip: JSZip, secondBody: string) {
+  const relsPath = 'word/_rels/document.xml.rels';
+  const relsFile = firstZip.file(relsPath);
+  const typesFile = firstZip.file('[Content_Types].xml');
+  if (!relsFile || !typesFile) return secondBody;
+  let rels = await relsFile.async('string');
+  let types = await typesFile.async('string');
+  const secondRelsXml = await secondZip.file(relsPath)?.async('string') || '';
+  const secondRels = new Map<string, { type: string; target: string; external: boolean }>();
+  for (const match of secondRelsXml.matchAll(/<Relationship\b[^>]*\/>/g)) {
+    const id = /\bId="([^"]+)"/.exec(match[0])?.[1];
+    if (id) secondRels.set(id, {
+      type: /\bType="([^"]+)"/.exec(match[0])?.[1] || '',
+      target: /\bTarget="([^"]+)"/.exec(match[0])?.[1] || '',
+      external: /\bTargetMode="External"/.test(match[0]),
+    });
+  }
+  const usedIds = new Set<string>();
+  for (const match of secondBody.matchAll(/\b(?:r:(?:id|embed|link|pict|href)|o:relid)="(rId\d+)"/g)) usedIds.add(match[1]);
+  if (!usedIds.size) return secondBody;
+  // 新编号必须同时避开第一个文档的现有编号和第二个文档的旧编号，
+  // 否则逐个重写时会出现“旧编号撞上新编号”的链式误替换。
+  let nextId = Math.max(0,
+    ...[...rels.matchAll(/\bId="rId(\d+)"/g)].map(match => Number(match[1])),
+    ...[...usedIds].map(id => Number(id.slice(3)))) + 1;
+  const contentTypesByExtension: Record<string, string> = {
+    bin: 'application/vnd.openxmlformats-officedocument.oleObject',
+    emf: 'image/x-emf', wmf: 'image/x-wmf', png: 'image/png', jpg: 'image/jpeg', jpeg: 'image/jpeg',
+    gif: 'image/gif', bmp: 'image/bmp', tif: 'image/tiff', tiff: 'image/tiff',
+  };
+  const knownExtensions = new Set([...types.matchAll(/<Default\b[^>]*\bExtension="([^"]+)"/g)]
+    .map(match => match[1].toLowerCase()));
+  // 先整体确定编号映射，再统一重写正文引用。
+  const remap = new Map<string, string>();
+  for (const oldId of usedIds) {
+    if (secondRels.has(oldId)) remap.set(oldId, `rId${nextId++}`);
+  }
+  for (const [oldId, newId] of remap) {
+    const rel = secondRels.get(oldId)!;
+    if (!rel.external) {
+      // 关系目标相对 word/ 目录解析，支持 ../ 形式（如 ../customXml/item1.xml）。
+      const segments = ['word'];
+      for (const segment of rel.target.split('/')) {
+        if (!segment || segment === '.') continue;
+        if (segment === '..') segments.pop(); else segments.push(segment);
+      }
+      const partPath = segments.join('/');
+      const data = await secondZip.file(partPath)?.async('nodebuffer');
+      if (data) {
+        firstZip.file(partPath, data);
+        const extension = partPath.split('.').pop()?.toLowerCase() || '';
+        if (extension && !knownExtensions.has(extension) && contentTypesByExtension[extension]) {
+          types = types.replace('</Types>', `<Default Extension="${extension}" ContentType="${contentTypesByExtension[extension]}"/></Types>`);
+          knownExtensions.add(extension);
+        }
+      }
+    }
+    rels = rels.replace('</Relationships>',
+      `<Relationship Id="${newId}" Type="${escapeXml(rel.type)}" Target="${escapeXml(rel.target)}"${rel.external ? ' TargetMode="External"' : ''}/></Relationships>`);
+  }
+  let body = secondBody;
+  for (const [oldId, newId] of remap) {
+    body = body.replace(new RegExp(`\\b((?:r:(?:id|embed|link|pict|href)|o:relid)=")${oldId}(")`, 'g'), `$1${newId}$2`);
+  }
+  firstZip.file(relsPath, rels);
+  firstZip.file('[Content_Types].xml', types);
+  return body;
+}
+
 async function appendDocument(first: Buffer, second: Buffer) {
   const firstZip = await JSZip.loadAsync(first), secondZip = await JSZip.loadAsync(second);
   const firstXml = await firstZip.file('word/document.xml')!.async('string');
@@ -346,8 +418,9 @@ async function appendDocument(first: Buffer, second: Buffer) {
   if (!secondBody.trim() || firstBodyEnd < 0 || firstFinalSection < 0) {
     throw new Error('测评方案 init/last 模板正文结构无效，无法合并');
   }
+  const adoptedBody = await adoptAppendedBodyRelationships(firstZip, secondZip, secondBody);
   const pageBreak = '<w:p><w:r><w:br w:type="page"/></w:r></w:p>';
-  const merged = firstXml.slice(0, firstFinalSection) + pageBreak + secondBody
+  const merged = firstXml.slice(0, firstFinalSection) + pageBreak + adoptedBody
     + firstXml.slice(firstFinalSection);
   firstZip.file('word/document.xml', merged);
   return Buffer.from(await firstZip.generateAsync({ type: 'nodebuffer', compression: 'DEFLATE' }));
