@@ -887,6 +887,7 @@
       font-size: 17px; line-height: 1.9; letter-spacing: .01em; text-align: justify;
       white-space: pre-wrap; overflow-wrap: anywhere;
     }
+    .report-analysis-card:focus-within { border-color: #2456a6; box-shadow: 0 0 0 3px rgba(36,86,166,.08); }
     .report-analysis-card .report-textarea:focus { outline: none; box-shadow: none; }
     .risk-high { color: #c62828; font-weight: 700; }
     .risk-mid { color: #e65100; font-weight: 600; }
@@ -996,12 +997,15 @@
       align-items: center;
       gap: 10px;
       z-index: 3000;
-      transform: translateX(400px);
-      transition: transform 0.3s ease;
+      transform: translateX(calc(100% + 56px));
+      opacity: 0;
+      visibility: hidden;
+      pointer-events: none;
+      transition: transform 0.3s ease, opacity 0.2s ease, visibility 0s linear 0.3s;
       font-size: 14px;
       border-left: 4px solid #4caf50;
     }
-    .toast.show { transform: translateX(0); }
+    .toast.show { transform: translateX(0); opacity:1; visibility:visible; transition-delay:0s; }
     .toast.error { border-left-color: #e53935; }
     .toast .icon { font-size: 20px; }
   </style>
@@ -7437,14 +7441,18 @@
   function closeModal(id) { document.getElementById(id).classList.remove('active'); }
 
   // ===== Toast =====
+  let toastShowTimer = null;
+  let toastHideTimer = null;
   function showToast(msg, isError = false) {
     const toast = document.getElementById('toast');
     const icon = toast.querySelector('.icon');
+    clearTimeout(toastShowTimer);
+    clearTimeout(toastHideTimer);
     document.getElementById('toast-text').textContent = msg;
     icon.textContent = isError ? '❌' : '✅';
     toast.className = 'toast' + (isError ? ' error' : '');
-    setTimeout(() => toast.classList.add('show'), 10);
-    setTimeout(() => toast.classList.remove('show'), 3000);
+    toastShowTimer = setTimeout(() => toast.classList.add('show'), 10);
+    toastHideTimer = setTimeout(() => toast.classList.remove('show'), 3000);
   }
 
   // ===== 测评对象 · 层面子Tab =====
@@ -11043,7 +11051,7 @@
   }
 
   function replaceImplementationText(value, key, findText, replacement, counter) {
-    const skippedKeys = new Set(['id', 'nodeId', 'type', 'index', 'checked', 'src', 'dataUrl', 'display', 'prototypeVersion', 'version', 'methods']);
+    const skippedKeys = new Set(['id', 'nodeId', 'index', 'checked', 'src', 'dataUrl', 'display', 'prototypeVersion', 'methods']);
     if (typeof value === 'string') {
       if (skippedKeys.has(key) || /^data:(?:image|application)\//i.test(value)) return value;
       const pieces = value.split(findText);
@@ -11052,7 +11060,15 @@
     }
     if (Array.isArray(value)) return value.map(function (item) { return replaceImplementationText(item, key, findText, replacement, counter); });
     if (value && typeof value === 'object') {
+      // `type` 同时用于控件/拓扑块的内部类型和表2-1、表2-2的业务“类型”列。
+      // 只保护真正的内部类型；业务表格的 type、version 等文本必须参与全局替换。
+      const protectInternalType = Object.prototype.hasOwnProperty.call(value, 'type') && (
+        (Object.prototype.hasOwnProperty.call(value, 'value') && Object.prototype.hasOwnProperty.call(value, 'checked')) ||
+        ((value.type === 'text' || value.type === 'image') &&
+          (Object.prototype.hasOwnProperty.call(value, 'content') || Object.prototype.hasOwnProperty.call(value, 'dataUrl')))
+      );
       return Object.fromEntries(Object.entries(value).map(function (entry) {
+        if (entry[0] === 'type' && protectInternalType) return entry;
         return [entry[0], replaceImplementationText(entry[1], entry[0], findText, replacement, counter)];
       }));
     }
