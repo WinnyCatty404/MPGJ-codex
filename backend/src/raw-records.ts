@@ -134,7 +134,7 @@ function buildContext(source: RawRecordSource) {
     }));
   }
   const appendix = reporting.appendixBData || {};
-  const reviewer = appendix['b7-reviewer'] || institution.contact || leader;
+  const reviewer = appendix['b7-reviewer'] || '';
   const approver = appendix['b7-approver'] || '';
   const gradingRecord = splitGradingRecord(values['等保已定级备案情况'], values['等保未定级情况']);
   const context: JsonRecord = {
@@ -161,7 +161,7 @@ function buildContext(source: RawRecordSource) {
     evaluate_tech_member: nonEmpty([leader, member1]).join('、'), evaluate_mana_member: member2 || member1,
     project_quality_supervisor: institution.contact || '',
     project_starttime: cnDate(project.start_date || phase1Start), project_endtime: cnDate(project.end_date || phase4End),
-    evaluate_plan_date: cnDate(phase2End), evaluate_plan_approve_date: cnDate(phase2End),
+    evaluate_plan_date: cnDate(phase2End), evaluate_plan_approve_date: cnDate(phase1End),
     evaluate_note_date: cnDate(phase3Start), evaluate_feedback_date: cnDate(phase3End),
     // 风险告知书现有模板把双方“日期”位置沿用了旧工具的签名图片槽名。
     // 兼容该占位符，统一写入现场测评阶段开始时间，便于管理员仅调整模板样式。
@@ -179,10 +179,11 @@ function buildContext(source: RawRecordSource) {
     evaluate_do_date3: dateRange(phase3Start, phase3End), evaluate_do_date4: dateRange(phase3Start, phase3End),
     evaluate_do_date5: dateRange(phase3Start, phase3End), evaluate_do_date6: dateRange(phase3Start, phase3End),
     evaluate_do_date7: cnDate(phase3End), evaluate_do_date8: cnDate(phase3End),
-    evaluate_plan_approve_leader: reviewer, evaluate_plan_approve_member1: member1,
-    evaluate_plan_approve_member2: member2, evaluate_plan_approve_member3: leader === reviewer ? '' : leader,
-    evaluate_reviewer_leader: reviewer, evaluate_reviewer_member1: member1,
-    evaluate_reviewer_member2: member2, evaluate_reviewer_member3: approver,
+    evaluate_plan_approve_leader: reviewer, evaluate_plan_approve_member1: reviewer,
+    evaluate_plan_approve_member2: leader, evaluate_plan_approve_member3: '',
+    evaluate_reviewer_leader: approver, evaluate_reviewer_member1: reviewer,
+    // 兼容尚未更新占位符的旧模板；新版模板直接复用 evaluate_plan_approve_member2。
+    evaluate_reviewer_member2: leader, evaluate_reviewer_member3: '',
     devicelist: deviceNames.map((name, index) => ({ number: String(index + 1), name, note: '-' })),
     toollist: tools.map((tool: JsonRecord, index: number) => ({ number: String(index + 1), name: tool.name || '', version: tool.version || '', note: '-' })),
     problist: risks,
