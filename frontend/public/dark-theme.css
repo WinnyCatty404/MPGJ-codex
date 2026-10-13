@@ -411,6 +411,9 @@ html[data-theme="dark"] body.bb-embedded #page-implement .apb-img-slot.selected 
 html[data-theme="dark"] .evi-active-bar,
 html[data-theme="dark"] .onsite-record-row.is-editing td,
 html[data-theme="dark"] .onsite-record-editor-row td { background: var(--dark-primary-soft) !important; border-color: #5a8d7c; }
+/* 证据抽屉“正在录入 图A-x.xx”提示条：文字统一为抽屉标题同色，避免深蓝字压在深色条上。 */
+html[data-theme="dark"] .evi-active-bar,
+html[data-theme="dark"] .evi-active-bar strong { color: #d4ded8 !important; }
 html[data-theme="dark"] .onsite-record-modal-body { background: var(--dark-surface); }
 html[data-theme="dark"] .risk-callout,
 html[data-theme="dark"] .object-match-panel { background: var(--dark-warning-soft); }
