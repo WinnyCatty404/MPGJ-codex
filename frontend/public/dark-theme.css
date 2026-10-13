@@ -338,6 +338,16 @@ html[data-theme="dark"] body.bb-embedded #page-implement tbody,
 html[data-theme="dark"] body.bb-embedded #page-implement td { background: var(--dark-surface); color: var(--dark-text); border-color: #46554e; }
 html[data-theme="dark"] body.bb-embedded #page-implement table th { background: #2c3934; color: #d4ded8; border-color: #526159; }
 html[data-theme="dark"] body.bb-embedded #page-implement table tbody tr:hover > td { background: #27352f; }
+html[data-theme="dark"] body.bb-embedded #page-implement tbody[data-selectable-delete="1"] > tr.bb-row-selected > td {
+  background: var(--dark-primary-soft) !important;
+  box-shadow: inset 0 2px 0 var(--dark-primary), inset 0 -2px 0 var(--dark-primary);
+}
+html[data-theme="dark"] body.bb-embedded #page-implement tbody[data-selectable-delete="1"] > tr.bb-row-selected > td:first-child {
+  box-shadow: inset 2px 0 0 var(--dark-primary), inset 0 2px 0 var(--dark-primary), inset 0 -2px 0 var(--dark-primary);
+}
+html[data-theme="dark"] body.bb-embedded #page-implement tbody[data-selectable-delete="1"] > tr.bb-row-selected > td:last-child {
+  box-shadow: inset -2px 0 0 var(--dark-primary), inset 0 2px 0 var(--dark-primary), inset 0 -2px 0 var(--dark-primary);
+}
 html[data-theme="dark"] body.bb-embedded #page-implement .indicator-table .ind-name,
 html[data-theme="dark"] body.bb-embedded #page-implement .mi-table .label-cell,
 html[data-theme="dark"] body.bb-embedded #page-implement .mi-table .sub-label,
@@ -392,6 +402,12 @@ html[data-theme="dark"] .topology-upload,
 html[data-theme="dark"] .apb-img-slot,
 html[data-theme="dark"] .apb-cert-grid-table td,
 html[data-theme="dark"] .suggestion-empty { background: #222e29 !important; color: var(--dark-text-muted); border-color: #4c6157 !important; }
+html[data-theme="dark"] body.bb-embedded #page-implement .image-area-selected,
+html[data-theme="dark"] body.bb-embedded #page-implement .evi-cell.selected,
+html[data-theme="dark"] body.bb-embedded #page-implement .apb-img-slot.selected {
+  background: var(--dark-primary-soft) !important;
+  outline-color: var(--dark-primary) !important;
+}
 html[data-theme="dark"] .evi-active-bar,
 html[data-theme="dark"] .onsite-record-row.is-editing td,
 html[data-theme="dark"] .onsite-record-editor-row td { background: var(--dark-primary-soft) !important; border-color: #5a8d7c; }
@@ -412,6 +428,23 @@ html[data-theme="dark"] .report-export-progress { background: #35443e; }
 html[data-theme="dark"] .report-export-progress span { background: var(--dark-primary); }
 
 /* 附录 B：自动带入字段和表单行悬浮状态保持深色。 */
+html[data-theme="dark"] body.bb-embedded #page-implement .apb-page-title,
+html[data-theme="dark"] body.bb-embedded #page-implement .apb-sec-title,
+html[data-theme="dark"] body.bb-embedded #page-implement .ua-caption {
+  color: #d8e3de;
+}
+html[data-theme="dark"] body.bb-embedded #page-implement .apb-sec-title {
+  border-left-color: var(--dark-primary);
+}
+html[data-theme="dark"] body.bb-embedded #page-implement .apb-tab { color: var(--dark-text-muted); }
+html[data-theme="dark"] body.bb-embedded #page-implement .apb-tab:hover {
+  background: var(--dark-primary-soft);
+  color: var(--dark-primary-strong);
+}
+html[data-theme="dark"] body.bb-embedded #page-implement .apb-tab.active {
+  border-bottom-color: var(--dark-primary);
+  color: var(--dark-primary-strong);
+}
 html[data-theme="dark"] body.bb-embedded #page-implement .apb-form-table tbody > tr:hover {
   background: #27352f;
 }
@@ -419,6 +452,30 @@ html[data-theme="dark"] body.bb-embedded #page-implement .apb-auto {
   background: #25312d !important;
   border-color: #42534c !important;
   color: #d7e2dc !important;
+}
+
+/* Word 导入结果及报告表标题。 */
+html[data-theme="dark"] body.bb-embedded .modal-header h3,
+html[data-theme="dark"] body.bb-embedded #modal-import-log .import-log-sec .sec-title {
+  color: #d8e3de;
+}
+html[data-theme="dark"] body.bb-embedded #modal-import-log .import-log-sec .sec-title {
+  border-left-color: var(--dark-primary);
+}
+
+/* 现场记录关联对象：提升警示面板内文字对比度。 */
+html[data-theme="dark"] body.bb-embedded #page-implement .object-match-panel {
+  border-color: #715f38;
+}
+html[data-theme="dark"] body.bb-embedded #page-implement .object-match-title {
+  color: #edc46e;
+}
+html[data-theme="dark"] body.bb-embedded #page-implement .object-match-row span,
+html[data-theme="dark"] body.bb-embedded #page-implement .object-match-row span b {
+  color: #d7e2dc;
+}
+html[data-theme="dark"] body.bb-embedded #page-implement .object-match-row > span:nth-child(2) {
+  color: var(--dark-primary-strong);
 }
 
 /* 测评准备与方案编制：左侧分组、系统资产子页签和测评接入点。 */
