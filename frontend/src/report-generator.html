@@ -7565,9 +7565,29 @@
   }
   ensureObjDataIds();
 
-  // 注意：测评对象改名不做全局文本替换。对象名常是其他对象名与结果描述正文的子串
-  // （如“XX平台”是“XX平台非密访问通道”的子串），全局替换会误改无关记录的正文；
-  // 历史名称匹配由 aliases + reconcileObjLayerObjects 负责。
+  // 测评对象改名时同步报告编制阶段文本。
+  // 范围说明：
+  //   - 现场测评表格的「测评对象」列由对象绑定实时渲染，改名自动跟随，无需文本替换；
+  //   - 现场测评的「结果记录/结果描述」正文不做替换：对象名常是其他对象名与叙述文字的子串
+  //     （如“XX平台”是“XX平台非密访问通道”的子串），全局替换会误改无关记录的正文；
+  //   - 报告编制阶段的风险描述/分析与正文仍随改名同步，保持报告整体一致。
+  function replaceObjectNameReferences(previous, next) {
+    previous = String(previous || '').trim();
+    next = String(next || '').trim();
+    if (!previous || !next || previous === next) return;
+    const replace = function(value) { return typeof value === 'string' ? value.split(previous).join(next) : value; };
+    reportImportedRiskRows.forEach(function(row) {
+      row.desc = replace(row.desc);
+      row.analysis = replace(row.analysis);
+    });
+    Object.keys(reportRiskStore).forEach(function(key) {
+      const row = reportRiskStore[key];
+      if (!row) return;
+      row.desc = replace(row.desc);
+      row.analysis = replace(row.analysis);
+    });
+    Object.keys(reportTexts).forEach(function(key) { reportTexts[key] = replace(reportTexts[key]); });
+  }
 
   function switchObjLayer(n) {
     const tabs = document.querySelectorAll('#obj-layer-tabs .obj-layer-tab');
@@ -7638,6 +7658,7 @@
         objData[layer][idx].aliases.push(previous);
       }
       objData[layer][idx][field] = value;
+      replaceObjectNameReferences(previous, value);
       reconcileObjLayerObjects(layer);
       return;
     }
