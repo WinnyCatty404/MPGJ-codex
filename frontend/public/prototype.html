@@ -7515,26 +7515,9 @@
   }
   ensureObjDataIds();
 
-  function replaceObjectNameReferences(previous, next) {
-    previous = String(previous || '').trim();
-    next = String(next || '').trim();
-    if (!previous || !next || previous === next) return;
-    const replace = function(value) { return typeof value === 'string' ? value.split(previous).join(next) : value; };
-    Object.keys(onsiteRecords).forEach(function(key) {
-      if (onsiteRecords[key]) onsiteRecords[key].record = replace(onsiteRecords[key].record);
-    });
-    reportImportedRiskRows.forEach(function(row) {
-      row.desc = replace(row.desc);
-      row.analysis = replace(row.analysis);
-    });
-    Object.keys(reportRiskStore).forEach(function(key) {
-      const row = reportRiskStore[key];
-      if (!row) return;
-      row.desc = replace(row.desc);
-      row.analysis = replace(row.analysis);
-    });
-    Object.keys(reportTexts).forEach(function(key) { reportTexts[key] = replace(reportTexts[key]); });
-  }
+  // 注意：测评对象改名不做全局文本替换。对象名常是其他对象名与结果描述正文的子串
+  // （如“XX平台”是“XX平台非密访问通道”的子串），全局替换会误改无关记录的正文；
+  // 历史名称匹配由 aliases + reconcileObjLayerObjects 负责。
 
   function switchObjLayer(n) {
     const tabs = document.querySelectorAll('#obj-layer-tabs .obj-layer-tab');
@@ -7605,7 +7588,6 @@
         objData[layer][idx].aliases.push(previous);
       }
       objData[layer][idx][field] = value;
-      replaceObjectNameReferences(previous, value);
       reconcileObjLayerObjects(layer);
       return;
     }
