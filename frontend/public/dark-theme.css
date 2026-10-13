@@ -419,6 +419,26 @@ html[data-theme="dark"] body.bb-embedded #page-implement .asset-sub-tabs {
   background: #293630;
   border: 1px solid var(--dark-border);
 }
+html[data-theme="dark"] body.bb-embedded #page-implement .indicator-sub-tabs {
+  background: #293630;
+  border-color: var(--dark-border);
+}
+html[data-theme="dark"] body.bb-embedded #page-implement .indicator-sub-tab {
+  background: #25312d;
+  border-color: transparent;
+  color: var(--dark-text-muted);
+}
+html[data-theme="dark"] body.bb-embedded #page-implement .indicator-sub-tab:hover {
+  background: var(--dark-primary-soft);
+  border-color: #527f70;
+  color: var(--dark-primary-strong);
+}
+html[data-theme="dark"] body.bb-embedded #page-implement .indicator-sub-tab.active {
+  background: #3f806e;
+  border-color: #5fa78f;
+  color: #fff;
+  box-shadow: none;
+}
 html[data-theme="dark"] body.bb-embedded #page-implement #method-sub-panel-2 .obj-table-caption {
   color: #d8e3de;
 }
