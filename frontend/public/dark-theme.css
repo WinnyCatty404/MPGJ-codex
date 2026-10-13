@@ -407,6 +407,40 @@ html[data-theme="dark"] .overall-editor-hint { color: var(--dark-text-muted); }
 html[data-theme="dark"] .report-export-progress { background: #35443e; }
 html[data-theme="dark"] .report-export-progress span { background: var(--dark-primary); }
 
+/* Word 导入选项弹窗：覆盖写在标签上的浅色内联样式。 */
+html[data-theme="dark"] #modal-word-import-options .modal-header,
+html[data-theme="dark"] #modal-word-import-options .modal-footer {
+  background: #293630;
+  border-color: var(--dark-border);
+}
+html[data-theme="dark"] #modal-word-import-options .modal-body { background: var(--dark-surface); }
+html[data-theme="dark"] #modal-word-import-options .modal-header h3,
+html[data-theme="dark"] #modal-word-import-options .modal-body label { color: var(--dark-text); }
+html[data-theme="dark"] #modal-word-import-options .modal-close { color: var(--dark-text-muted); }
+html[data-theme="dark"] #modal-word-import-options .modal-body > div:first-child,
+html[data-theme="dark"] #modal-word-import-options .modal-body > div:last-child { color: var(--dark-text-muted) !important; }
+html[data-theme="dark"] #modal-word-import-options label:has(#word-import-records-enabled),
+html[data-theme="dark"] #modal-word-import-options label:has(#word-import-evidence-enabled) {
+  background: var(--dark-surface-raised) !important;
+  border-color: #465850 !important;
+  color: var(--dark-text) !important;
+}
+html[data-theme="dark"] #word-import-records-layers,
+html[data-theme="dark"] #word-import-evidence-layers {
+  background: #1d2824;
+  border-color: #465850 !important;
+}
+html[data-theme="dark"] #modal-word-import-options .btn-secondary {
+  background: var(--dark-surface-raised);
+  border-color: #52645c;
+  color: #d7e2dc;
+}
+html[data-theme="dark"] #word-import-selection-summary {
+  background: var(--dark-warning-soft) !important;
+  border-color: #715f38 !important;
+  color: #e5c77e !important;
+}
+
 /* 打印与正式报告输出不继承屏幕深色主题。 */
 @media print {
   html[data-theme="dark"],
