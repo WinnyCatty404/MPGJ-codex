@@ -1209,6 +1209,8 @@
     outline: none; border-color: #1467c9;
     box-shadow: 0 0 0 3px rgba(20, 103, 201, .11);
   }
+  #page-implement input[type="date"],
+  #page-implement input[type="date"]::-webkit-calendar-picker-indicator { cursor: pointer; }
   #page-implement table textarea {
     height: auto; max-height: none; overflow-y: hidden; resize: none;
     field-sizing: content; white-space: pre-wrap; overflow-wrap: anywhere;
@@ -2918,6 +2920,16 @@
       el.value = next;
       el.dispatchEvent(new Event('input', { bubbles: true }));
     }
+  });
+  // 原生日期框在部分桌面浏览器中只有日历图标可点击；统一让整条输入框都能打开选择器。
+  document.addEventListener('click', function (event) {
+    const input = event.target && event.target.closest
+      ? event.target.closest('#page-implement input[type="date"]')
+      : null;
+    if (!input || input.disabled || input.readOnly || typeof input.showPicker !== 'function') return;
+    event.preventDefault();
+    input.focus({ preventScroll: true });
+    try { input.showPicker(); } catch (_error) { /* 浏览器不允许时保留原生交互。 */ }
   });
   const paragraphObserver = new MutationObserver(function (changes) {
     changes.forEach(function (change) {
