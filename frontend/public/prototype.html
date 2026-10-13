@@ -611,6 +611,14 @@
     }
     .onsite-record-expand { position:absolute; right:0; bottom:0; border:0; padding:0; background:transparent; color:#2456A6; font-size:11px; font-weight:700; cursor:pointer; }
     .onsite-record-count { margin-top:4px; color:#8a94a3; font-size:11px; line-height:1.4; }
+    .onsite-record-meta { display:flex; align-items:center; justify-content:space-between; gap:8px; margin-top:4px; }
+    .onsite-record-meta .onsite-record-count { margin-top:0; }
+    .onsite-record-copy {
+      height:26px; padding:0 9px; border:1px solid #b9c8dc; border-radius:4px;
+      background:#fff; color:#2456A6; font-size:11px; cursor:pointer;
+    }
+    .onsite-record-copy:hover { background:#eef5ff; }
+    .onsite-record-copy:disabled { border-color:#d8dee8; color:#a4adba; background:#f7f8fa; cursor:not-allowed; }
     .onsite-record-row.is-editing td { background:#EAF1FA; border-top:2px solid #2456A6; }
     .onsite-record-row.is-editing .unit-cell { color:#2456A6; font-weight:700; }
     .onsite-record-editing-tag { display:block; margin-top:3px; color:#2456A6; font-size:10px; font-weight:600; }
@@ -4986,7 +4994,38 @@
     return '<div class="onsite-record-summary" onclick="expandOnsiteRecord(' + t + ',' + itemIdx + ',' + objIdx + ')">' +
       '<div class="onsite-record-summary-text" id="onsite-record-summary-' + key + '">' + onsiteEsc(value || '（暂无结果记录）') + '</div>' +
       '<button type="button" class="onsite-record-expand" id="onsite-record-expand-' + key + '" onclick="event.stopPropagation();expandOnsiteRecord(' + t + ',' + itemIdx + ',' + objIdx + ')">编辑</button></div>' +
-      '<div class="onsite-record-count">共 ' + onsiteRecordCharCount(value) + ' 字</div>';
+      '<div class="onsite-record-meta"><span class="onsite-record-count">共 ' + onsiteRecordCharCount(value) + ' 字</span>' +
+      '<button type="button" class="onsite-record-copy"' + (value ? '' : ' disabled') +
+      ' onclick="event.stopPropagation();copyOnsiteRecordText(' + t + ',' + itemIdx + ',' + objIdx + ',this)">复制文字</button></div>';
+  }
+
+  async function copyOnsiteRecordText(t, itemIdx, objIdx, button) {
+    const value = String(getOnsiteRec(t, itemIdx, objIdx).record || '');
+    if (!value) { showToast('暂无可复制的结果记录', true); return; }
+    try {
+      if (navigator.clipboard && window.isSecureContext) {
+        await navigator.clipboard.writeText(value);
+      } else {
+        const helper = document.createElement('textarea');
+        helper.value = value;
+        helper.setAttribute('readonly', '');
+        helper.style.position = 'fixed';
+        helper.style.opacity = '0';
+        document.body.appendChild(helper);
+        helper.select();
+        const copied = document.execCommand('copy');
+        helper.remove();
+        if (!copied) throw new Error('复制失败');
+      }
+      showToast('结果记录已复制');
+      if (button) {
+        const original = button.textContent;
+        button.textContent = '已复制';
+        setTimeout(function() { if (button.isConnected) button.textContent = original; }, 1200);
+      }
+    } catch (error) {
+      showToast('复制失败，请重试', true);
+    }
   }
 
   function onsiteRecordCollapsedEditHtml(t, itemIdx, objIdx) {
@@ -5544,7 +5583,7 @@
     const key = onsiteKey(t, itemIdx, objIdx);
     return (onsiteExpandedRecordKeys.has(key)
       ? onsiteRecordCollapsedEditHtml(t, itemIdx, objIdx)
-      : onsiteRecordSummaryHtml(t, itemIdx, objIdx, recordVal)) + onsiteEvidenceRecordToolsHtml(t, key);
+      : onsiteRecordSummaryHtml(t, itemIdx, objIdx, recordVal));
   }
 
   function renderOnsiteTables() {
