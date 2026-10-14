@@ -276,7 +276,7 @@ export function formatAppendixBHeadings(xml: string): string {
     return paragraph.replace(existing, properties);
   });
 }
-// 模板中的图1-1为嵌入式 Visio/OLE 对象。固定为10厘米宽，并按原始比例计算高度。
+// 模板中的图1-1为嵌入式 Visio/OLE 对象。固定为11厘米宽，并按原始比例计算高度。
 export function formatFigureOneOne(xml: string): string {
   const paragraphs = [...xml.matchAll(/<w:p\b[^>]*>[\s\S]*?<\/w:p>/g)];
   const captionIndex = paragraphs.findIndex(match => /^图\s*1[-－]\s*1/.test(textOf(match[0]).replace(/\s/g, '')));
@@ -288,7 +288,7 @@ export function formatFigureOneOne(xml: string): string {
       const width = /\bwidth:([\d.]+)pt/.exec(style);
       const height = /\bheight:([\d.]+)pt/.exec(style);
       if (!width || !height || Number(width[1]) <= 0) return start + style + end;
-      const targetWidthPt = 10 * 72 / 2.54;
+      const targetWidthPt = 11 * 72 / 2.54;
       const targetHeightPt = Number(height[1]) * targetWidthPt / Number(width[1]);
       const resized = style
         .replace(/\bwidth:[\d.]+pt/, `width:${targetWidthPt.toFixed(2)}pt`)
@@ -296,6 +296,23 @@ export function formatFigureOneOne(xml: string): string {
       return start + resized + end;
     });
     return xml.slice(0, paragraph.index!) + updated + xml.slice(paragraph.index! + paragraph[0].length);
+  }
+  return xml;
+}
+
+// 三级模板把“表6-1风险分析”放在表格之后；导出时移到对应表格上方。
+// 二级模板的标题原本就在上方，因此保持不变。
+export function placeRiskTableCaptionAbove(xml: string): string {
+  const caption = [...xml.matchAll(/<w:p\b[^>]*>[\s\S]*?<\/w:p>/g)]
+    .find(match => /^表\s*6[-－—.]?\s*1\s*风险分析$/.test(textOf(match[0]).replace(/\s/g, '')));
+  if (!caption) return xml;
+  const captionStart = caption.index!;
+  const prefix = xml.slice(0, captionStart);
+  if (!prefix.endsWith('</w:tbl>')) return xml;
+  for (let tableStart = prefix.lastIndexOf('<w:tbl'); tableStart >= 0; tableStart = prefix.lastIndexOf('<w:tbl', tableStart - 1)) {
+    if (findBalancedTableEnd(xml, tableStart) !== captionStart) continue;
+    const table = xml.slice(tableStart, captionStart);
+    return xml.slice(0, tableStart) + addKeepNext(caption[0]) + table + xml.slice(captionStart + caption[0].length);
   }
   return xml;
 }

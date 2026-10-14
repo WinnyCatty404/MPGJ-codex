@@ -14,7 +14,7 @@ import { fileURLToPath } from 'node:url';
 import { randomUUID } from 'node:crypto';
 import { writeReportContent } from './report-content.js';
 import { writeAppendixBImages, writePlanningImages, writeReportEvidence, writeTopologyBlocks } from './report-evidence.js';
-import { allowLatinWordWrap, formatAppendixBHeadings, formatFigureOneOne, formatLatinFonts, formatReportTables, normalizeBasicInfoTemplateValues, normalizeCheckboxLabelSpacing, prepareLevelTwoTemplate, replaceReportSlots, specializeReportTemplate, unresolvedReportSlots } from './report-template.js';
+import { allowLatinWordWrap, formatAppendixBHeadings, formatFigureOneOne, formatLatinFonts, formatReportTables, normalizeBasicInfoTemplateValues, normalizeCheckboxLabelSpacing, placeRiskTableCaptionAbove, prepareLevelTwoTemplate, replaceReportSlots, specializeReportTemplate, unresolvedReportSlots } from './report-template.js';
 import { generatePreviousAssessment } from './previous-assessment.js';
 import { generateRawRecords } from './raw-records.js';
 import { replaceProjectTextInStageData, syncProjectDatesInStageData } from './project-date-sync.js';
@@ -275,6 +275,7 @@ async function buildProjectDocx(projectId: string) {
     if (name === 'word/document.xml') {
       xml = formatAppendixBHeadings(xml);
       xml = formatFigureOneOne(xml);
+      xml = placeRiskTableCaptionAbove(xml);
       xml = formatReportTables(xml);
     }
     xml = formatLatinFonts(xml);
