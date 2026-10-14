@@ -7444,16 +7444,6 @@
     else if (n === 5) renderReportSuggestions();
     else if (n === 6) renderAppendixB();
     else if (n === 7) renderReportReview();
-    if (n >= 0 && n <= 5) {
-      const panel = document.getElementById('report-panel-' + n);
-      if (panel && !panel.querySelector('.report-review-section-action')) {
-        const action = document.createElement('button');
-        action.type = 'button'; action.className = 'btn report-review-section-action';
-        action.textContent = '审核本节'; action.style.marginBottom = '12px';
-        action.onclick = function() { runReportReview(n); };
-        panel.prepend(action);
-      }
-    }
   }
 
   // 进入第4步时只渲染当前页签；完整数据在导出时由快照函数统一重算。
