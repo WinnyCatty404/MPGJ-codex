@@ -2,6 +2,7 @@
 let reportReviewState = { findings: [], accepted: [], ranAt: '', scope: null, signature: '' };
 (function() {
   const labels = ['单元测评结果分析', '整体测评分析', '风险分析', '评估结论', '总体评价', '安全问题及改进建议'];
+  labels[8] = '密码应用概况';
   let selected = '';
   const esc = value => onsiteEsc(String(value || ''));
   function assetNames(kind) {
@@ -38,6 +39,10 @@ let reportReviewState = { findings: [], accepted: [], ranAt: '', scope: null, si
       definitions.forEach(([section, id, auto, coverage]) => targets.push({ id, section, layer: t, text: getReportTextVal(id, auto),
         manual: Object.prototype.hasOwnProperty.call(reportTexts, id), coverage,
         problemUnits: section === 5 ? problemUnits : undefined }));
+    });
+    ['physical', 'network', 'device', 'application'].forEach((key, layer) => {
+      const id = 'plan-crypto-' + key;
+      targets.push({ id, section: 8, layer, text: document.getElementById(id)?.value || '', manual: true, coverage: 'all' });
     });
     // 整体分析与评估结论继续保留；建议只核对问题描述中的低分对象和编号，不核对改进建议。
     // 整体分析是结构化修正：保留人工填写理由，不将修正前后结果不同直接判错。
@@ -143,15 +148,24 @@ let reportReviewState = { findings: [], accepted: [], ranAt: '', scope: null, si
     switchOnsiteTab(f.object.layer);
     expandOnsiteRecord(f.object.layer, f.object.item, f.object.index);
   };
-  window.locateReviewTarget = function(id) {
+  window.locateReviewTarget = async function(id) {
     const f = reportReviewState.findings.find(x => x.id === id); if (!f) return;
-    switchStep(4);
-    if (f.target.section === 0) reportUaLayer = f.target.layer;
-    if (f.target.section === 4) activeOverallLayer = f.target.layer;
-    if (f.target.section === 5) activeSuggestionLayer = f.target.layer;
-    switchReportTab(f.target.section);
-    const panel = document.getElementById('report-panel-' + f.target.section);
-    const field = document.getElementById(f.target.id) || Array.from(panel.querySelectorAll('textarea')).find(el => el.value === f.target.text);
+    let panel;
+    if (f.target.section === 8) {
+      switchStep(2);
+      await switchPlanTab(12);
+      switchCryptoModule('overview');
+      await switchCryptoLayer(f.target.layer);
+      panel = document.getElementById('plan-tab-12');
+    } else {
+      switchStep(4);
+      if (f.target.section === 0) reportUaLayer = f.target.layer;
+      if (f.target.section === 4) activeOverallLayer = f.target.layer;
+      if (f.target.section === 5) activeSuggestionLayer = f.target.layer;
+      switchReportTab(f.target.section);
+      panel = document.getElementById('report-panel-' + f.target.section);
+    }
+    const field = document.getElementById(f.target.id) || Array.from(panel?.querySelectorAll('textarea') || []).find(el => el.value === f.target.text);
     if (field) { field.scrollIntoView({ block: 'center', behavior: 'smooth' }); field.focus(); field.style.outline = '3px solid #e7a12a'; setTimeout(() => field.style.outline = '', 3000); }
     else showToast('已定位章节，请核对对应指标：' + f.object.unit);
   };
@@ -223,8 +237,8 @@ let reportReviewState = { findings: [], accepted: [], ranAt: '', scope: null, si
         '<label>处理状态 <select onchange="setReviewStatus(\'' + f.id + '\',this.value)">' + STATUSES.map(s => '<option' + (s === f.status ? ' selected' : '') + '>' + s + '</option>').join('') + '</select></label>' +
         '<label>处理说明<textarea class="text-area" onchange="setReviewNote(\'' + f.id + '\',this.value)">' + esc(f.note) + '</textarea></label>';
     })() : '<p>选择左侧问题查看原文对照。</p>';
-    panel.innerHTML = '<h3>报告审核</h3><p>根据第二步对象与第三步现场记录，核对单元测评结果分析、总体评价等现有审核目标。允许同类服务器、数据库达到3个时合并称呼；重要数据资产达到3项时可称“重要数据”。</p>' +
-      '<p class="review-hint">安全问题及改进建议仅检查各层面问题描述中的低分对象和编号数量，不对比改进建议；风险分析不参与对比。整体分析依据、复杂语义及截图代码仍需人工复核。</p>' +
+    panel.innerHTML = '<h3>报告审核</h3><p>根据第二步对象与第三步现场记录，核对密码应用概况四个层面的应用情况描述、单元测评结果分析和总体评价等目标。允许同类服务器、数据库达到3个时合并称呼；重要数据资产达到3项时可称“重要数据”。</p>' +
+      '<p class="review-hint">安全问题及改进建议仅检查各层面问题描述中的低分对象和编号末项，不对比改进建议；风险分析不参与对比。复杂语义及截图代码仍需人工复核。</p>' +
       statusbar +
       (state.accepted.length ? '<details class="review-accepted"><summary>已确认合理差异（' + state.accepted.length + '，不计入问题数）</summary>' +
         state.accepted.map(item => '<div class="review-accepted-item"><span>' + esc(item.rule + ' · ' + item.title + ' · ' + item.objectName + ' · ' + (labels[item.targetSection] || '报告内容')) +

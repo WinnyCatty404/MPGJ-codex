@@ -57,7 +57,8 @@
   }
   function numberedProblems(text) {
     const source = String(text || '').replace(/\r\n?/g, '\n');
-    const markers = [...source.matchAll(/(?:^|\n)[ \t]*(\d{1,3})(?:[）、）]|\.(?!\d)|(?=[ \t]+\S))[ \t]*/g)];
+    // Word 导入常保留全角段首空格，多个编号也可能在同一段的句号后连续出现。
+    const markers = [...source.matchAll(/(?:^|[\n。；;])[ \t\u3000\u00a0]*(\d{1,3})(?:[）、）]|\.(?!\d)|(?=[ \t\u3000\u00a0]+\S))[ \t\u3000\u00a0]*/g)];
     return markers.map((match, index) => ({ number: Number(match[1]),
       text: source.slice(match.index + match[0].length, index + 1 < markers.length ? markers[index + 1].index : source.length).trim() }));
   }
@@ -85,9 +86,10 @@
             '本层面有 ' + expected.length + ' 个问题项，但问题描述没有可识别的独立编号；请补充编号或人工核对。', summary.record, '无法核对');
           continue;
         }
-        if (entries.length !== expected.length) {
+        const lastNumber = entries.at(-1)?.number || 0;
+        if (lastNumber !== expected.length) {
           add('C32', target, summary, '问题描述编号数量不一致',
-            '本层面有 ' + expected.length + ' 个问题项，问题描述识别到 ' + entries.length + ' 个编号条目。', summary.record, '数量核对');
+            '本层面有 ' + expected.length + ' 个问题项，问题描述最后一个可识别编号为 ' + lastNumber + '。', summary.record, '数量核对');
         }
         const objects = input.objects.filter(o => o.layer === target.layer && typeof o.rawScore === 'number' && o.rawScore >= 0 && o.rawScore < 1 && o.applicable);
         for (const o of objects) {
@@ -112,10 +114,11 @@
         const unique = [...new Map(required.map(o => [o.name, o])).values()];
         for (const o of unique) {
           if (!objectMentioned(target.text, o, allNames) && !groupMentioned(target.text, o, applicable, input)) {
-            add('C29', target, o, '可能遗漏测评对象：' + o.name,
+            add(target.section === 8 ? 'C33' : 'C29', target, o,
+              (target.section === 8 ? '密码应用概况可能遗漏测评对象：' : '可能遗漏测评对象：') + o.name,
               '第二步测评对象/重要数据与第三步对应记录中存在该对象，但当前描述未找到其名称、已登记别名或满足数量条件的合并名称。请确认是否已有等价概括。', '', '覆盖检查');
           }
-          if (!o.record.trim() && !o.planOnly) add('C28', target, o, '现场结果记录尚未填写', '该对象缺少现场原文，无法核对描述的事实依据。', '（结果记录为空）', '证据不足');
+          if (target.section !== 8 && !o.record.trim() && !o.planOnly) add('C28', target, o, '现场结果记录尚未填写', '该对象缺少现场原文，无法核对描述的事实依据。', '（结果记录为空）', '证据不足');
         }
       }
       if (target.advice || target.section === 3) continue;

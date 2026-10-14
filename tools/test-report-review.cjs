@@ -48,6 +48,12 @@ for (const marker of ['1 身份鉴别：A服务器。','1）身份鉴别：A服�
 assert.equal(reviewProblems([low],'1）身份鉴别：A服务器使用TLS1.2、AES_256_GCM。').length,0);
 assert.equal(reviewProblems([low],'1）身份鉴别：A服务器。\n1.2版本已记录。').filter(f=>f.rule==='C32').length,0);
 assert.equal(reviewProblems([low],'1）身份鉴别：A服务器。\n2）访问控制：B服务器。').filter(f=>f.rule==='C32').length,1);
+assert.equal(reviewProblems([low],'　1）身份鉴别：A服务器。').filter(f=>f.rule==='C32').length,0);
+assert.equal(reviewProblems([low],'1）身份鉴别：A服务器。2）访问控制：B服务器。',
+  [{item:0,name:'身份鉴别'},{item:1,name:'访问控制'}]).filter(f=>f.rule==='C32').length,0);
+assert.equal(reviewProblems([low],'1）身份鉴别：A服务器。3）访问控制：B服务器。',
+  [{item:0,name:'身份鉴别'},{item:1,name:'访问控制'}]).filter(f=>f.rule==='C32').length,1,
+  '应按最后一个编号判断问题项数量，而非只数编号条目');
 const unnumbered = reviewProblems([low],'身份鉴别：A服务器存在不足。');
 assert.equal(unnumbered.filter(f=>f.rule==='C32'&&f.type==='无法核对').length,1);
 assert.equal(unnumbered.filter(f=>f.rule==='C31').length,0);
@@ -57,6 +63,11 @@ const otherChannel = object('上城区一体化智能化公共数据平台国密
 assert.equal(engine.analyze({objects:[polluted,otherChannel],units:[],serverNames:[],databaseNames:[],dataCount:0,
   targets:[{id:'report-overall-0',layer:0,section:4,text:'上城区一体化智能化公共数据平台采用国密访问通道。',manual:true,coverage:'all'}]})
   .filter(f=>f.rule==='C29'&&f.object.name==='浙政钉扫码通道').length,1);
+const cryptoTarget = text => ({ id:'plan-crypto-device',layer:2,section:8,text,manual:true,coverage:'all' });
+const cryptoInput = text => ({objects:[object('A服务器')],units:[],serverNames:[],databaseNames:[],dataCount:0,targets:[cryptoTarget(text)]});
+assert.equal(engine.analyze(cryptoInput('未描述服务器')).filter(f=>f.rule==='C33').length,1);
+assert.equal(engine.analyze(cryptoInput('A服务器采用TLS1.2和AES128。')).filter(f=>f.rule==='C33').length,0);
+assert.equal(engine.analyze(cryptoInput('A服务器采用TLS1.3和AES256。')).filter(f=>['C06','C07'].includes(f.rule)).length,2);
 for(const path of ['frontend/public/prototype.html','frontend/src/report-generator.html']) {
   const html=fs.readFileSync(path,'utf8');
   for(const match of html.matchAll(/<script\b[^>]*>([\s\S]*?)<\/script>/gi)) if(match[1].trim()) new vm.Script(match[1]);
@@ -67,9 +78,10 @@ new vm.Script(fs.readFileSync('frontend/public/report-review.js','utf8'));
 console.log('PASS: 合并阈值、遗漏对象、重要数据计数、参数差异、结论差异、自动字段边界、两份页面脚本语法');
 // 页签适配集成：审核/状态保存/定位/局部复核后状态失效。
 async function integration() {
-  let saves=0, located=0;
+  let saves=0, located=0, planLocated=0;
   const panel={innerHTML:'',querySelectorAll:()=>[]};
-  const sandbox={console, setTimeout, document:{head:{appendChild(){}},createElement:()=>({}),getElementById:id=>id==='report-panel-7'?panel:null},
+  const cryptoField={value:'A服务器采用TLS1.2。',style:{},scrollIntoView(){planLocated++;},focus(){}};
+  const sandbox={console, setTimeout, document:{head:{appendChild(){}},createElement:()=>({}),getElementById:id=>id==='report-panel-7'?panel:(id==='plan-crypto-device'?cryptoField:null)},
     onsiteEsc:s=>String(s).replace(/</g,'&lt;'),ONSITE_LAYERS:Array.from({length:8},(_,i)=>({name:'层面'+i})),
     evaluationIndicatorLevels:Array.from({length:8},(_,i)=>({items:i===2?[{name:'身份鉴别'}]:[]})),objData:{},
     getOnsiteObjectEntries:t=>t===2?[{id:'obj',name:'A服务器'}]:[],getOnsiteUnitObjectEntries:t=>t===2?[{id:'obj',name:'A服务器'}]:[],
@@ -79,7 +91,7 @@ async function integration() {
     buildLayerAnalysisText:()=>'',buildLayerOverallText:()=>'',buildSugProblemText:t=>t===2?'1）身份鉴别：A服务器密码应用存在不足。':'无。',
     buildSugAdviceText:()=>'',buildConclusionSentence:()=>'',
     getReportTextVal:(id,auto)=>sandbox.reportTexts[id]??auto,getRiskRows:()=>[],reportRiskStore:{},reportFixes:{},
-    switchReportTab:()=>sandbox.renderReportReview(),showToast(){},switchStep(){},switchOnsiteTab(){},expandOnsiteRecord:()=>located++,
+    switchReportTab:()=>sandbox.renderReportReview(),showToast(){},switchStep(){},switchPlanTab(){},switchCryptoModule(){},switchCryptoLayer(){},switchOnsiteTab(){},expandOnsiteRecord:()=>located++,
     bbPersistProjectStage:async()=>saves++};
   sandbox.window=sandbox;
   const ctx=vm.createContext(sandbox);
@@ -143,6 +155,12 @@ async function integration() {
   sandbox.getLayerProblemUnits=t=>t===2?[{itemIdx:0,name:'身份鉴别'},{itemIdx:1,name:'访问控制'}]:[];
   await sandbox.runReportReview(null);
   assert(!get().accepted.some(x=>x.id===counted.id));
+  cryptoField.value='这里尚未说明对应的测评对象。';
+  await sandbox.runReportReview(null);
+  const cryptoMissing=get().findings.find(x=>x.rule==='C33');
+  assert(cryptoMissing, '第二步密码应用概况应提示遗漏对象');
+  await sandbox.locateReviewTarget(cryptoMissing.id);
+  assert.equal(planLocated,1, '应定位到第二步对应描述框');
   console.log('PASS: 风险与改进建议排除、合理差异持久化和失效、问题描述与计数审核');
 }
 integration().catch(error=>{console.error(error);process.exitCode=1;});
