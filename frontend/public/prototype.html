@@ -745,9 +745,9 @@
     .evi-group-list { display:grid; grid-template-columns:repeat(auto-fill,minmax(260px,1fr)); gap:10px; }
     .evi-group { border:1px solid #d5deea; border-radius:7px; padding:8px; background:#fff; }
     .evi-group.active { border-color:#1a73e8; box-shadow:0 0 0 2px rgba(26,115,232,.12); }
-    .evi-group-head { display:flex; align-items:center; gap:6px; }
+    .evi-group-head { display:flex; align-items:flex-start; gap:6px; }
     .evi-no { flex:none; font-size:11px; font-weight:700; color:#1a73e8; background:#eef4ff; border-radius:3px; padding:2px 6px; }
-    .evi-name { flex:1; min-width:0; border:1px solid #d8e1ee; border-radius:4px; font-size:11px; padding:3px 5px; outline:none; }
+    .evi-name { flex:1; min-width:0; box-sizing:border-box; border:1px solid #d8e1ee; border-radius:4px; font-size:11px; line-height:1.4; padding:3px 5px; outline:none; resize:none; overflow:hidden; }
     .evi-name:focus { border-color:#1a73e8; }
     .evi-del { flex:none; cursor:pointer; color:#d93025; font-weight:700; padding:0 3px; font-size:14px; }
     .evi-thumbs { display:flex; gap:6px; margin-top:7px; overflow-x:auto; padding-bottom:2px; }
@@ -5304,6 +5304,13 @@
     if (group) { group.name = value; markOnsiteEvidenceChanged(); }
   }
 
+  function autoGrowOnsiteEvidenceName(el) {
+    if (!el) return;
+    el.style.height = 'auto';
+    const lineHeight = parseFloat(getComputedStyle(el).lineHeight) || 16;
+    el.style.height = Math.max(lineHeight * 2 + 8, el.scrollHeight) + 'px';
+  }
+
   function activateOnsiteEvidenceGroup(groupId) {
     const group = onsiteEvidenceGroups.find(function(item) { return item.id === groupId; });
     if (!group) return;
@@ -5432,7 +5439,7 @@
     html += '<div class="evi-group-list">' + groups.map(function(group) {
       return '<div class="evi-group' + (group.id === activeOnsiteEvidenceGroupId ? ' active' : '') + '">' +
         '<div class="evi-group-head"><span class="evi-no">' + onsiteEsc(group.no) + '</span>' +
-        '<input class="evi-name" placeholder="证据名称（可选）" value="' + onsiteEsc(group.name || '') + '" onchange="onsiteEviRename(\'' + group.id + '\',this.value)" />' +
+        '<textarea class="evi-name" rows="2" placeholder="证据名称（可选）" oninput="autoGrowOnsiteEvidenceName(this);onsiteEviRename(\'' + group.id + '\',this.value)">' + onsiteEsc(group.name || '') + '</textarea>' +
         '<span class="evi-del" title="删除证据组" onclick="deleteOnsiteEvidenceGroup(\'' + group.id + '\')">×</span></div>' +
         '<div class="evi-thumbs">' + (group.images || []).map(function(image) {
           return '<div class="evi-thumb"><img loading="lazy" src="' + onsiteEsc(onsiteEvidenceImageSrc(image)) + '" onclick="onsiteEviPreview(\'' + group.id + '\',\'' + image.id + '\')" />' +
@@ -5515,7 +5522,10 @@
     ensureOnsiteEvidenceDrawer();
     if (Number(t) === Number(currentOnsiteLayer)) {
       const library = document.getElementById('onsite-evidence-library-drawer');
-      if (library) library.innerHTML = onsiteEvidenceLibraryHtml(t);
+      if (library) {
+        library.innerHTML = onsiteEvidenceLibraryHtml(t);
+        library.querySelectorAll('textarea.evi-name').forEach(autoGrowOnsiteEvidenceName);
+      }
       const layer = document.getElementById('onsite-evidence-drawer-layer');
       if (layer) layer.textContent = ONSITE_LAYERS[t]?.name || '';
       const button = document.getElementById('onsite-evidence-fab');
