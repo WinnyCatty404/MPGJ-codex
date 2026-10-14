@@ -424,14 +424,23 @@ export async function writeAppendixBImages(xml: string, zip: JSZip, saved: Recor
 
 const planningImageSlots: Record<string, string> = {
   '工具接入示意图': 'access-image',
+  '被测系统情况_密码应用情况_物理和环境安全': 'physical-crypto-image',
+  '被测系统情况_密码应用情况_网络和通信安全': 'network-crypto-image',
   '被测系统情况_密码应用情况_设备和计算安全_密码应用情况图片': 'device-crypto-image',
   '被测系统情况_密码应用情况_应用和数据安全_密码应用情况图片': 'application-crypto-image',
 };
 
 const planningImageCaptionLabels: Record<string, string> = {
+  '被测系统情况_密码应用情况_物理和环境安全': '物理和环境安全密码应用情况',
+  '被测系统情况_密码应用情况_网络和通信安全': '网络和通信安全密码应用情况',
   '被测系统情况_密码应用情况_设备和计算安全_密码应用情况图片': '设备和计算安全密码应用情况',
   '被测系统情况_密码应用情况_应用和数据安全_密码应用情况图片': '应用和数据安全密码应用情况',
 };
+
+const inlinePlanningImageSlots = new Set([
+  '被测系统情况_密码应用情况_物理和环境安全',
+  '被测系统情况_密码应用情况_网络和通信安全',
+]);
 
 type TopologyBlock = { type?: string; content?: string; dataUrl?: string; caption?: string };
 
@@ -492,7 +501,7 @@ export async function writeTopologyBlocks(xml: string, zip: JSZip, blocks: Topol
 }
 
 export async function writePlanningImages(xml: string, zip: JSZip, images: Record<string, string>,
-  topologyImageCount = 0): Promise<string> {
+  topologyImageCount = 0, captionNames: Record<string, string> = {}): Promise<string> {
   const relPath = 'word/_rels/document.xml.rels';
   let rels = await zip.file(relPath)?.async('string');
   let types = await zip.file('[Content_Types].xml')?.async('string');
@@ -506,26 +515,29 @@ export async function writePlanningImages(xml: string, zip: JSZip, images: Recor
     if (paragraphs.length !== 1) throw new Error(`Word模板中的 {{${slot}}} 必须恰好出现一次`);
     const paragraph = paragraphs[0];
     const captionLabel = planningImageCaptionLabels[slot];
-    const captionParagraph = captionLabel
+    const inlineAfterDescription = inlinePlanningImageSlots.has(slot);
+    const captionParagraph = captionLabel && !inlineAfterDescription
       ? [...xml.matchAll(/<w:p\b[^>]*>[\s\S]*?<\/w:p>/g)].find(match => {
         const text = paragraphText(match[0]).trim();
         return match.index! > paragraph.index! && /^\u56fe\s*2[-－—]\s*\d+/.test(text) && text.endsWith(captionLabel);
       })
       : undefined;
-    if (captionLabel && !captionParagraph) throw new Error(`Word模板中缺少“${captionLabel}”图片标题`);
+    if (captionLabel && !inlineAfterDescription && !captionParagraph) throw new Error(`Word模板中缺少“${captionLabel}”图片标题`);
     const dataUrl = images[imageId];
-    let replacement = '<w:p/>';
+    let replacement = inlineAfterDescription ? paragraph[0] : '<w:p/>';
     if (dataUrl) {
-      const description = captionLabel ? `图 2-${++cryptoImageNumber} ${captionLabel}` : slot;
+      const captionName = String(captionNames[imageId] || '').trim() || captionLabel;
+      const description = captionLabel ? `图 2-${++cryptoImageNumber} ${captionName}` : slot;
       const { bytes, ext, size } = await exportImage(dataUrl, slot);
       const suffix = ext === 'jpeg' ? 'jpg' : ext;
       const filename = `bb-planning-${imageId}.${suffix}`;
       zip.file(`word/media/${filename}`, bytes);
       const relationId = `rId${rid++}`;
       rels = rels.replace('</Relationships>', `<Relationship Id="${relationId}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" Target="media/${filename}"/></Relationships>`);
-      replacement = imageParagraph(relationId, drawingId++, size.width, size.height, description,
+      const imageAndCaption = imageParagraph(relationId, drawingId++, size.width, size.height, description,
         REPORT_IMAGE_WIDTH_EMU, !!captionLabel, REPORT_IMAGE_MAX_HEIGHT_EMU);
-      if (captionLabel) replacement += evidenceCaptionParagraph(description);
+      replacement = (inlineAfterDescription ? paragraph[0] : '') + imageAndCaption +
+        (captionLabel ? evidenceCaptionParagraph(description) : '');
       if (!new RegExp(`<Default\\b[^>]*Extension="${suffix}"`, 'i').test(types)) {
         types = types.replace('</Types>', `<Default Extension="${suffix}" ContentType="${ext === 'jpeg' ? 'image/jpeg' : `image/${ext}`}"/></Types>`);
       }

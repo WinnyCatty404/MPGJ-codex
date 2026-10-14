@@ -476,6 +476,9 @@
     .asset-sub-tab.active { background: #1a73e8; color: #fff; border-color: #1a73e8; }
     .asset-sub-panel { display: none; }
     .asset-sub-panel.active { display: block; }
+    .plan-subtab-footer { display:flex; justify-content:flex-end; align-items:center; gap:12px; margin-top:18px; padding:12px 0; border-top:1px solid #d8e1ee; }
+    .plan-subtab-footer span { color:#65758a; font-size:12px; }
+    .plan-subtab-footer button { width:auto; padding:0 16px; }
     .asset-table-actions {
       display: flex; gap: 8px; margin-bottom: 10px;
     }
@@ -1932,25 +1935,25 @@
                 <section class="crypto-layer-panel active" data-layer="0" data-image-id="physical-crypto-image">
                   <div class="crypto-layer-main">
                     <div class="crypto-description"><label for="plan-crypto-physical">应用情况描述</label><textarea id="plan-crypto-physical" maxlength="2000" class="text-area indent-text" oninput="updateCryptoLayerUi()"></textarea><span class="crypto-char-count">0/2000</span></div>
-                    <div class="crypto-media"><label>配图（可粘贴截图）</label><div class="crypto-thumb"><img id="physical-crypto-image" style="display:none;"><button type="button" onclick="clearPlanCryptoImage('physical-crypto-image')">×</button></div><div class="crypto-upload" tabindex="0" onclick="selectPlanImageArea(this)">点击本框选中后 <b>Ctrl+V</b> 粘贴图片，或 <button type="button" class="image-import-link" onclick="event.stopPropagation(); selectPlanImageArea(this.parentElement); this.nextElementSibling.click()">导入本机图片</button><input type="file" accept="image/*" onchange="handlePlanCryptoUpload(this,'physical-crypto-image')"></div></div>
+                    <div class="crypto-media"><label>配图（可粘贴截图）</label><div class="crypto-thumb"><img id="physical-crypto-image" style="display:none;"><button type="button" onclick="clearPlanCryptoImage('physical-crypto-image')">×</button></div><div class="crypto-upload" tabindex="0" onclick="selectPlanImageArea(this)">点击本框选中后 <b>Ctrl+V</b> 粘贴图片，或 <button type="button" class="image-import-link" onclick="event.stopPropagation(); selectPlanImageArea(this.parentElement); this.nextElementSibling.click()">导入本机图片</button><input type="file" accept="image/*" onchange="handlePlanCryptoUpload(this,'physical-crypto-image')"></div><div class="crypto-caption" style="display:none"><span class="crypto-caption-number"></span><input id="plan-crypto-caption-physical" type="text" value="物理和环境安全密码应用情况" aria-label="图片名称"></div></div>
                   </div>
                 </section>
                 <section class="crypto-layer-panel" data-layer="1" data-image-id="network-crypto-image">
                   <div class="crypto-layer-main">
                     <div class="crypto-description"><label for="plan-crypto-network">应用情况描述</label><textarea id="plan-crypto-network" maxlength="2000" class="text-area indent-text" oninput="updateCryptoLayerUi()"></textarea><span class="crypto-char-count">0/2000</span></div>
-                    <div class="crypto-media"><label>配图（可粘贴截图）</label><div class="crypto-thumb"><img id="network-crypto-image" style="display:none;"><button type="button" onclick="clearPlanCryptoImage('network-crypto-image')">×</button></div><div class="crypto-upload" tabindex="0" onclick="selectPlanImageArea(this)">点击本框选中后 <b>Ctrl+V</b> 粘贴图片，或 <button type="button" class="image-import-link" onclick="event.stopPropagation(); selectPlanImageArea(this.parentElement); this.nextElementSibling.click()">导入本机图片</button><input type="file" accept="image/*" onchange="handlePlanCryptoUpload(this,'network-crypto-image')"></div></div>
+                    <div class="crypto-media"><label>配图（可粘贴截图）</label><div class="crypto-thumb"><img id="network-crypto-image" style="display:none;"><button type="button" onclick="clearPlanCryptoImage('network-crypto-image')">×</button></div><div class="crypto-upload" tabindex="0" onclick="selectPlanImageArea(this)">点击本框选中后 <b>Ctrl+V</b> 粘贴图片，或 <button type="button" class="image-import-link" onclick="event.stopPropagation(); selectPlanImageArea(this.parentElement); this.nextElementSibling.click()">导入本机图片</button><input type="file" accept="image/*" onchange="handlePlanCryptoUpload(this,'network-crypto-image')"></div><div class="crypto-caption" style="display:none"><span class="crypto-caption-number"></span><input id="plan-crypto-caption-network" type="text" value="网络和通信安全密码应用情况" aria-label="图片名称"></div></div>
                   </div>
                 </section>
                 <section class="crypto-layer-panel" data-layer="2" data-image-id="device-crypto-image">
                   <div class="crypto-layer-main">
                     <div class="crypto-description"><label for="plan-crypto-device">应用情况描述</label><textarea id="plan-crypto-device" maxlength="2000" class="text-area indent-text" oninput="updateCryptoLayerUi()"></textarea><span class="crypto-char-count">0/2000</span></div>
-                    <div class="crypto-media"><label>配图（可粘贴截图）</label><div class="crypto-thumb"><img id="device-crypto-image" style="display:none;"><button type="button" onclick="clearPlanCryptoImage('device-crypto-image')">×</button></div><div class="crypto-upload" tabindex="0" onclick="selectPlanImageArea(this)">点击本框选中后 <b>Ctrl+V</b> 粘贴图片，或 <button type="button" class="image-import-link" onclick="event.stopPropagation(); selectPlanImageArea(this.parentElement); this.nextElementSibling.click()">导入本机图片</button><input type="file" accept="image/*" onchange="handlePlanCryptoUpload(this,'device-crypto-image')"></div></div>
+                    <div class="crypto-media"><label>配图（可粘贴截图）</label><div class="crypto-thumb"><img id="device-crypto-image" style="display:none;"><button type="button" onclick="clearPlanCryptoImage('device-crypto-image')">×</button></div><div class="crypto-upload" tabindex="0" onclick="selectPlanImageArea(this)">点击本框选中后 <b>Ctrl+V</b> 粘贴图片，或 <button type="button" class="image-import-link" onclick="event.stopPropagation(); selectPlanImageArea(this.parentElement); this.nextElementSibling.click()">导入本机图片</button><input type="file" accept="image/*" onchange="handlePlanCryptoUpload(this,'device-crypto-image')"></div><div class="crypto-caption" style="display:none"><span class="crypto-caption-number"></span><input id="plan-crypto-caption-device" type="text" value="设备和计算安全密码应用情况" aria-label="图片名称"></div></div>
                   </div>
                 </section>
                 <section class="crypto-layer-panel crypto-layer-application" data-layer="3" data-image-id="application-crypto-image">
                   <div class="crypto-layer-main">
                     <div class="crypto-description"><label for="plan-crypto-application">应用情况描述</label><textarea id="plan-crypto-application" maxlength="2000" class="text-area indent-text" oninput="updateCryptoLayerUi()"></textarea><span class="crypto-char-count">0/2000</span></div>
-                    <div class="crypto-media"><label>配图（可粘贴截图）</label><div class="crypto-thumb"><img id="application-crypto-image" style="display:none;"><button type="button" onclick="clearPlanCryptoImage('application-crypto-image')">×</button></div><div class="crypto-upload" tabindex="0" onclick="selectPlanImageArea(this)">点击本框选中后 <b>Ctrl+V</b> 粘贴图片，或 <button type="button" class="image-import-link" onclick="event.stopPropagation(); selectPlanImageArea(this.parentElement); this.nextElementSibling.click()">导入本机图片</button><input type="file" accept="image/*" onchange="handlePlanCryptoUpload(this,'application-crypto-image')"></div></div>
+                    <div class="crypto-media"><label>配图（可粘贴截图）</label><div class="crypto-thumb"><img id="application-crypto-image" style="display:none;"><button type="button" onclick="clearPlanCryptoImage('application-crypto-image')">×</button></div><div class="crypto-upload" tabindex="0" onclick="selectPlanImageArea(this)">点击本框选中后 <b>Ctrl+V</b> 粘贴图片，或 <button type="button" class="image-import-link" onclick="event.stopPropagation(); selectPlanImageArea(this.parentElement); this.nextElementSibling.click()">导入本机图片</button><input type="file" accept="image/*" onchange="handlePlanCryptoUpload(this,'application-crypto-image')"></div><div class="crypto-caption" style="display:none"><span class="crypto-caption-number"></span><input id="plan-crypto-caption-application" type="text" value="应用和数据安全密码应用情况" aria-label="图片名称"></div></div>
                   </div>
                   <div class="crypto-key-card">
                     <div class="crypto-key-title"><strong>非对称密钥列表</strong><span>导出为报告表 2-1</span></div>
@@ -3935,6 +3938,7 @@
       return '<div class="topology-block"><div class="topology-block-head"><span>文字块</span>' + actions + '</div><textarea class="text-area indent-text" style="min-height:130px" placeholder="请输入拓扑说明" oninput="updateTopologyBlock(' + index + ',\'content\',this.value)">' + onsiteEsc(block.content || '') + '</textarea></div>';
     }).join('');
     syncLegacyTopologyFields();
+    updateCryptoLayerUi();
   }
   function updateTopologyBlock(index, key, value) { if (topologyBlocks[index]) topologyBlocks[index][key] = value; syncLegacyTopologyFields(); }
   function notifyTopologyBlocksChanged() { document.dispatchEvent(new CustomEvent('bb:prototype-change')); }
@@ -4123,6 +4127,7 @@
 
   function updateCryptoLayerUi() {
     let completed = 0;
+    let figureNumber = topologyBlocks.filter(function(block) { return block.type === 'image' && block.dataUrl; }).length;
     document.querySelectorAll('#plan-tab-12 .crypto-layer-panel').forEach(function (panel) {
       const index = Number(panel.dataset.layer || 0);
       const textarea = panel.querySelector('textarea[id^="plan-crypto-"]');
@@ -4141,6 +4146,11 @@
       }
       const thumb = panel.querySelector('.crypto-thumb');
       if (thumb) thumb.classList.toggle('has-image', hasImage);
+      const caption = panel.querySelector('.crypto-caption');
+      if (caption) {
+        caption.style.display = hasImage ? 'flex' : 'none';
+        if (hasImage) caption.querySelector('.crypto-caption-number').textContent = '图 2-' + (++figureNumber);
+      }
     });
     const total = document.getElementById('crypto-layer-completed');
     if (total) total.textContent = completed + '/4 已完成';
@@ -4413,11 +4423,54 @@
     showToast('系统资产已保存');
   }
 
+  function ensurePlanSubtabFooters() {
+    [['asset', 10], ['object', 2], ['indicator', 3], ['method', 4], ['crypto-service', 12]].forEach(function(entry) {
+      const kind = entry[0];
+      const host = kind === 'crypto-service' ? document.getElementById('crypto-module-service') : document.getElementById('plan-tab-' + entry[1]);
+      if (!host || document.getElementById('plan-subtab-footer-' + kind)) return;
+      const footer = document.createElement('div');
+      footer.id = 'plan-subtab-footer-' + kind;
+      footer.className = 'plan-subtab-footer';
+      footer.innerHTML = '<span>本页会自动保存，也可点击按钮手动保存并继续。</span>' +
+        '<button type="button" class="btn btn-primary" onclick="saveAndNextPlanSubTab(\'' + kind + '\')">保存并进入下一项</button>';
+      const actions = kind === 'crypto-service' ? null : host.querySelector('.form-actions');
+      if (actions) host.insertBefore(footer, actions);
+      else host.appendChild(footer);
+    });
+  }
+
+  async function saveAndNextPlanSubTab(kind) {
+    try {
+      if (window.bbPersistProjectStage) await window.bbPersistProjectStage(2, true, true);
+      else document.dispatchEvent(new Event('bb:prototype-change'));
+    } catch (error) {
+      showToast('保存失败，请重试：' + (error.message || error), true);
+      return;
+    }
+    if (kind === 'asset') {
+      const types = Object.keys(assetTypeNames);
+      const current = document.querySelector('#plan-tab-10 .asset-sub-tab.active')?.id.replace('asset-sub-btn-', '');
+      const next = types[types.indexOf(current) + 1];
+      if (next) switchAssetSubTab(next); else switchPlanTab(7);
+    } else if (kind === 'object') {
+      const index = Array.from(document.querySelectorAll('#obj-layer-tabs .obj-layer-tab')).findIndex(tab => tab.classList.contains('active'));
+      if (index < 4) switchObjLayer(index + 2); else switchPlanTab(3);
+    } else if (kind === 'indicator') {
+      const index = Array.from(document.querySelectorAll('#indicator-sub-tab-nav .indicator-sub-tab')).findIndex(tab => tab.classList.contains('active'));
+      if (index < 7) switchIndicatorSubTab(index + 1); else switchPlanTab(4);
+    } else if (kind === 'method') {
+      const index = Array.from(document.querySelectorAll('#method-sub-tabs .obj-layer-tab')).findIndex(tab => tab.classList.contains('active'));
+      if (index < 1) switchMethodSubTab(2); else switchPlanTab(9);
+    } else if (kind === 'crypto-service') switchPlanTab(10);
+    showToast('已保存，进入下一项');
+  }
+
   // 注册拓扑图粘贴事件
   document.addEventListener('paste', handleTopologyPaste);
 
   // ===== 测评实施 · 步骤切换 =====
   function switchStep(n) {
+    if (n === 2) ensurePlanSubtabFooters();
     for (let i = 1; i <= 5; i++) {
       const stepEl = document.getElementById('step-' + i);
       const panelEl = document.getElementById('step-panel-' + i);
@@ -9807,6 +9860,9 @@
   .crypto-thumb button { position:absolute; top:3px; right:3px; display:grid; width:18px; height:18px; padding:0; place-items:center; background:rgba(31,35,41,.72); border:0; border-radius:50%; color:#fff; cursor:pointer; line-height:18px; }
   .crypto-upload { display:flex; min-height:64px; flex:1; align-items:center; justify-content:center; box-sizing:border-box; border:1px dashed #C9CDD4; border-radius:6px; color:var(--primary); font-size:12px; cursor:pointer; }
   .crypto-upload input { display:none; }
+  .crypto-caption { align-items:center; gap:5px; margin-top:7px; }
+  .crypto-caption-number { flex:none; color:var(--text-2); font-size:11px; white-space:nowrap; }
+  body.bb-embedded #page-implement .crypto-caption input { flex:1; min-width:0; height:28px; box-sizing:border-box; padding:3px 6px; font-size:11px; }
   .crypto-key-card { margin:0 0 10px; padding:10px; flex:none; background:#FAFBFC; border:1px solid var(--border); border-radius:6px; }
   .crypto-key-title { display:flex; margin-bottom:8px; align-items:baseline; gap:8px; }
   .crypto-key-title strong { color:var(--text-1); font-size:12px; }

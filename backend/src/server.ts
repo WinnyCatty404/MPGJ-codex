@@ -243,6 +243,10 @@ async function buildProjectDocx(projectId: string) {
   const replacements = Object.fromEntries(Object.entries(values).map(([name, value]) => [`{{${name}}}`, value]));
   replacements['{{报告编号}}}'] = values['报告编号']; // 兼容封面多写的一个右花括号。
   const planningImages = Object.fromEntries((stageData.planning?.images || []).map((image: { id: string; src: string }) => [image.id, image.src]));
+  const planningFields = Object.fromEntries((stageData.planning?.fields || []).map((field: { id: string; value: string }) => [field.id, field.value]));
+  const planningImageCaptions = Object.fromEntries(['physical', 'network', 'device', 'application'].map(layer => [
+    `${layer}-crypto-image`, String(planningFields[`plan-crypto-caption-${layer}`] || ''),
+  ]));
   const xmlEntries = Object.keys(zip.files).filter(name => /^word\/(document|header\d*|footer\d*)\.xml$/.test(name));
   const unresolved = new Set<string>();
   for (const name of xmlEntries) {
@@ -266,7 +270,7 @@ async function buildProjectDocx(projectId: string) {
         : (planningImages['topology-image'] ? 1 : 0);
       xml = await writeTopologyBlocks(xml, zip, stageData.planning?.topologyBlocks,
         planningImages['topology-image'], values['被测系统情况_网络拓扑图及描述_描述'], project.system_name);
-      xml = await writePlanningImages(xml, zip, planningImages, topologyImageCount);
+      xml = await writePlanningImages(xml, zip, planningImages, topologyImageCount, planningImageCaptions);
       xml = await writeReportEvidence(xml, zip, stageData.onsite?.onsiteRecords || {},
         reportEvidenceGroups);
       xml = await writeAppendixBImages(xml, zip, stageData.reporting?.appendixBImages || {});
