@@ -1447,7 +1447,7 @@
         <h2 data-page-node-id="tptCKi9lh858WGOHmvBAod">测评实施</h2>
         <div id="implement-page-meta" class="breadcrumb" data-page-node-id="ajjEJQEunEh4adoJhAVBl2">正在读取项目信息…</div>
       </div>
-      <div class="implementation-header-actions"><button type="button" class="btn btn-secondary global-replace-trigger" onclick="openGlobalReplace()">全局替换</button><div id="implementation-save-state" class="implementation-save-state"><span class="save-dot"></span><span>等待编辑</span></div><button class="btn btn-secondary" style="width:auto; padding:0 20px;" onclick="showPage('page-projects')" data-page-node-id="SanYfw2eF4sKnTfwETbMb0">← 返回项目列表</button></div>
+      <div class="implementation-header-actions"><button type="button" class="btn btn-secondary global-replace-trigger" onclick="openGlobalReplace()">全局替换</button><span class="implementation-save-hint">按 Ctrl+S 手动保存，也会自动保存</span><div id="implementation-save-state" class="implementation-save-state"><span class="save-dot"></span><span>等待编辑</span></div><button class="btn btn-secondary" style="width:auto; padding:0 20px;" onclick="showPage('page-projects')" data-page-node-id="SanYfw2eF4sKnTfwETbMb0">← 返回项目列表</button></div>
     </div>
 
     <!-- 系统评分与评估结论 -->
@@ -9699,7 +9699,7 @@
   body.bb-embedded #page-implement > .navbar { display:none !important; }
   body.bb-embedded #page-implement .main-content { max-width:none; margin:0; padding:0; }
   body.bb-embedded #page-implement .page-header {
-    display:flex; height:56px; min-height:56px; margin:0; padding:0 20px;
+    position:sticky; top:0; z-index:1100; display:flex; height:56px; min-height:56px; margin:0; padding:0 20px;
     align-items:center; justify-content:space-between; box-sizing:border-box;
     background:#fff; border:0; border-bottom:1px solid var(--border); border-radius:0; box-shadow:none;
   }
@@ -9716,6 +9716,7 @@
   body.bb-embedded #page-implement .implementation-header-actions {
     display:flex; flex:0 0 auto; align-items:center; gap:16px;
   }
+  body.bb-embedded #page-implement .implementation-save-hint { color:var(--text-3); font-size:11px; white-space:nowrap; }
   body.bb-embedded #page-implement .page-header .btn {
     width:auto; height:32px; padding:0 14px !important; background:#fff;
     border:1px solid var(--border); border-radius:var(--radius); color:var(--text-2);
