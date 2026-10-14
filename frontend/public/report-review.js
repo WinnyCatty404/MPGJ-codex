@@ -19,21 +19,27 @@ let reportReviewState = { findings: [], accepted: [], ranAt: '', scope: null, si
           const record = getOnsiteRec(t, i, j);
           const aliases = (objData[t < 4 ? t + 1 : 5] || []).find(o => o.objectId === entry.id)?.aliases || [];
           objects.push({ key: onsiteKey(t, i, j), layer: t, item: i, index: j, name: entry.name, aliases,
-            unit: unit.name, record: String(record.record || ''), result: getObjectCls(t, i, j), applicable,
+            unit: unit.name, record: String(record.record || ''), result: getObjectCls(t, i, j),
+            rawScore: getReportObjectScore(t, i, j, false), applicable,
             isData: t === 3 && Boolean(ONSITE_UNIT_DATA_REQ[unit.name]) });
         });
       });
       // 第二步存在但未绑定任何现场指标的对象也纳入覆盖检查。
       planned.forEach(entry => { if (!objects.some(o => o.layer === t && o.name === entry.name)) objects.push({ key: 'plan|' + entry.id,
         layer: t, item: -1, index: -1, name: entry.name, aliases: [], unit: '', record: '', result: '未测评', applicable: true, planOnly: true }); });
+      const problemUnits = getLayerProblemUnits(t).map(p => ({ item: p.itemIdx, name: p.name }));
+      objects.push({ key: 'problem-count|' + t, layer: t, item: -1, index: -1, name: '问题项', unit: '',
+        record: '问题项 ' + problemUnits.length + ' 个', result: String(problemUnits.length), summaryCount: true });
       const definitions = [
         [0, 'report-ua-text-' + t, buildLayerAnalysisText(t), 'all'],
-        [4, 'report-overall-' + t, buildLayerOverallText(t), 'all']
+        [4, 'report-overall-' + t, buildLayerOverallText(t), 'all'],
+        [5, 'report-sug-prob-' + t, buildSugProblemText(t), 'problems']
       ];
       definitions.forEach(([section, id, auto, coverage]) => targets.push({ id, section, layer: t, text: getReportTextVal(id, auto),
-        manual: Object.prototype.hasOwnProperty.call(reportTexts, id), coverage, advice: id.includes('sug-adv') }));
+        manual: Object.prototype.hasOwnProperty.call(reportTexts, id), coverage,
+        problemUnits: section === 5 ? problemUnits : undefined }));
     });
-    // 整体分析与评估结论继续保留为现有审核目标；风险分析和建议不参与对比。
+    // 整体分析与评估结论继续保留；建议只核对问题描述中的低分对象和编号，不核对改进建议。
     // 整体分析是结构化修正：保留人工填写理由，不将修正前后结果不同直接判错。
     Object.entries(reportFixes).forEach(([key, fix]) => {
       const loc = locateOnsiteRecordKey(key);
@@ -43,14 +49,25 @@ let reportReviewState = { findings: [], accepted: [], ranAt: '', scope: null, si
     return { objects, units, targets, serverNames: assetNames('server'), databaseNames: assetNames('db'), dataCount: assetNames('data').length };
   }
   function signature(input) { return BBReportReviewEngine.hash(JSON.stringify(input)); }
-  const excludedSections = new Set([2, 5]);
-  function sourceFingerprint(target, object) {
-    return BBReportReviewEngine.hash(JSON.stringify([target.text, object.record, object.result, object.name]));
+  const excludedSections = new Set([2]);
+  const suggestionRules = new Set(['C31', 'C32']);
+  function validFinding(finding) {
+    return finding && !excludedSections.has(finding.target?.section) &&
+      (finding.target?.section !== 5 || suggestionRules.has(finding.rule));
+  }
+  function validAccepted(item) {
+    return item && !excludedSections.has(item.targetSection) &&
+      (item.targetSection !== 5 || suggestionRules.has(item.rule));
+  }
+  function sourceFingerprint(target, object, rule) {
+    const source = [target.text, object.record, object.result, object.name];
+    if (rule === 'C31') source.push(object.unit, object.rawScore);
+    return BBReportReviewEngine.hash(JSON.stringify(source));
   }
   function acceptedFromFinding(finding) {
     return { id: finding.id, rule: finding.rule, objectKey: finding.object.key, objectName: finding.object.name,
       targetId: finding.target.id, targetSection: finding.target.section, title: finding.title,
-      fingerprint: finding.fingerprint, sourceFingerprint: sourceFingerprint(finding.target, finding.object),
+      fingerprint: finding.fingerprint, sourceFingerprint: sourceFingerprint(finding.target, finding.object, finding.rule),
       note: finding.note || '', confirmedAt: new Date().toISOString() };
   }
   function normalizeState() {
@@ -58,12 +75,12 @@ let reportReviewState = { findings: [], accepted: [], ranAt: '', scope: null, si
     if (!Array.isArray(reportReviewState.accepted)) reportReviewState.accepted = [];
     const accepted = new Map(reportReviewState.accepted.filter(item => item && item.id).map(item => [item.id, item]));
     reportReviewState.findings = reportReviewState.findings.filter(finding => {
-      if (!finding || excludedSections.has(finding.target?.section)) return false;
+      if (!validFinding(finding)) return false;
       if (finding.status !== '合理差异') return true;
       accepted.set(finding.id, acceptedFromFinding(finding));
       return false;
     });
-    reportReviewState.accepted = Array.from(accepted.values()).filter(item => !excludedSections.has(item.targetSection));
+    reportReviewState.accepted = Array.from(accepted.values()).filter(validAccepted);
   }
   window.bbNormalizeReportReviewState = normalizeState;
   async function persist() {
@@ -77,7 +94,7 @@ let reportReviewState = { findings: [], accepted: [], ranAt: '', scope: null, si
     reportReviewState.accepted = reportReviewState.accepted.filter(item => {
       const target = input.targets.find(t => t.id === item.targetId);
       const object = input.objects.find(o => o.key === item.objectKey);
-      return target && object && item.sourceFingerprint === sourceFingerprint(target, object);
+      return target && object && item.sourceFingerprint === sourceFingerprint(target, object, item.rule);
     });
     const accepted = new Map(reportReviewState.accepted.map(item => [item.id, item]));
     const fresh = BBReportReviewEngine.analyze(filtered).filter(finding => {
@@ -120,6 +137,7 @@ let reportReviewState = { findings: [], accepted: [], ranAt: '', scope: null, si
   };
   window.locateReviewSource = function(id) {
     const f = reportReviewState.findings.find(x => x.id === id); if (!f) return;
+    if (f.rule === 'C32') { switchStep(4); activeSuggestionLayer = f.target.layer; switchReportTab(5); showToast('请核对本层面的“问题项”数量及编号条目。'); return; }
     switchStep(f.object.planOnly ? 2 : 3);
     if (f.object.planOnly) { showToast('请在第二步测评对象中核对：' + f.object.name); return; }
     switchOnsiteTab(f.object.layer);
@@ -163,6 +181,7 @@ let reportReviewState = { findings: [], accepted: [], ranAt: '', scope: null, si
     return out;
   }
   function rvDescribe(finding) {
+    if (finding.rule === 'C31' || finding.rule === 'C32') return '<b>审核依据：</b>' + esc(finding.reason);
     const left = rvBrief(finding.baseline || finding.object.name);
     const right = String(finding.target.text || '').trim();
     return '<b>A</b> 现场结果记录中写了「<em class="ok">' + esc(left) + '</em>」，<b>B</b> ' + esc(labels[finding.target.section]) +
@@ -198,14 +217,14 @@ let reportReviewState = { findings: [], accepted: [], ranAt: '', scope: null, si
           '<div><div class="review-compare-head"><span>现场结果记录 / 第二步对象</span><button type="button" onclick="locateReviewSource(\'' + f.id + '\')">定位现场对象</button></div>' +
           '<pre>' + rvMarkText(f.baseline || f.object.name, rvPatterns(f, 'left'), 'rv-ok') + '</pre></div>' +
           '<div><div class="review-compare-head"><span>' + esc(labels[f.target.section]) + '原文</span><button type="button" onclick="locateReviewTarget(\'' + f.id + '\')">定位报告原文</button></div>' +
-          (hasObject ? '' : '<div class="review-missing">未找到「' + esc(f.object.name) + '」相关描述</div>') +
+          (hasObject || f.rule === 'C32' || f.type === '无法核对' ? '' : '<div class="review-missing">未找到「' + esc(f.object.name) + '」相关描述</div>') +
           '<pre>' + rvMarkText(f.target.text || '（未填写）', rvPatterns(f, 'right'), 'rv-bad') + '</pre></div>' +
         '</div>' +
         '<label>处理状态 <select onchange="setReviewStatus(\'' + f.id + '\',this.value)">' + STATUSES.map(s => '<option' + (s === f.status ? ' selected' : '') + '>' + s + '</option>').join('') + '</select></label>' +
         '<label>处理说明<textarea class="text-area" onchange="setReviewNote(\'' + f.id + '\',this.value)">' + esc(f.note) + '</textarea></label>';
     })() : '<p>选择左侧问题查看原文对照。</p>';
     panel.innerHTML = '<h3>报告审核</h3><p>根据第二步对象与第三步现场记录，核对单元测评结果分析、总体评价等现有审核目标。允许同类服务器、数据库达到3个时合并称呼；重要数据资产达到3项时可称“重要数据”。</p>' +
-      '<p class="review-hint">当前不对比风险分析、安全问题及改进建议，也不因这些栏目缺少测评对象而报错。其余栏目进行本地规则初审；整体分析依据、复杂语义及截图代码仍需人工复核。</p>' +
+      '<p class="review-hint">安全问题及改进建议仅检查各层面问题描述中的低分对象和编号数量，不对比改进建议；风险分析不参与对比。整体分析依据、复杂语义及截图代码仍需人工复核。</p>' +
       statusbar +
       (state.accepted.length ? '<details class="review-accepted"><summary>已确认合理差异（' + state.accepted.length + '，不计入问题数）</summary>' +
         state.accepted.map(item => '<div class="review-accepted-item"><span>' + esc(item.rule + ' · ' + item.title + ' · ' + item.objectName + ' · ' + (labels[item.targetSection] || '报告内容')) +

@@ -30,6 +30,33 @@ for (const section of [2, 5]) {
   assert.equal(engine.analyze({objects:[object('A服务器')],units:[],serverNames:[],databaseNames:[],dataCount:0,
     targets:[{id:'excluded-' + section,layer:2,section,text:'遗漏对象且TLS1.3。',manual:true,coverage:'all'}]}).length,0);
 }
+function reviewProblems(objects, text, problemUnits = [{item:0,name:'身份鉴别'}], extra = {}) {
+  return engine.analyze({objects,units:[],serverNames:objects.map(o=>o.name),databaseNames:[],dataCount:0,
+    targets:[{id:'report-sug-prob-2',layer:2,section:5,text,manual:true,coverage:'problems',problemUnits}],...extra});
+}
+const low = object('A服务器',{item:0,rawScore:0.5});
+assert.equal(reviewProblems([low],'1）身份鉴别：A服务器密码应用存在不足。').length,0);
+assert.equal(reviewProblems([low],'1）身份鉴别：存在密码应用不足。').filter(f=>f.rule==='C31').length,1);
+assert.equal(reviewProblems([low],'1）访问控制：A服务器存在不足。\n2）身份鉴别：存在不足。',
+  [{item:1,name:'访问控制'},{item:0,name:'身份鉴别'}]).filter(f=>f.rule==='C31').length,1);
+assert.equal(reviewProblems([object('A服务器',{rawScore:1})],'1）身份鉴别：存在不足。').filter(f=>f.rule==='C31').length,0);
+assert.equal(reviewProblems([object('A服务器',{rawScore:'NA'})],'1）身份鉴别：存在不足。').filter(f=>f.rule==='C31').length,0);
+assert.equal(reviewProblems([object('A服务器',{rawScore:null})],'1）身份鉴别：存在不足。').filter(f=>f.rule==='C31').length,0);
+for (const marker of ['1 身份鉴别：A服务器。','1）身份鉴别：A服务器。','1、身份鉴别：A服务器。','1. 身份鉴别：A服务器。']) {
+  assert.equal(reviewProblems([low],marker).length,0,marker);
+}
+assert.equal(reviewProblems([low],'1）身份鉴别：A服务器使用TLS1.2、AES_256_GCM。').length,0);
+assert.equal(reviewProblems([low],'1）身份鉴别：A服务器。\n1.2版本已记录。').filter(f=>f.rule==='C32').length,0);
+assert.equal(reviewProblems([low],'1）身份鉴别：A服务器。\n2）访问控制：B服务器。').filter(f=>f.rule==='C32').length,1);
+const unnumbered = reviewProblems([low],'身份鉴别：A服务器存在不足。');
+assert.equal(unnumbered.filter(f=>f.rule==='C32'&&f.type==='无法核对').length,1);
+assert.equal(unnumbered.filter(f=>f.rule==='C31').length,0);
+assert.equal(reviewProblems([low],'1）存在不足。').filter(f=>f.rule==='C31'&&f.type==='无法核对').length,1);
+const polluted = object('浙政钉扫码通道',{layer:0,aliases:['z','上城区一体化智能化公共数据平台']});
+const otherChannel = object('上城区一体化智能化公共数据平台国密访问通道',{layer:0});
+assert.equal(engine.analyze({objects:[polluted,otherChannel],units:[],serverNames:[],databaseNames:[],dataCount:0,
+  targets:[{id:'report-overall-0',layer:0,section:4,text:'上城区一体化智能化公共数据平台采用国密访问通道。',manual:true,coverage:'all'}]})
+  .filter(f=>f.rule==='C29'&&f.object.name==='浙政钉扫码通道').length,1);
 for(const path of ['frontend/public/prototype.html','frontend/src/report-generator.html']) {
   const html=fs.readFileSync(path,'utf8');
   for(const match of html.matchAll(/<script\b[^>]*>([\s\S]*?)<\/script>/gi)) if(match[1].trim()) new vm.Script(match[1]);
@@ -46,9 +73,11 @@ async function integration() {
     onsiteEsc:s=>String(s).replace(/</g,'&lt;'),ONSITE_LAYERS:Array.from({length:8},(_,i)=>({name:'层面'+i})),
     evaluationIndicatorLevels:Array.from({length:8},(_,i)=>({items:i===2?[{name:'身份鉴别'}]:[]})),objData:{},
     getOnsiteObjectEntries:t=>t===2?[{id:'obj',name:'A服务器'}]:[],getOnsiteUnitObjectEntries:t=>t===2?[{id:'obj',name:'A服务器'}]:[],
-    getOnsiteRec:()=>({record:'A服务器采用TLS1.2。'}),getObjectCls:()=> '部分符合',getRawUnitScore:()=>0.25,reportClassify:()=> '部分符合',
+    getOnsiteRec:()=>({record:'A服务器采用TLS1.2。'}),getObjectCls:()=> '部分符合',getRawUnitScore:()=>0.25,
+    getReportObjectScore:()=>0.5,getLayerProblemUnits:t=>t===2?[{itemIdx:0,name:'身份鉴别'}]:[],reportClassify:()=> '部分符合',
     isOnsiteUnitApplicable:()=>true,onsiteKey:()=> 'ind|obj',ONSITE_UNIT_DATA_REQ:{},reportTexts:{'report-overall-2':'A服务器采用TLS1.3。'},
-    buildLayerAnalysisText:()=>'',buildLayerOverallText:()=>'',buildSugProblemText:()=>'',buildSugAdviceText:()=>'',buildConclusionSentence:()=>'',
+    buildLayerAnalysisText:()=>'',buildLayerOverallText:()=>'',buildSugProblemText:t=>t===2?'1）身份鉴别：A服务器密码应用存在不足。':'无。',
+    buildSugAdviceText:()=>'',buildConclusionSentence:()=>'',
     getReportTextVal:(id,auto)=>sandbox.reportTexts[id]??auto,getRiskRows:()=>[],reportRiskStore:{},reportFixes:{},
     switchReportTab:()=>sandbox.renderReportReview(),showToast(){},switchStep(){},switchOnsiteTab(){},expandOnsiteRecord:()=>located++,
     bbPersistProjectStage:async()=>saves++};
@@ -60,7 +89,7 @@ async function integration() {
   assert(panel.innerHTML.includes('TLS版本可能不一致'));
   const get=()=>vm.runInContext('reportReviewState',ctx);
   const finding=get().findings[0];
-  assert(get().findings.every(x=>![2,5].includes(x.target.section)));
+  assert(get().findings.every(x=>x.target.section!==2 && (x.target.section!==5 || ['C31','C32'].includes(x.rule))));
   await sandbox.setReviewStatus(finding.id,'合理差异');
   assert.equal(get().findings.length,0);
   assert.equal(get().accepted.length,1);
@@ -85,6 +114,35 @@ async function integration() {
   sandbox.bbNormalizeReportReviewState();
   assert.equal(get().findings.length,0);
   assert.equal(get().accepted.length,1);
-  console.log('PASS: 排除风险与建议、合理差异移出与撤销、重新审核、原文变化、旧数据迁移');
+  vm.runInContext('reportReviewState = {findings:[],accepted:[],ranAt:"",scope:null,signature:""}',ctx);
+  sandbox.reportTexts['report-sug-prob-2']='1）身份鉴别：存在不足。';
+  await sandbox.runReportReview(null);
+  const omitted=get().findings.find(x=>x.rule==='C31');
+  assert(omitted);
+  await sandbox.setReviewStatus(omitted.id,'合理差异');
+  await sandbox.runReportReview(null);
+  assert(!get().findings.some(x=>x.id===omitted.id));
+  const savedSuggestion=JSON.parse(JSON.stringify(get()));
+  vm.runInContext('reportReviewState = ' + JSON.stringify(savedSuggestion),ctx);
+  await sandbox.runReportReview(null);
+  assert(!get().findings.some(x=>x.id===omitted.id));
+  sandbox.reportTexts['report-sug-prob-2']='1）身份鉴别：缺少说明。';
+  await sandbox.runReportReview(null);
+  assert(get().findings.some(x=>x.id===omitted.id));
+  assert(!get().accepted.some(x=>x.id===omitted.id));
+  sandbox.reportTexts['report-sug-prob-2']='1）身份鉴别：A服务器存在不足。\n2）访问控制：其他问题。';
+  await sandbox.runReportReview(null);
+  const counted=get().findings.find(x=>x.rule==='C32');
+  assert(counted);
+  await sandbox.setReviewStatus(counted.id,'合理差异');
+  await sandbox.runReportReview(null);
+  assert(!get().findings.some(x=>x.id===counted.id));
+  vm.runInContext('reportReviewState = ' + JSON.stringify(JSON.parse(JSON.stringify(get()))),ctx);
+  await sandbox.runReportReview(null);
+  assert(!get().findings.some(x=>x.id===counted.id));
+  sandbox.getLayerProblemUnits=t=>t===2?[{itemIdx:0,name:'身份鉴别'},{itemIdx:1,name:'访问控制'}]:[];
+  await sandbox.runReportReview(null);
+  assert(!get().accepted.some(x=>x.id===counted.id));
+  console.log('PASS: 风险与改进建议排除、合理差异持久化和失效、问题描述与计数审核');
 }
 integration().catch(error=>{console.error(error);process.exitCode=1;});
