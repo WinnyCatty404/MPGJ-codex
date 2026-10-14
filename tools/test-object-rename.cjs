@@ -37,10 +37,14 @@ const context = vm.createContext({
 vm.runInContext(fs.readFileSync('frontend/public/object-rename-review.js', 'utf8'), context);
 const review = context.window.BBObjectRename;
 review.refresh();
-assert.match(box.innerHTML, /对象改名待处理：5 处/);
+assert.match(box.innerHTML, /对象改名待处理/);
+assert.match(box.innerHTML, /rename-review-count">5 处/);
 review.open();
 assert.match(box.innerHTML, /平台非国密通道/);
 assert.match(box.innerHTML, /名称嵌在更长文字中/);
+assert.match(box.innerHTML, /rename-layer-badge/);
+assert.match(box.innerHTML, /rename-mark-before">平台<\/mark>/);
+assert.match(box.innerHTML, /rename-mark-after">平台1<\/mark>/);
 review.apply();
 assert.equal(context.onsiteRecords['record|app'].record, '平台1，平台非国密通道，平台其他通道。');
 assert.equal(context.reportTexts['report-ua-text-3'], '平台1，结果符合。');
