@@ -144,19 +144,23 @@ let reportReviewState = { findings: [], accepted: [], ranAt: '', scope: null, si
     const t = String(text || '').replace(/\s+/g, ' ').trim();
     return t.length > 40 ? t.slice(0, 40) + '…' : (t || '（空）');
   }
-  function rvHighlight(raw, words, cls) {
-    const list = (words || []).filter(w => w && String(w).length > 1);
-    return String(raw || '').split(/([。；;\n])/).map((seg, i) => {
-      if (!seg) return '';
-      if (i % 2 === 1) return esc(seg);
-      const hit = list.some(w => seg.indexOf(w) >= 0);
-      return hit ? '<mark class="' + cls + '">' + esc(seg) + '</mark>' : esc(seg);
-    }).join('');
+  const escapeReg = value => String(value).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  function rvPatterns(finding, side) {
+    const names = [finding.object.name].concat(finding.object.aliases || []);
+    const list = names.filter(n => n && String(n).length > 1).map(n => new RegExp(escapeReg(n), 'g'));
+    const p = finding.params;
+    if (p && p.attr) {
+      const value = side === 'left' ? p.left : p.right;
+      if (value) list.push(p.attr === 'tls'
+        ? new RegExp('TLS\\s*v?\\s*' + escapeReg(value), 'gi')
+        : new RegExp('AES[\\s_-]*' + escapeReg(value), 'gi'));
+    }
+    return list;
   }
-  function rvKeywords(finding) {
-    const words = [finding.object.name].concat(finding.object.aliases || []);
-    ['TLS', 'SSL', 'AES', 'SM2', 'SM3', 'SM4', 'RSA', 'ZUC', '哈希', '密钥长度', '随机数'].forEach(w => words.push(w));
-    return Array.from(new Set(words.filter(Boolean)));
+  function rvMarkText(text, patterns, cls) {
+    let out = esc(text);
+    (patterns || []).forEach(re => { out = out.replace(re, m => '<mark class="' + cls + '">' + m + '</mark>'); });
+    return out;
   }
   function rvDescribe(finding) {
     const left = rvBrief(finding.baseline || finding.object.name);
@@ -182,7 +186,6 @@ let reportReviewState = { findings: [], accepted: [], ranAt: '', scope: null, si
     const filters = '<div class="review-filters"><button type="button" class="review-chip' + (reviewFilter === '全部' ? ' on' : '') + '" onclick="setReviewFilter(\'全部\')">全部 ' + state.findings.length + '</button>' +
       STATUSES.map((s, i) => '<button type="button" class="review-chip' + (reviewFilter === s ? ' on' : '') + (counts[i] ? '' : ' empty') + '" onclick="setReviewFilter(\'' + s + '\')">' + s + ' ' + counts[i] + '</button>').join('') + '</div>';
     const detail = f ? (function() {
-      const words = rvKeywords(f);
       const hasObject = String(f.target.text || '').indexOf(f.object.name) >= 0;
       return '<h4>' + esc(f.title) + '</h4>' +
         '<p class="review-desc">' + rvDescribe(f) + '</p>' +
@@ -193,10 +196,10 @@ let reportReviewState = { findings: [], accepted: [], ranAt: '', scope: null, si
         '</div>' +
         '<div class="review-compare">' +
           '<div><div class="review-compare-head"><span>现场结果记录 / 第二步对象</span><button type="button" onclick="locateReviewSource(\'' + f.id + '\')">定位现场对象</button></div>' +
-          '<pre>' + rvHighlight(f.baseline || f.object.name, words, 'rv-ok') + '</pre></div>' +
+          '<pre>' + rvMarkText(f.baseline || f.object.name, rvPatterns(f, 'left'), 'rv-ok') + '</pre></div>' +
           '<div><div class="review-compare-head"><span>' + esc(labels[f.target.section]) + '原文</span><button type="button" onclick="locateReviewTarget(\'' + f.id + '\')">定位报告原文</button></div>' +
           (hasObject ? '' : '<div class="review-missing">未找到「' + esc(f.object.name) + '」相关描述</div>') +
-          '<pre>' + rvHighlight(f.target.text || '（未填写）', words, 'rv-bad') + '</pre></div>' +
+          '<pre>' + rvMarkText(f.target.text || '（未填写）', rvPatterns(f, 'right'), 'rv-bad') + '</pre></div>' +
         '</div>' +
         '<label>处理状态 <select onchange="setReviewStatus(\'' + f.id + '\',this.value)">' + STATUSES.map(s => '<option' + (s === f.status ? ' selected' : '') + '>' + s + '</option>').join('') + '</select></label>' +
         '<label>处理说明<textarea class="text-area" onchange="setReviewNote(\'' + f.id + '\',this.value)">' + esc(f.note) + '</textarea></label>';

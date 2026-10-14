@@ -36,10 +36,10 @@
   function analyze(input) {
     const findings = [];
     const allNames = [...new Set(input.objects.map(o => o.name))];
-    function add(rule, target, object, title, reason, baseline, type) {
+    function add(rule, target, object, title, reason, baseline, type, params) {
       const id = hash([rule, target.id, object.key, title].join('|'));
       if (findings.some(f => f.id === id)) return;
-      findings.push({ id, rule, target: { ...target }, object: { ...object }, title, reason,
+      findings.push({ id, rule, target: { ...target }, object: { ...object }, title, reason, params: params || null,
         baseline: baseline || object.record || '', type: type || '疑点', status: '待确认', note: '',
         fingerprint: hash(JSON.stringify([baseline || object.record, target.text, object.result, object.name])) });
     }
@@ -109,7 +109,8 @@
           const left = [...new Set(a[attr])], right = [...new Set(b[attr])];
           if (left.length === 1 && right.length === 1 && left[0] !== right[0]) {
             add(attr === 'tls' ? 'C06' : 'C07', target, o, attr === 'tls' ? 'TLS版本可能不一致' : 'AES密钥长度可能不一致',
-              '现场记录为 ' + left[0] + '，对应对象的报告句子为 ' + right[0] + '。需确认是否同一次连接、同一用途和有效版本。', source);
+              '现场记录为 ' + left[0] + '，对应对象的报告句子为 ' + right[0] + '。需确认是否同一次连接、同一用途和有效版本。',
+              source, null, { attr, left: left[0], right: right[0] });
           }
         }
       }
