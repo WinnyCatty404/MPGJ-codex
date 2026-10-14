@@ -2392,6 +2392,7 @@
                 <button class="btn btn-secondary" style="width:auto; padding:0 16px; height:32px; font-size:13px;" onclick="syncAssetsToObjects()" title="将系统资产中勾选了测评的资产同步到对应层面" data-page-node-id="7Z9j5NwIVLNcTZqfYE5jNo">⇄ 同步系统资产</button>
               </div>
               <div style="font-size:12px; color:#999; margin-bottom:10px; padding-left:10px;" data-page-node-id="9dnG9cSfAy9LNCfoGGOwxD">同步规则：物理环境 → 物理和环境安全；服务器/存储设备、数据库管理系统、网络及安全设备、密码产品 → 设备和计算安全；关键业务应用 → 应用和数据安全（仅同步勾选了“是否测评”的资产，未勾选不同步；同名对象自动跳过，说明自动填入各层面默认文案）</div>
+              <div id="object-rename-review" class="object-rename-review"></div>
               <div class="obj-layer-tabs" id="obj-layer-tabs" data-page-node-id="2s3BiTABnGNgkz57Qpe7D9">
                 <div class="obj-layer-tab active" onclick="switchObjLayer(1)" data-page-node-id="3MwK1rCWAL0PeyE5NPC4Qi">物理和环境安全</div>
                 <div class="obj-layer-tab" onclick="switchObjLayer(2)" data-page-node-id="zn2Q1vQkLjAA8pXO9jxUst">网络和通信安全</div>
@@ -7531,28 +7532,23 @@
   }
   ensureObjDataIds();
 
-  // 测评对象改名时同步报告编制阶段文本。
-  // 范围说明：
-  //   - 现场测评表格的「测评对象」列由对象绑定实时渲染，改名自动跟随，无需文本替换；
-  //   - 现场测评的「结果记录/结果描述」正文不做替换：对象名常是其他对象名与叙述文字的子串
-  //     （如“XX平台”是“XX平台非密访问通道”的子串），全局替换会误改无关记录的正文；
-  //   - 报告编制阶段的风险描述/分析与正文仍随改名同步，保持报告整体一致。
-  function replaceObjectNameReferences(previous, next) {
-    previous = String(previous || '').trim();
-    next = String(next || '').trim();
-    if (!previous || !next || previous === next) return;
-    const replace = function(value) { return typeof value === 'string' ? value.split(previous).join(next) : value; };
-    reportImportedRiskRows.forEach(function(row) {
-      row.desc = replace(row.desc);
-      row.analysis = replace(row.analysis);
-    });
-    Object.keys(reportRiskStore).forEach(function(key) {
-      const row = reportRiskStore[key];
-      if (!row) return;
-      row.desc = replace(row.desc);
-      row.analysis = replace(row.analysis);
-    });
-    Object.keys(reportTexts).forEach(function(key) { reportTexts[key] = replace(reportTexts[key]); });
+  let pendingObjectRenames = [];
+  function finishObjectRename(layer, idx, before, after) {
+    const row = objData[layer]?.[idx];
+    if (!row) return;
+    before = String(before || '').trim();
+    after = String(after || '').trim();
+    if (!before || !after || before === after) return;
+    if (!row.aliases.includes(before)) row.aliases.push(before);
+    let pending = pendingObjectRenames.find(item => item.objectId === row.objectId);
+    if (!pending) {
+      pending = { objectId: row.objectId, layer: layer, oldNames: [], next: after };
+      pendingObjectRenames.push(pending);
+    }
+    if (!pending.oldNames.includes(before)) pending.oldNames.push(before);
+    pending.next = after;
+    BBObjectRename.refresh();
+    if (window.bbMarkProjectDirty) window.bbMarkProjectDirty(2, true);
   }
 
   function switchObjLayer(n) {
@@ -7593,7 +7589,7 @@
         return `<tr>
         <td class="col-no">${idx + 1}</td>
         ${unitCell}
-        <td><textarea class="long-text-input" oninput="updateObjField(${layer},${idx},'object',this.value)" placeholder="请输入测评对象">${onsiteEsc(r.object || '')}</textarea></td>
+        <td><textarea class="long-text-input" onfocus="this.dataset.renameBefore=this.value" oninput="updateObjField(${layer},${idx},'object',this.value)" onblur="finishObjectRename(${layer},${idx},this.dataset.renameBefore,this.value)" placeholder="请输入测评对象">${onsiteEsc(r.object || '')}</textarea></td>
         <td class="col-method">${buildMethodCheckboxes(layer, idx, r.methods)}</td>
         <td class="col-desc"><textarea class="long-text-input" oninput="updateObjField(${layer},${idx},'desc',this.value)" placeholder="请输入说明">${onsiteEsc(r.desc || '')}</textarea></td>
         <td class="col-action"><button class="btn-del-row" onclick="delObjRow(${layer},${idx})" title="删除">×</button></td>
@@ -7602,7 +7598,7 @@
     } else {
       tbody.innerHTML = rows.map((r, idx) => `<tr>
         <td class="col-no">${idx + 1}</td>
-        <td><textarea class="long-text-input" oninput="updateObjField(${layer},${idx},'object',this.value)" placeholder="请输入测评对象">${onsiteEsc(r.object || '')}</textarea></td>
+        <td><textarea class="long-text-input" onfocus="this.dataset.renameBefore=this.value" oninput="updateObjField(${layer},${idx},'object',this.value)" onblur="finishObjectRename(${layer},${idx},this.dataset.renameBefore,this.value)" placeholder="请输入测评对象">${onsiteEsc(r.object || '')}</textarea></td>
         <td class="col-method">${buildMethodCheckboxes(layer, idx, r.methods)}</td>
         <td class="col-desc"><textarea class="long-text-input" oninput="updateObjField(${layer},${idx},'desc',this.value)" placeholder="请输入说明">${onsiteEsc(r.desc || '')}</textarea></td>
         <td class="col-action"><button class="btn-del-row" onclick="delObjRow(${layer},${idx})" title="删除">×</button></td>
@@ -7619,12 +7615,7 @@
     ensureObjDataIds();
     if (field === 'object') {
       reconcileObjLayerObjects(layer);
-      const previous = String(objData[layer][idx].object || '').trim();
-      if (previous && previous !== String(value || '').trim() && objData[layer][idx].aliases.indexOf(previous) < 0) {
-        objData[layer][idx].aliases.push(previous);
-      }
       objData[layer][idx][field] = value;
-      replaceObjectNameReferences(previous, value);
       reconcileObjLayerObjects(layer);
       return;
     }
@@ -10222,7 +10213,7 @@
   // 否则 Word 导入改变行数后，后续字段会整体错位并反向污染 objData/toolData/accessPoints。
   function isStructuredField(el) {
     return !!(el && el.closest(
-      '#plan-reference-list, [id^="asset-tbody-"], #app-user-tbody, [id^="obj-tbody-"], #tool-tbody, #access-point-list, #topology-block-list, #crypto-asymmetric-body, #crypto-symmetric-body, #crypto-service-body, [id^="onsite-panel-"], [id^="report-panel-"]'
+      '#plan-reference-list, #object-rename-review, [id^="asset-tbody-"], #app-user-tbody, [id^="obj-tbody-"], #tool-tbody, #access-point-list, #topology-block-list, #crypto-asymmetric-body, #crypto-symmetric-body, #crypto-service-body, [id^="onsite-panel-"], [id^="report-panel-"]'
     ));
   }
 
@@ -10393,6 +10384,7 @@
       data.currentReferenceStandards = clone(currentReferenceStandards);
       data.assets = captureAssets();
       data.objData = clone(objData);
+      data.pendingObjectRenames = clone(pendingObjectRenames);
       data.toolData = clone(toolData);
       data.accessPoints = clone(accessPoints);
       data.cryptoKeyTables = clone(cryptoKeyTables);
@@ -10868,6 +10860,7 @@
       renderCryptoServices();
       if (saved.currentReferenceStandards) currentReferenceStandards = clone(saved.currentReferenceStandards);
       if (saved.objData) objData = clone(saved.objData);
+      pendingObjectRenames = clone(saved.pendingObjectRenames || []);
       ensureObjDataIds();
       if (saved.toolData) toolData = clone(saved.toolData);
       if (saved.accessPoints) accessPoints = clone(saved.accessPoints);
@@ -10875,6 +10868,7 @@
       renderIndicatorTables();
       restoreAssets(saved.assets);
       renderAllObjLayers();
+      BBObjectRename.refresh();
       renderToolTable();
       renderAccessPoints();
     }
@@ -10895,6 +10889,7 @@
       onsiteUnmatchedObjects = clone(saved.onsiteUnmatchedObjects || {});
       reconcileAllOnsiteObjectBindings();
       renderOnsiteTables();
+      BBObjectRename.refresh();
     }
     if (step === 4) {
       if (saved.reportFixes) reportFixes = migrateLegacyStableKeyMap(saved.reportFixes, onsiteImportedObjects, onsiteObjectBindings, true);
@@ -10911,6 +10906,7 @@
       }
       if (saved.appendixBImages) appendixBImages = clone(saved.appendixBImages);
       renderReport();
+      BBObjectRename.refresh();
     }
     restoreFields(panelForStep(step), saved.fields, saved.prototypeVersion);
     if (step === 2) {
@@ -11506,6 +11502,7 @@ document.addEventListener('keydown', function(event) {
 
 <script src="/report-review-engine.js"></script>
 <script src="/report-review.js"></script>
+<script src="/object-rename-review.js"></script>
 </body>
 </html>
 
