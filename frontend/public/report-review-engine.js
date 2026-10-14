@@ -3,9 +3,27 @@
   function norm(text) { return String(text || '').normalize('NFKC').replace(/[\s“”‘’"'_-]/g, '').toLowerCase(); }
   function hash(value) { let n = 2166136261; for (const c of value) n = Math.imul(n ^ c.charCodeAt(0), 16777619); return (n >>> 0).toString(16); }
   function mentioned(text, name) { return Boolean(norm(name)) && norm(text).includes(norm(name)); }
+  // 简称变体：从对象全称中移除一段 2-3 字的内部片段生成候选（如「浙政钉扫码通道」→「浙政钉通道」）。
+  // 与其它对象名冲突的变体剔除，避免把别家对象的句子算到当前对象头上。
+  function nameVariants(name, allNames) {
+    const out = new Set();
+    if (String(name).length >= 5) {
+      for (let i = 1; i < name.length - 2; i++) {
+        for (let j = 2; j <= 3; j++) {
+          if (i + j > name.length - 1) continue;
+          const v = name.slice(0, i) + name.slice(i + j);
+          if (v.length < 4) continue;
+          if (allNames.some(n => n && n !== name && (n.includes(v) || v.includes(n)))) continue;
+          out.add(v);
+        }
+      }
+    }
+    return [...out];
+  }
   function tokens(text) {
     const result = { tls: [], aes: [] };
-    for (const m of String(text).matchAll(/TLS\s*v?\s*(1\.[0-3])/gi)) result.tls.push(m[1]);
+    // 严格写法（TLS 1.2 / TLSv1.3）与宽松写法（"TLS 协议版本为 1.2"）都识别；数字与关键词间隔不超过 12 字。
+    for (const m of String(text).matchAll(/TLS\s*v?\s*(1\.[0-3])|TLS[^\d。；\n]{0,12}?(1\.[0-3])/gi)) result.tls.push(m[1] || m[2]);
     for (const m of String(text).matchAll(/AES[\s_-]*(128|192|256)/gi)) result.aes.push(m[1]);
     return result;
   }
@@ -17,6 +35,7 @@
   }
   function analyze(input) {
     const findings = [];
+    const allNames = [...new Set(input.objects.map(o => o.name))];
     function add(rule, target, object, title, reason, baseline, type) {
       const id = hash([rule, target.id, object.key, title].join('|'));
       if (findings.some(f => f.id === id)) return;
@@ -38,12 +57,13 @@
           '重要数据': input.dataCount };
         for (const o of unique) {
           const group = category(o, input);
-          const alias = (o.aliases || []).some(a => mentioned(target.text, a));
+          const variants = nameVariants(o.name, allNames);
+          const mentionObj = s => mentioned(s, o.name) || (o.aliases || []).some(a => mentioned(s, a)) || variants.some(v => mentioned(s, v));
           let groupText = norm(target.text);
           applicable.filter(x => category(x, input) === group).map(x => norm(x.name)).sort((a,b) => b.length - a.length)
             .forEach(name => { groupText = groupText.split(name).join(''); });
           const grouped = group && counts[group] >= 3 && groupText.includes(norm(group));
-          if (!mentioned(target.text, o.name) && !alias && !grouped) {
+          if (!mentionObj(target.text) && !grouped) {
             add('C29', target, o, '可能遗漏测评对象：' + o.name,
               '第二步测评对象/重要数据与第三步对应记录中存在该对象，但当前描述未找到其名称、已登记别名或满足数量条件的合并名称。请确认是否已有等价概括。', '', '覆盖检查');
           }
@@ -63,18 +83,33 @@
           }
         }
       }
-      // 参数比较限定到包含对象名称的句子，避免在多对象段落中交叉比较。
+      // 参数比较限定到包含对象名称的句子，避免在多对象段落中交叉比较；
+      // 对象名使用简称或写在相邻句时，通过简称变体与相邻句回退兜底（相邻句不得提及其它对象）。
       for (const o of applicable.filter(o => o.record.trim())) {
-        const sentences = target.text.split(/[。；\n]/).filter(s => mentioned(s, o.name) || (o.aliases || []).some(a => mentioned(s, a)));
-        for (const sentence of sentences) {
-          const source = o.record.split(/[。；\n]/).filter(s => mentioned(s, o.name) || applicable.length === 1).join('。');
-          const a = tokens(source), b = tokens(sentence);
-          for (const attr of ['tls', 'aes']) {
-            const left = [...new Set(a[attr])], right = [...new Set(b[attr])];
-            if (left.length === 1 && right.length === 1 && left[0] !== right[0]) {
-              add(attr === 'tls' ? 'C06' : 'C07', target, o, attr === 'tls' ? 'TLS版本可能不一致' : 'AES密钥长度可能不一致',
-                '现场记录为 ' + left[0] + '，对应对象的报告句子为 ' + right[0] + '。需确认是否同一次连接、同一用途和有效版本。', source);
-            }
+        const variants = nameVariants(o.name, allNames);
+        const mention = s => mentioned(s, o.name) || (o.aliases || []).some(a => mentioned(s, a)) || variants.some(v => mentioned(s, v));
+        const namesOther = s => allNames.some(n => n && n !== o.name && mentioned(s, n));
+        const recSents = o.record.split(/[。；\n]/);
+        const recParts = new Set(applicable.length === 1 ? recSents : recSents.filter(mention));
+        for (let i = 0; i < recSents.length; i++) {
+          if (!mention(recSents[i])) continue;
+          const next = recSents[i + 1];
+          if (next && !namesOther(next)) recParts.add(next);
+        }
+        const source = [...recParts].join('。');
+        const repSents = target.text.split(/[。；\n]/);
+        const repParts = new Set(repSents.filter(mention));
+        for (let i = 0; i < repSents.length; i++) {
+          if (!mention(repSents[i])) continue;
+          const next = repSents[i + 1];
+          if (next && !namesOther(next)) repParts.add(next);
+        }
+        const a = tokens(source), b = tokens([...repParts].join('。'));
+        for (const attr of ['tls', 'aes']) {
+          const left = [...new Set(a[attr])], right = [...new Set(b[attr])];
+          if (left.length === 1 && right.length === 1 && left[0] !== right[0]) {
+            add(attr === 'tls' ? 'C06' : 'C07', target, o, attr === 'tls' ? 'TLS版本可能不一致' : 'AES密钥长度可能不一致',
+              '现场记录为 ' + left[0] + '，对应对象的报告句子为 ' + right[0] + '。需确认是否同一次连接、同一用途和有效版本。', source);
           }
         }
       }
