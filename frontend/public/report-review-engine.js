@@ -25,6 +25,7 @@
         fingerprint: hash(JSON.stringify([baseline || object.record, target.text, object.result, object.name])) });
     }
     for (const target of input.targets) {
+      if (target.section === 2 || target.section === 5) continue;
       if (!target.manual) continue;
       const objects = input.objects.filter(o => o.layer === target.layer && (!target.unit || o.unit === target.unit));
       const applicable = objects.filter(o => o.applicable);

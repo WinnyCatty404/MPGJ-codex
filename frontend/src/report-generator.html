@@ -10950,7 +10950,8 @@
     if (step === 4) {
       if (saved.reportFixes) reportFixes = migrateLegacyStableKeyMap(saved.reportFixes, onsiteImportedObjects, onsiteObjectBindings, true);
       if (saved.reportTexts) reportTexts = clone(saved.reportTexts);
-      reportReviewState = clone(saved.reportReview || { findings: [], ranAt: '', scope: null, signature: '' });
+      reportReviewState = clone(saved.reportReview || { findings: [], accepted: [], ranAt: '', scope: null, signature: '' });
+      if (window.bbNormalizeReportReviewState) window.bbNormalizeReportReviewState();
       if (saved.reportRiskStore) reportRiskStore = clone(saved.reportRiskStore);
       if (saved.reportImportedRiskRows) reportImportedRiskRows = clone(saved.reportImportedRiskRows);
       if (saved.appendixBData) appendixBData = clone(saved.appendixBData);

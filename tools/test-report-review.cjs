@@ -26,6 +26,10 @@ assert.equal(engine.analyze({objects:[object('A服务器')],units:[],serverNames
 const unitInput = {objects:[object('A服务器',{result:'不符合'})],units:[{layer:2,name:'身份鉴别',result:'不符合'}],serverNames:[],databaseNames:[],dataCount:0,
   targets:[{id:'unit',layer:2,section:0,text:'身份鉴别测评指标中，A服务器采用口令。故该指标部分符合。',manual:true,coverage:'all'}]};
 assert.equal(engine.analyze(unitInput).filter(f=>f.rule==='C03').length,1);
+for (const section of [2, 5]) {
+  assert.equal(engine.analyze({objects:[object('A服务器')],units:[],serverNames:[],databaseNames:[],dataCount:0,
+    targets:[{id:'excluded-' + section,layer:2,section,text:'遗漏对象且TLS1.3。',manual:true,coverage:'all'}]}).length,0);
+}
 for(const path of ['frontend/public/prototype.html','frontend/src/report-generator.html']) {
   const html=fs.readFileSync(path,'utf8');
   for(const match of html.matchAll(/<script\b[^>]*>([\s\S]*?)<\/script>/gi)) if(match[1].trim()) new vm.Script(match[1]);
@@ -56,12 +60,31 @@ async function integration() {
   assert(panel.innerHTML.includes('TLS版本可能不一致'));
   const get=()=>vm.runInContext('reportReviewState',ctx);
   const finding=get().findings[0];
+  assert(get().findings.every(x=>![2,5].includes(x.target.section)));
   await sandbox.setReviewStatus(finding.id,'合理差异');
-  assert.equal(get().findings[0].status,'合理差异'); assert(saves>=2);
+  assert.equal(get().findings.length,0);
+  assert.equal(get().accepted.length,1);
+  assert(panel.innerHTML.includes('已确认合理差异（1'));
+  assert(saves>=2);
+  await sandbox.runReportReview(null);assert.equal(get().findings.length,0);
+  const saved=JSON.parse(JSON.stringify(get()));
+  vm.runInContext('reportReviewState = ' + JSON.stringify(saved),ctx);
+  sandbox.bbNormalizeReportReviewState();
+  await sandbox.runReportReview(null);assert.equal(get().findings.length,0);
+  await sandbox.restoreAcceptedReview(finding.id);
+  assert.equal(get().accepted.length,0);
+  assert(get().findings.some(x=>x.id===finding.id));
   sandbox.locateReviewSource(finding.id);assert.equal(located,1);
-  await sandbox.runReportReview(4);assert.equal(get().findings[0].status,'合理差异');
-  sandbox.reportTexts['report-overall-2']='A服务器采用TLS1.2。';
-  await sandbox.runReportReview(4);assert.equal(get().findings.length,0);
-  console.log('PASS: 审核页对照、阶段保存、处理状态、现场定位、局部复核更新');
+  await sandbox.setReviewStatus(finding.id,'合理差异');
+  sandbox.reportTexts['report-overall-2']='A服务器采用TLS1.3，现场核查补充。';
+  await sandbox.runReportReview(null);
+  assert.equal(get().accepted.length,0);
+  assert(get().findings.some(x=>x.id===finding.id));
+  vm.runInContext('reportReviewState = ' + JSON.stringify({findings:[{...get().findings[0],status:'合理差异'},
+    {...get().findings[0],id:'old-risk',target:{section:2}}],ranAt:'',scope:null,signature:''}),ctx);
+  sandbox.bbNormalizeReportReviewState();
+  assert.equal(get().findings.length,0);
+  assert.equal(get().accepted.length,1);
+  console.log('PASS: 排除风险与建议、合理差异移出与撤销、重新审核、原文变化、旧数据迁移');
 }
 integration().catch(error=>{console.error(error);process.exitCode=1;});
