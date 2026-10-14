@@ -31,9 +31,16 @@ CloseApplications=no
 Name: "chinese"; MessagesFile: "compiler:Languages\ChineseSimplified.isl"
 
 [Files]
-; 打包 installer\staging\（由 build-installer.bat 先用 robocopy 生成干净暂存副本，
-; 排除规则全部在 build-installer.bat 中，不在本文件里做 Excludes 匹配，避免语义坑）。
+; build-windows.ps1 生成干净的 build\windows\app 发布目录。
 Source: "build\windows\app\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
+; 数据目录只补齐缺失的出厂模板；卸载不得删除这些运行数据。
+Source: "build\windows\app\storage\templates\*"; DestDir: "{code:GetDataDir}\storage\templates"; Flags: onlyifdoesntexist recursesubdirs createallsubdirs uninsneveruninstall
+; 本次更新的模板在重装/升级时覆盖数据目录中的同名版本，其余模板保持原样。
+Source: "build\windows\app\storage\templates\records\1-系统基本情况调查表（二级）.docx"; DestDir: "{code:GetDataDir}\storage\templates\records"; Flags: ignoreversion uninsneveruninstall
+Source: "build\windows\app\storage\templates\records\1-系统基本情况调查表（三级）.docx"; DestDir: "{code:GetDataDir}\storage\templates\records"; Flags: ignoreversion uninsneveruninstall
+Source: "build\windows\app\storage\templates\records\2-测评方案-init.docx"; DestDir: "{code:GetDataDir}\storage\templates\records"; Flags: ignoreversion uninsneveruninstall
+Source: "build\windows\app\storage\templates\records\2-测评方案-last.docx"; DestDir: "{code:GetDataDir}\storage\templates\records"; Flags: ignoreversion uninsneveruninstall
+Source: "build\windows\app\storage\templates\records\3-测评方案评审表.docx"; DestDir: "{code:GetDataDir}\storage\templates\records"; Flags: ignoreversion uninsneveruninstall
 
 [Icons]
 Name: "{group}\BMPBGS"; Filename: "{app}\BMPBGS.exe"; WorkingDir: "{app}"; IconFilename: "{app}\bmpbgs.ico"
@@ -57,6 +64,12 @@ Type: files; Name: "{userdesktop}\BMPBGS控制台.lnk"
 var
   DataPage: TInputDirWizardPage;
   SuggestedDataDir: String;
+  TemplateNoticeAdded: Boolean;
+
+function GetDataDir(Param: String): String;
+begin
+  Result := DataPage.Values[0];
+end;
 
 procedure InitializeWizard;
 begin
@@ -82,6 +95,12 @@ begin
       DataPage.Values[0] := NewSuggestion;
     SuggestedDataDir := NewSuggestion;
     DataPage.Values[0] := ExpandConstant('{param:DATADIR|' + DataPage.Values[0] + '}');
+  end;
+  if (CurPageID = wpFinished) and (not TemplateNoticeAdded) then
+  begin
+    WizardForm.FinishedLabel.Caption := WizardForm.FinishedLabel.Caption + #13#10 + #13#10 +
+      '模板已更新。如您此前自行修改过模板，请按需重新导入或替换。';
+    TemplateNoticeAdded := True;
   end;
 end;
 

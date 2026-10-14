@@ -42,4 +42,6 @@ powershell -NoProfile -ExecutionPolicy Bypass -File installer\build-windows.ps1
 
 安装目录中的 `bb-data-path.txt` 记录数据目录，`bb-config.json` 保存端口等运行配置。升级时自动复用记录的数据目录；更换目录不会自动迁移旧数据，可先备份，再在新目录恢复。
 
+安装时会补齐数据目录中缺失的出厂模板，并更新本版指定的原始记录模板；其余已有模板保持原样。模板已更新。如您此前自行修改过模板，请按需重新导入或替换。
+
 升级安装和卸载不会主动删除上述用户数据。
