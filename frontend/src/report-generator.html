@@ -2650,7 +2650,7 @@
         </div>
       </div>
       <div id="step-panel-4" class="step-panel" style="display:none;">
-        <div id="report-review-actions" style="display:none;justify-content:flex-end;padding:12px 0;"><button type="button" class="btn btn-primary" style="width:auto;" onclick="runReportReview(null)">开始审核</button></div>
+        <div id="report-review-actions" style="display:none;"></div>
         <div class="tab-layout">
           <div class="tab-sidebar">
             <div class="tab-item active" id="report-tab-btn-0" onclick="switchReportTab(0)">单元测评结果分析</div>
@@ -7464,12 +7464,6 @@
   let activeReportTab = 0;
   function switchReportTab(n) {
     activeReportTab = n;
-    const reviewActions = document.getElementById('report-review-actions');
-    if (reviewActions) {
-      reviewActions.style.display = n === 7 ? 'flex' : 'none';
-      const button = reviewActions.querySelector('button');
-      if (button) button.textContent = reportReviewState.ranAt ? '重新审核整份报告' : '开始审核';
-    }
     for (let i = 0; i < 8; i++) {
       const btn = document.getElementById('report-tab-btn-' + i);
       const panel = document.getElementById('report-panel-' + i);
