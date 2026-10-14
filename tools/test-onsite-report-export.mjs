@@ -65,6 +65,16 @@ const fractionalPngBytes = await sharp({
   create: { width: 1379, height: 800, channels: 3, background: { r: 242, g: 246, b: 250 } },
 }).png().toBuffer();
 const fractionalPng = 'data:image/png;base64,' + fractionalPngBytes.toString('base64');
+const squarePngBytes = await sharp({
+  create: { width: 1200, height: 1200, channels: 3, background: { r: 218, g: 225, b: 230 } },
+}).png().toBuffer();
+const squarePng = 'data:image/png;base64,' + squarePngBytes.toString('base64');
+const documentPngBytes = await sharp({
+  create: { width: 469, height: 693, channels: 3, background: { r: 235, g: 235, b: 235 } },
+}).png().toBuffer();
+const tablePngBytes = await sharp({
+  create: { width: 934, height: 772, channels: 3, background: { r: 225, g: 225, b: 225 } },
+}).png().toBuffer();
 const beforeEvidenceXml = xml;
 xml = await writeReportEvidence(xml, zip, {
   '0|0|0': { evidence: [{ no: '图A-1.1', name: '测试截图', dataUrl: png }] },
@@ -73,6 +83,10 @@ xml = await writeReportEvidence(xml, zip, {
 }, [
   { layer: 2, no: '图A-3.1', name: '多张并排测试', images: [widePng, widePng, widePng].map(dataUrl => ({ dataUrl })) },
   { layer: 3, no: '图A-4.1', name: '非整数比例测试', images: [{ dataUrl: fractionalPng }] },
+  { layer: 4, no: '图A-5.1', name: '四张分两行', images: Array.from({ length: 4 }, () => ({ dataUrl: squarePng })) },
+  { layer: 5, no: '图A-6.1', name: '细长截图', images: [{ dataUrl: tallPng }, { dataUrl: tallPng }] },
+  { layer: 6, no: '图A-7.1', name: '文字证据宽度保护', images: [documentPngBytes, tablePngBytes]
+    .map(bytes => ({ dataUrl: 'data:image/png;base64,' + bytes.toString('base64') })) },
 ]);
 assert.ok(xml.includes('图A-1.1 测试截图'));
 assert.ok(xml.includes('图A-8.1 应急截图'));
@@ -80,13 +94,27 @@ const evidenceParagraphs = [...xml.matchAll(/<w:p\b[^>]*>[\s\S]*?<\/w:p>/g)].map
 const multiImageRows = evidenceParagraphs.filter(paragraph =>
   paragraph.includes('<w:drawing>') && paragraph.includes('图A-3.1 多张并排测试'));
 assert.deepEqual(multiImageRows.map(paragraph => (paragraph.match(/<w:drawing>/g) || []).length), [2, 1],
-  '三张宽图应按原比例排成两张一行、末张单独一行');
+  '三张宽图应优先两张并排，再让剩余截图单独成行');
 assert.ok(multiImageRows.every(paragraph => paragraph.includes('<w:ind w:left="0" w:right="0" w:firstLine="0" w:firstLineChars="0"/>')),
   '图片行不能继承正文首行缩进');
-assert.ok(!multiImageRows[0].includes('<w:keepNext/>'), '前一行允许跨页');
-assert.ok(multiImageRows[1].includes('<w:keepNext/>'), '最后一行必须与图题同页');
-assert.equal(evidenceParagraphs[evidenceParagraphs.indexOf(multiImageRows[1]) + 1].includes('图A-3.1 多张并排测试'), true,
-  '图题应在最后一行图片后另起一段');
+assert.ok(multiImageRows.every(paragraph => paragraph.includes('<w:keepNext/>')),
+  '每张图片必须与各自的图题同页');
+for (const paragraph of multiImageRows) {
+  assert.equal(evidenceParagraphs[evidenceParagraphs.indexOf(paragraph) + 1].includes('图A-3.1 多张并排测试'), true,
+    '同编号的每张截图后都应有图题');
+}
+const fourImageRows = evidenceParagraphs.filter(paragraph => paragraph.includes('<w:drawing>') &&
+  paragraph.includes('图A-5.1 四张分两行'));
+assert.deepEqual(fourImageRows.map(paragraph => (paragraph.match(/<w:drawing>/g) || []).length), [2, 2],
+  '四张截图应在并排尺寸允许时排成两行、每行两张');
+const tallImageRows = evidenceParagraphs.filter(paragraph => paragraph.includes('<w:drawing>') &&
+  paragraph.includes('图A-6.1 细长截图'));
+assert.deepEqual(tallImageRows.map(paragraph => (paragraph.match(/<w:drawing>/g) || []).length), [1, 1],
+  '细长截图并排后宽度不足时应分行');
+const textImageRows = evidenceParagraphs.filter(paragraph => paragraph.includes('<w:drawing>') &&
+  paragraph.includes('图A-7.1 文字证据宽度保护'));
+assert.deepEqual(textImageRows.map(paragraph => (paragraph.match(/<w:drawing>/g) || []).length), [1, 1],
+  '文字证据并排后任一图片窄于5cm时应分行');
 for (const paragraph of multiImageRows) {
   const widths = [...paragraph.matchAll(/<wp:extent cx="(\d+)" cy="(\d+)"\/>/g)].map(match => Number(match[1]));
   assert.ok(widths.reduce((sum, width) => sum + width, 0) <= 13 * 360000,
@@ -101,7 +129,18 @@ assert.ok(!xml.includes('密码安全事件上报'));
 assert.ok(xml.includes('<w:vMerge w:val="restart"/>'));
 assert.ok(xml.includes('<w:vMerge w:val="continue"/>'));
 assert.ok(xml.includes('<w:keepNext/>'), '证据图片段落必须与后续图题保持同页');
-assert.ok(xml.includes('cy="4320000"'), '超高证据图片必须按比例限制为最高12cm');
+const evidenceHeights = evidenceParagraphs.filter(paragraph => /<wp:docPr\b[^>]*name="图A-/.test(paragraph))
+  .flatMap(paragraph => [...paragraph.matchAll(/<wp:extent cx="(\d+)" cy="(\d+)"\/>/g)].map(match => Number(match[2])));
+assert.ok(evidenceHeights.every(height => height <= 9 * 360000), '附录A每张截图的最高高度为9cm');
+const evidenceWidths = evidenceParagraphs.filter(paragraph => /<wp:docPr\b[^>]*name="图A-/.test(paragraph))
+  .flatMap(paragraph => [...paragraph.matchAll(/<wp:extent cx="(\d+)" cy="(\d+)"\/>/g)].map(match => Number(match[1])));
+assert.ok(evidenceWidths.every(width => width <= 13 * 360000), '附录A每张截图的最高宽度为13cm');
+assert.ok(xml.includes('cy="3240000"'), '超高证据图片应按比例限制为最高9cm');
+const tallParagraph = evidenceParagraphs.find(paragraph => paragraph.includes('<w:drawing>') &&
+  paragraph.includes('图A-8.1 应急截图'));
+const tallExtent = /<wp:extent cx="(\d+)" cy="(\d+)"\/>/.exec(tallParagraph);
+assert.ok(Math.abs(Number(tallExtent[1]) / Number(tallExtent[2]) - 500 / 1800) < 0.0001,
+  '超高证据截图必须保持原始宽高比');
 assert.equal((xml.match(/<w:sectPr\b/g) || []).length, (await zip.file('word/document.xml').async('string')).match(/<w:sectPr\b/g).length);
 assert.ok(zip.file('word/media/bb-evidence-1-1-1.png'));
 assert.deepEqual(await zip.file('word/media/bb-evidence-2-1-1.png').async('nodebuffer'), hdPngBytes);

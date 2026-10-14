@@ -75,9 +75,11 @@ const REPORT_IMAGE_WIDTH_EMU = 13 * EMU_PER_CM;
 // 当前报告模板中 15cm 高的图片已接近占满正文页；证据图超过 12cm 时等比例缩小，
 // 确保“图片 + 编号/名称”能够作为一组放进同一页。
 const REPORT_IMAGE_MAX_HEIGHT_EMU = 12 * EMU_PER_CM;
-// 附录A同编号的截图按原图比例并排。低于此尺寸时改为下一行，避免为了塞进一行而无法辨认。
+// 附录A单独限制为9cm；其他章节与原始记录继续使用各自原有的尺寸。
+const APPENDIX_A_IMAGE_MAX_HEIGHT_EMU = 9 * EMU_PER_CM;
+// 同编号图片优先两张并排；3.5cm 是最低行高，并非目标尺寸。
 const EVIDENCE_MIN_ROW_HEIGHT_EMU = 3.5 * EMU_PER_CM;
-const EVIDENCE_MIN_IMAGE_WIDTH_EMU = 2.5 * EMU_PER_CM;
+const EVIDENCE_MIN_IMAGE_WIDTH_EMU = 5 * EMU_PER_CM;
 const EVIDENCE_IMAGE_GAP_EMU = 0.2 * EMU_PER_CM;
 async function exportImage(dataUrl: string, label: string) {
   const match = /^data:image\/(png|jpe?g|gif);base64,([A-Za-z0-9+/=]+)$/.exec(dataUrl);
@@ -133,9 +135,10 @@ function evidenceImageRows(images: SizedEvidenceImage[]): SizedEvidenceImage[][]
   const rows: SizedEvidenceImage[][] = [];
   let row: SizedEvidenceImage[] = [];
   const fits = (candidate: SizedEvidenceImage[]) => {
+    if (candidate.length > 2) return false;
     const availableWidth = REPORT_IMAGE_WIDTH_EMU - EVIDENCE_IMAGE_GAP_EMU * (candidate.length - 1);
     const ratioSum = candidate.reduce((sum, image) => sum + image.width / image.height, 0);
-    const rowHeight = Math.min(REPORT_IMAGE_MAX_HEIGHT_EMU, availableWidth / ratioSum);
+    const rowHeight = Math.min(APPENDIX_A_IMAGE_MAX_HEIGHT_EMU, availableWidth / ratioSum);
     return rowHeight >= EVIDENCE_MIN_ROW_HEIGHT_EMU && candidate.every(image =>
       rowHeight * image.width / image.height >= EVIDENCE_MIN_IMAGE_WIDTH_EMU);
   };
@@ -153,7 +156,7 @@ function evidenceImageRows(images: SizedEvidenceImage[]): SizedEvidenceImage[][]
 function evidenceImageRowParagraph(row: SizedEvidenceImage[], description: string, keepWithCaption: boolean): string {
   const availableWidth = REPORT_IMAGE_WIDTH_EMU - EVIDENCE_IMAGE_GAP_EMU * (row.length - 1);
   const ratioSum = row.reduce((sum, image) => sum + image.width / image.height, 0);
-  const height = Math.max(1, Math.round(Math.min(REPORT_IMAGE_MAX_HEIGHT_EMU, availableWidth / ratioSum)));
+  const height = Math.max(1, Math.round(Math.min(APPENDIX_A_IMAGE_MAX_HEIGHT_EMU, availableWidth / ratioSum)));
   const runs = row.flatMap((image, index) => {
     const width = Math.floor(height * image.width / image.height);
     const drawing = imageRun(image.relationId, image.drawingId, image.width, image.height, description, width, height);
@@ -205,10 +208,13 @@ export async function writeReportEvidence(xml: string, zip: JSZip, records: Reco
         }
       }
       if (!images.length) continue;
-      // 同一行的图片共用段落；只有图片行之间，以及最后一行与图题之间换段。
+      // 每张图片（或经确认可读的图片行）均有自己的图题。图片与图题同页，
+      // 同编号不同截图之间不强行绑定，可分别跨页，减少整组被推到下一页的留白。
       const rows = evidenceImageRows(sizedImages);
-      rows.forEach((row, index) => paragraphs.push(evidenceImageRowParagraph(row, description, index === rows.length - 1)));
-      paragraphs.push(evidenceCaptionParagraph(description));
+      rows.forEach(row => {
+        paragraphs.push(evidenceImageRowParagraph(row, description, true));
+        paragraphs.push(evidenceCaptionParagraph(description));
+      });
     }
     inserts.push(paragraphs.join(''));
   }
