@@ -19,7 +19,14 @@ function source(level) {
   return {
     project: { code: `TEST-L${level}`, report_code: `TEST-L${level}`, system_name: `测试${level}级系统`, org_name: '测试单位', system_level: level },
     stages: [
-      { stage_key: 'planning', data: { fields: [], assets: {}, toolData: [] } },
+      { stage_key: 'planning', data: { fields: [], assets: {
+        crypto: [[{ value: '密码产品甲' }], [{ value: '密码产品乙' }]],
+        server: [[{ value: '服务器甲' }]],
+        network: [[{ value: '网络设备甲' }], [{ value: '安全设备乙' }]],
+        security: [[{ value: '不应出现在授权书的物理安防设施' }]],
+        db: [[{ value: '数据库甲' }]],
+        app: [[{ value: '业务应用甲' }]],
+      }, toolData: [] } },
       { stage_key: 'reporting', data: { templateValues: {}, exportContent: { tables } } },
     ],
     institution: { name: '测试机构', contact: '监督员' },
@@ -31,6 +38,19 @@ const textOf = xml => [...xml.matchAll(/<w:t\b[^>]*>([\s\S]*?)<\/w:t>/g)].map(ma
 for (const level of [2, 3]) {
   const files = await generateRawRecords(templateRoot, source(level));
   assert.ok(files.length >= 14, `等级${level}应生成完整原始记录`);
+
+  const authorization = files.find(file => file.path.startsWith('4-现场测评授权书'));
+  assert.ok(authorization, `等级${level}缺少现场测评授权书`);
+  const authorizationZip = await JSZip.loadAsync(authorization.data);
+  const authorizationText = textOf(await authorizationZip.file('word/document.xml').async('string'));
+  const expectedDevices = ['密码产品甲', '密码产品乙', '服务器甲', '网络设备甲', '安全设备乙', '数据库甲', '业务应用甲'];
+  let previousPosition = -1;
+  for (const device of expectedDevices) {
+    const position = authorizationText.indexOf(device);
+    assert.ok(position > previousPosition, `授权书应按资产类别及表格行顺序列出${device}`);
+    previousPosition = position;
+  }
+  assert.doesNotMatch(authorizationText, /不应出现在授权书的物理安防设施/);
 
   const quality = files.find(file => file.path.startsWith('11-质量监督记录表'));
   assert.ok(quality, `等级${level}缺少质量监督记录表`);

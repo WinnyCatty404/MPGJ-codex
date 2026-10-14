@@ -122,7 +122,7 @@ function buildContext(source: RawRecordSource) {
   const level = Number(project.system_level || planning.assessmentLevel || 3);
   const levelCn = ['', '一', '二', '三', '四'][level] || String(level);
   const assets = planning.assets || {};
-  const deviceNames = assetNames(assets, ['crypto', 'server', 'security', 'db', 'app']);
+  const deviceNames = assetNames(assets, ['crypto', 'server', 'network', 'db', 'app']);
   const tools = (planning.toolData || []).filter((tool: JsonRecord) => tool?.name || tool?.version);
   const riskTable = (reporting.exportContent?.tables || []).find((table: JsonRecord) => String(table.caption || '').includes('风险分析'));
   const risks = (riskTable?.rows || []).map((row: unknown[]) => ({
