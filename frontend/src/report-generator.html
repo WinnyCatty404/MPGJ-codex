@@ -2429,7 +2429,7 @@
                 <div style="font-size:13px; font-weight:600; color:#1a3a6c; padding-left:10px; border-left:3px solid #4caf50;" data-page-node-id="7GE8hBO04llMpEUkCuG1vm">测评对象确定结果</div>
                 <button class="btn btn-secondary" style="width:auto; padding:0 16px; height:32px; font-size:13px;" onclick="syncAssetsToObjects()" title="将系统资产中勾选了测评的资产同步到对应层面" data-page-node-id="7Z9j5NwIVLNcTZqfYE5jNo">⇄ 同步系统资产</button>
               </div>
-              <div style="font-size:12px; color:#999; margin-bottom:10px; padding-left:10px;" data-page-node-id="9dnG9cSfAy9LNCfoGGOwxD">同步规则：物理环境 → 物理和环境安全；服务器/存储设备、数据库管理系统、网络及安全设备、密码产品 → 设备和计算安全；关键业务应用 → 网络和通信安全、应用和数据安全（仅同步勾选了“是否测评”的资产，未勾选不同步；同名对象自动跳过，说明自动填入各层面默认文案）</div>
+              <div style="font-size:12px; color:#999; margin-bottom:10px; padding-left:10px;" data-page-node-id="9dnG9cSfAy9LNCfoGGOwxD">同步规则：物理环境 → 物理和环境安全；服务器/存储设备、数据库管理系统、网络及安全设备、密码产品 → 设备和计算安全；关键业务应用 → 应用和数据安全（仅同步勾选了“是否测评”的资产，未勾选不同步；同名对象自动跳过，说明自动填入各层面默认文案）</div>
               <div class="obj-layer-tabs" id="obj-layer-tabs" data-page-node-id="2s3BiTABnGNgkz57Qpe7D9">
                 <div class="obj-layer-tab active" onclick="switchObjLayer(1)" data-page-node-id="3MwK1rCWAL0PeyE5NPC4Qi">物理和环境安全</div>
                 <div class="obj-layer-tab" onclick="switchObjLayer(2)" data-page-node-id="zn2Q1vQkLjAA8pXO9jxUst">网络和通信安全</div>
@@ -7759,7 +7759,7 @@
       { type: 'db',      layers: [3] },
       { type: 'network', layers: [3] },
       { type: 'crypto',  layers: [3] },
-      { type: 'app',     layers: [2, 4] }
+      { type: 'app',     layers: [4] }
     ];
     // 各层面默认测评方式：物理和环境安全=访谈+文档审查；网络和通信/设备和计算/应用和数据=全部勾选
     const defaultMethods = {
@@ -7781,7 +7781,7 @@
         const nameInput = tr.cells[1] && tr.cells[1].querySelector('input[type="text"], textarea');
         const name = nameInput ? nameInput.value.trim() : '';
         if (!name) return;
-        // 同步到目标层面（关键业务应用同时进入网络和通信安全与应用和数据安全）
+        // 同步到目标层面（关键业务应用仅进入应用和数据安全）
         layers.forEach(layer => {
           if (!objData[layer]) objData[layer] = [];
           // 同名对象去重
