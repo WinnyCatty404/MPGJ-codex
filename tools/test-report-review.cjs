@@ -32,10 +32,26 @@ for (const section of [2, 5]) {
 }
 function reviewProblems(objects, text, problemUnits = [{item:0,name:'身份鉴别'}], extra = {}) {
   return engine.analyze({objects,units:[],serverNames:objects.map(o=>o.name),databaseNames:[],dataCount:0,
-    targets:[{id:'report-sug-prob-2',layer:2,section:5,text,manual:true,coverage:'problems',problemUnits}],...extra});
+    targets:[{id:'report-sug-prob-' + (objects[0]?.layer ?? 2),layer:objects[0]?.layer ?? 2,
+      section:5,text,manual:true,coverage:'problems',problemUnits}],...extra});
 }
 const low = object('A服务器',{item:0,rawScore:0.5});
 assert.equal(reviewProblems([low],'1）身份鉴别：A服务器密码应用存在不足。').length,0);
+const accessRoom = object('上城区信息机房',{layer:0,unit:'电子门禁记录数据存储完整性',rawScore:0});
+const accessDescription = '1）上城区信息机房的电子门禁未采用密码技术对进出机房人员进行身份鉴别。' +
+  '2）上城区信息机房的电子门禁记录数据未采用密码技术进行存储完整性防护。' +
+  '3）上城区信息机房的视频图像监控记录数据未采用密码技术进行存储完整性防护。';
+assert.equal(reviewProblems([accessRoom],accessDescription,[{item:0,name:'身份鉴别'},
+  {item:1,name:'电子门禁记录数据存储完整性'},{item:2,name:'视频监控记录数据存储完整性'}])
+  .filter(f=>f.rule==='C31').length,0,'同一编号条目拆开表述指标名时应能对应现场低分对象');
+assert.equal(reviewProblems([accessRoom],
+  '1）上城区信息机房的视频监控记录数据未采用密码技术进行存储完整性防护。',
+  [{item:1,name:'电子门禁记录数据存储完整性'}]).filter(f=>f.rule==='C31'&&f.type==='无法核对').length,1,
+  '视频监控记录不能代替电子门禁记录');
+assert.equal(reviewProblems([accessRoom],
+  '1）电子门禁记录数据未采用密码技术进行存储完整性防护。',
+  [{item:1,name:'电子门禁记录数据存储完整性'}]).filter(f=>f.rule==='C31'&&f.type==='覆盖检查').length,1,
+  '对应指标条目存在但未写对象时仍应提示');
 assert.equal(reviewProblems([low],'1）身份鉴别：存在密码应用不足。').filter(f=>f.rule==='C31').length,1);
 assert.equal(reviewProblems([low],'1）访问控制：A服务器存在不足。\n2）身份鉴别：存在不足。',
   [{item:1,name:'访问控制'},{item:0,name:'身份鉴别'}]).filter(f=>f.rule==='C31').length,1);

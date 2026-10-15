@@ -62,6 +62,20 @@
     return markers.map((match, index) => ({ number: Number(match[1]),
       text: source.slice(match.index + match[0].length, index + 1 < markers.length ? markers[index + 1].index : source.length).trim() }));
   }
+  function problemMentionsUnit(text, unit) {
+    const name = norm(unit);
+    const parts = /^(.*?)(传输|存储|来源)?(完整性|机密性|真实性)$/.exec(name);
+    return String(text || '').split(/[。！？；;\n]/).some(sentence => {
+      const line = norm(sentence);
+      if (line.includes(name)) return true;
+      if (!parts) return false;
+      const subject = parts[1].replace(/的$/, '');
+      const property = (parts[2] || '') + parts[3];
+      if (subject.length < 4) return false;
+      const start = line.indexOf(subject);
+      return start >= 0 && line.slice(start + subject.length, start + subject.length + 50).includes(property);
+    });
+  }
   function analyze(input) {
     const findings = [];
     const allNames = [...new Set(input.objects.filter(o => !o.summaryCount).map(o => o.name))];
@@ -93,12 +107,12 @@
         }
         const objects = input.objects.filter(o => o.layer === target.layer && typeof o.rawScore === 'number' && o.rawScore >= 0 && o.rawScore < 1 && o.applicable);
         for (const o of objects) {
-          const entry = entries.find(e => e.text.split(/[：:。；\n]/, 1)[0].includes(o.unit));
-          if (!entry) {
+          const matchingEntries = entries.filter(e => problemMentionsUnit(e.text, o.unit));
+          if (!matchingEntries.length) {
             add('C31', target, o, '无法定位低分对象对应的问题条目：' + o.name,
               '现场该对象在“' + o.unit + '”指标中得分低于1，但编号条目未明确对应此指标；请人工核对，不能据此断定问题已遗漏。', '', '无法核对');
-          } else if (!objectMentioned(entry.text, o, allNames) && !groupMentioned(entry.text, o,
-            input.objects.filter(x => x.layer === target.layer && x.applicable && !x.summaryCount), input)) {
+          } else if (!matchingEntries.some(entry => objectMentioned(entry.text, o, allNames) || groupMentioned(entry.text, o,
+            input.objects.filter(x => x.layer === target.layer && x.applicable && !x.summaryCount), input))) {
             add('C31', target, o, '问题描述可能遗漏低分对象：' + o.name,
               '现场该对象在“' + o.unit + '”指标中得分低于1，对应编号条目没有找到对象名称、有效别名或允许的合并称谓。', '', '覆盖检查');
           }
