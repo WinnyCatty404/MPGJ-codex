@@ -9917,6 +9917,20 @@
     body.bb-embedded #page-implement .tab-item,
     body.bb-embedded #page-implement #step-panel-2 .tab-item { width:auto; min-width:126px; flex:0 0 auto; justify-content:center; }
   }
+
+  /* 步骤二的长段落仅在页面上放大；Word 导出仍读取原文并使用模板字体。 */
+  #page-implement #step-panel-2 :is(
+    textarea.indent-text,
+    textarea.long-text-input,
+    .indicator-table .ind-reason textarea,
+    #asset-tbody-data td:nth-child(3) textarea,
+    #asset-tbody-doc td:nth-child(3) textarea,
+    #asset-tbody-crypto td:nth-child(7) textarea,
+    #asset-tbody-server td:nth-child(7) textarea,
+    #asset-tbody-network td:nth-child(5) textarea,
+    #asset-tbody-app td:nth-child(5) textarea,
+    #asset-tbody-person td:nth-child(4) textarea
+  ) { font-size:17px !important; }
 </style>
 <script>
 (function () {
