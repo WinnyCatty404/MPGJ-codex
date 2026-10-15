@@ -7,7 +7,7 @@ const html = fs.readFileSync(path.join(__dirname, '../frontend/public/prototype.
 const start = html.indexOf('  const PERSON_ASSET_DEFAULTS =');
 const end = html.indexOf('  // 新增、导入和历史数据恢复均保留控件顺序及原有属性。', start);
 assert.ok(start >= 0 && end > start);
-const context = vm.createContext({});
+const context = vm.createContext({ onsiteEsc: value => String(value), window: {} });
 vm.runInContext(html.slice(start, end), context);
 
 const expected = [
