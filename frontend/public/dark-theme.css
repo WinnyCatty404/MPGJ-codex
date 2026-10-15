@@ -415,6 +415,27 @@ html[data-theme="dark"] .onsite-record-editor-row td { background: var(--dark-pr
 html[data-theme="dark"] .evi-active-bar,
 html[data-theme="dark"] .evi-active-bar strong { color: #d4ded8 !important; }
 html[data-theme="dark"] .onsite-record-modal-body { background: var(--dark-surface); }
+/* 现场结果记录的复制按钮在深色表格中保持清晰的文字、边框和交互状态。 */
+html[data-theme="dark"] body.bb-embedded #page-implement .onsite-record-copy:not(:disabled) {
+  background: #315f52;
+  border-color: #7fc2a9;
+  color: #fff;
+  font-size: 12px;
+  font-weight: 600;
+}
+html[data-theme="dark"] body.bb-embedded #page-implement .onsite-record-copy:hover:not(:disabled) {
+  background: #3f806e;
+  border-color: #a2d6c2;
+}
+html[data-theme="dark"] body.bb-embedded #page-implement .onsite-record-copy:focus-visible {
+  outline: 2px solid #a2d6c2;
+  outline-offset: 2px;
+}
+html[data-theme="dark"] body.bb-embedded #page-implement .onsite-record-copy:disabled {
+  background: #2a3731;
+  border-color: #52645b;
+  color: #aebcb3;
+}
 html[data-theme="dark"] .risk-callout,
 html[data-theme="dark"] .object-match-panel { background: var(--dark-warning-soft); }
 html[data-theme="dark"] .report-export-card strong,
