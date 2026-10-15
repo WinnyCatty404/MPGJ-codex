@@ -52,6 +52,45 @@ assert.equal(reviewProblems([accessRoom],
   '1）电子门禁记录数据未采用密码技术进行存储完整性防护。',
   [{item:1,name:'电子门禁记录数据存储完整性'}]).filter(f=>f.rule==='C31'&&f.type==='覆盖检查').length,1,
   '对应指标条目存在但未写对象时仍应提示');
+const videoRoom = object('上城区信息机房',{layer:0,unit:'视频监控记录数据存储完整性',rawScore:0});
+assert.equal(reviewProblems([videoRoom],
+  '1）上城区信息机房的视频音像监控记录数据未采用密码技术进行存储完整性防护。',
+  [{item:2,name:videoRoom.unit}]).filter(f=>f.rule==='C31').length,0,'视频音像监控应对应视频监控指标');
+const privateChannel = object('上城区一体化智能化公共数据平台非国密访问通道',
+  {layer:1,unit:'通信过程中重要数据的机密性',rawScore:0});
+const nationalChannel = object('上城区一体化智能化公共数据平台国密访问通道',
+  {layer:1,unit:'通信过程中重要数据的机密性',rawScore:0});
+assert.equal(reviewProblems([privateChannel],
+  '1）上城区一体化智能化公共数据平台非国密访问通道的数据传输使用AES算法保护机密性。',
+  [{item:2,name:privateChannel.unit}]).filter(f=>f.rule==='C31').length,0,'数据传输机密性应对应通信中的数据机密性');
+assert.equal(reviewProblems([nationalChannel,privateChannel],
+  '1）上城区一体化智能化公共数据平台非国密访问通道的数据传输使用AES算法保护机密性。',
+  [{item:2,name:nationalChannel.unit}]).filter(f=>f.rule==='C31'&&f.object.name===nationalChannel.name).length,1,
+  '非国密通道不能证明国密通道已在问题描述中出现');
+const boundaryUnit='网络边界访问控制信息的完整性';
+assert.equal(reviewProblems([
+  {...nationalChannel,unit:boundaryUnit}, {...privateChannel,unit:boundaryUnit}],
+  '1）上城区一体化智能化公共数据平台非国密访问通道、国密访问通道的边界访问控制信息未采用密码技术保证完整性。',
+  [{item:3,name:boundaryUnit}]).filter(f=>f.rule==='C31').length,0,
+  '同一前缀并列列举的国密通道应识别为独立对象');
+const ding = object('浙政钉扫码通道',{layer:1,unit:'身份鉴别',rawScore:0});
+assert.equal(reviewProblems([ding],
+  '1）浙政钉访问通道使用RSA证书进行身份鉴别，未采用商用密码。').filter(f=>f.rule==='C31').length,0,
+  '唯一通道简称应可对应原对象');
+assert.equal(reviewProblems([ding,object('浙政钉国密访问通道',{layer:1,unit:'身份鉴别',rawScore:1})],
+  '1）浙政钉访问通道使用RSA证书进行身份鉴别，未采用商用密码。').filter(f=>f.rule==='C31'&&f.object.name===ding.name).length,1,
+  '多个同前缀通道时不应使用冲突泛称');
+for (const [unit, issue] of [
+  ['远程管理通道安全','应用服务器使用HTTPS协议，密码套件未采用国家商用密码算法。'],
+  ['重要可执行程序完整性、重要可执行程序来源真实性','应用服务器未采用密码技术保证重要可执行程序的完整性和重要可执行程序来源真实性。']
+]) {
+  const server = object('应用服务器',{unit,rawScore:0});
+  assert.equal(reviewProblems([server],'1）'+issue,[{item:0,name:unit}]).filter(f=>f.rule==='C31').length,0,unit);
+}
+const policy = object('《密码应用安全管理制度汇编》',{layer:4,unit:'定期修订安全管理制度',rawScore:0});
+assert.equal(reviewProblems([policy],
+  '1）明确本单位商用密码安全管理制度定期进行修订和更新，但未提供修订记录。',
+  [{item:0,name:policy.unit}]).filter(f=>f.rule==='C31').length,0,'单一制度对象不必重复文件全名');
 assert.equal(reviewProblems([low],'1）身份鉴别：存在密码应用不足。').filter(f=>f.rule==='C31').length,1);
 assert.equal(reviewProblems([low],'1）访问控制：A服务器存在不足。\n2）身份鉴别：存在不足。',
   [{item:1,name:'访问控制'},{item:0,name:'身份鉴别'}]).filter(f=>f.rule==='C31').length,1);
@@ -177,6 +216,48 @@ async function integration() {
   assert(cryptoMissing, '第二步密码应用概况应提示遗漏对象');
   await sandbox.locateReviewTarget(cryptoMissing.id);
   assert.equal(planLocated,1, '应定位到第二步对应描述框');
+  vm.runInContext('reportReviewState = {findings:[],accepted:[],ranAt:"",scope:null,signature:""}',ctx);
+  sandbox.getOnsiteObjectEntries=t=>t===2?[{id:'obj-a',name:'A服务器'},{id:'obj-b',name:'B服务器'}]:[];
+  sandbox.getOnsiteUnitObjectEntries=sandbox.getOnsiteObjectEntries;
+  sandbox.onsiteKey=(t,i,j)=>'ind|obj-'+j;
+  sandbox.getOnsiteRec=(t,i,j)=>({record:(j===0?'A服务器':'B服务器')+'采用TLS1.2。'});
+  sandbox.getLayerProblemUnits=t=>t===2?[{itemIdx:0,name:'身份鉴别'}]:[];
+  sandbox.reportTexts['report-sug-prob-2']='1）密码应用存在不足。';
+  await sandbox.runReportReview(null);
+  const unresolved=get().findings.filter(x=>x.rule==='C31'&&x.type==='无法核对');
+  assert.equal(unresolved.length,2);
+  assert(panel.innerHTML.includes('全部 '+(get().findings.length-1)), '同指标无法定位应合并为一个可见问题');
+  const groupId='c31-group-'+sandbox.BBReportReviewEngine.hash('report-sug-prob-2|身份鉴别');
+  sandbox.selectReviewFinding(groupId);
+  assert(panel.innerHTML.includes('定位A服务器') && panel.innerHTML.includes('定位B服务器'));
+  const beforeLocate=located;
+  unresolved.forEach(f=>sandbox.locateReviewSource(f.id));
+  assert.equal(located,beforeLocate+2,'合并疑点中的现场对象应可分别定位');
+  await sandbox.setReviewNote(groupId,'人工核对中');
+  assert(unresolved.every(f=>f.note==='人工核对中'));
+  await sandbox.setReviewStatus(groupId,'合理差异');
+  assert.equal(get().accepted.length,2);
+  assert(panel.innerHTML.includes('已确认合理差异（1'));
+  await sandbox.runReportReview(null);
+  assert(!get().findings.some(x=>x.rule==='C31'));
+  vm.runInContext('reportReviewState = ' + JSON.stringify(JSON.parse(JSON.stringify(get()))),ctx);
+  await sandbox.runReportReview(null);
+  assert(!get().findings.some(x=>x.rule==='C31'), '重新打开后合并确认仍应有效');
+  const legacyAccepted=JSON.parse(JSON.stringify(get()));
+  legacyAccepted.accepted.forEach(item=>delete item.objectUnit);
+  vm.runInContext('reportReviewState = ' + JSON.stringify(legacyAccepted),ctx);
+  await sandbox.runReportReview(null);
+  assert(!get().findings.some(x=>x.rule==='C31'), '旧版逐对象合理差异确认仍应有效');
+  vm.runInContext('reportReviewState = ' + JSON.stringify(JSON.parse(JSON.stringify(legacyAccepted))),ctx);
+  sandbox.reportTexts['report-sug-prob-2']='1）密码应用仍存在不足。';
+  await sandbox.runReportReview(null);
+  assert.equal(get().accepted.length,0, '原文变化后应撤销合并确认');
+  assert.equal(get().findings.filter(x=>x.rule==='C31').length,2);
+  await sandbox.setReviewStatus(groupId,'合理差异');
+  const acceptedGroupId='accepted-group-'+sandbox.BBReportReviewEngine.hash('report-sug-prob-2|身份鉴别');
+  await sandbox.restoreAcceptedReview(acceptedGroupId);
+  assert.equal(get().accepted.length,0);
+  assert.equal(get().findings.filter(x=>x.rule==='C31').length,2);
   console.log('PASS: 风险与改进建议排除、合理差异持久化和失效、问题描述与计数审核');
 }
 integration().catch(error=>{console.error(error);process.exitCode=1;});

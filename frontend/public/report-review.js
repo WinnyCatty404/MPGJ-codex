@@ -71,9 +71,57 @@ let reportReviewState = { findings: [], accepted: [], ranAt: '', scope: null, si
   }
   function acceptedFromFinding(finding) {
     return { id: finding.id, rule: finding.rule, objectKey: finding.object.key, objectName: finding.object.name,
-      targetId: finding.target.id, targetSection: finding.target.section, title: finding.title,
+      objectUnit: finding.object.unit, targetId: finding.target.id, targetSection: finding.target.section, title: finding.title,
       fingerprint: finding.fingerprint, sourceFingerprint: sourceFingerprint(finding.target, finding.object, finding.rule),
       note: finding.note || '', confirmedAt: new Date().toISOString() };
+  }
+  function groupedFindings(findings) {
+    const groups = new Map(), view = [];
+    findings.forEach(finding => {
+      if (finding.rule !== 'C31' || finding.type !== '无法核对') { view.push(finding); return; }
+      const key = finding.target.id + '|' + finding.object.unit;
+      if (!groups.has(key)) { groups.set(key, []); view.push({ groupKey: key }); }
+      groups.get(key).push(finding);
+    });
+    return view.map(item => {
+      if (!item.groupKey) return item;
+      const members = groups.get(item.groupKey);
+      if (members.length === 1) return members[0];
+      const first = members[0], names = members.map(f => f.object.name);
+      return { ...first, id: 'c31-group-' + BBReportReviewEngine.hash(item.groupKey),
+        memberIds: members.map(f => f.id), members: members.map(f => f.object),
+        object: { ...first.object, name: names.join('、') },
+        baseline: members.map(f => f.object.name + '：' + (f.object.record || '（结果记录为空）')).join('\n'),
+        title: '无法定位低分对象对应的问题条目：' + first.object.unit + '（' + members.length + '个对象）',
+        reason: first.reason + ' 涉及对象：' + names.join('、') + '。',
+        status: members.every(f => f.status === first.status) ? first.status : '待确认' };
+    });
+  }
+  function groupedAccepted(items) {
+    const groups = new Map(), view = [];
+    items.forEach(item => {
+      if (item.rule !== 'C31' || !item.objectUnit || !String(item.title || '').startsWith('无法定位低分对象对应的问题条目')) {
+        view.push(item); return;
+      }
+      const key = item.targetId + '|' + item.objectUnit;
+      if (!groups.has(key)) { groups.set(key, []); view.push({ groupKey: key }); }
+      groups.get(key).push(item);
+    });
+    return view.map(item => {
+      if (!item.groupKey) return item;
+      const members = groups.get(item.groupKey);
+      if (members.length === 1) return members[0];
+      return { ...members[0], id: 'accepted-group-' + BBReportReviewEngine.hash(item.groupKey),
+        memberIds: members.map(member => member.id),
+        objectName: members.map(member => member.objectName).join('、'),
+        title: '无法定位低分对象对应的问题条目：' + members[0].objectUnit };
+    });
+  }
+  function findingMembers(id) {
+    const finding = reportReviewState.findings.find(f => f.id === id);
+    if (finding) return [finding];
+    const group = groupedFindings(reportReviewState.findings).find(f => f.id === id);
+    return group?.memberIds?.map(memberId => reportReviewState.findings.find(f => f.id === memberId)).filter(Boolean) || [];
   }
   function normalizeState() {
     if (!Array.isArray(reportReviewState.findings)) reportReviewState.findings = [];
@@ -122,26 +170,29 @@ let reportReviewState = { findings: [], accepted: [], ranAt: '', scope: null, si
   };
   window.selectReviewFinding = function(id) { selected = id; render(); };
   window.setReviewStatus = async function(id, value) {
-    const f = reportReviewState.findings.find(x => x.id === id); if (!f) return;
+    const members = findingMembers(id); if (!members.length) return;
     if (value === '合理差异') {
-      reportReviewState.accepted.push(acceptedFromFinding(f));
-      reportReviewState.findings = reportReviewState.findings.filter(x => x.id !== id);
+      reportReviewState.accepted.push(...members.map(acceptedFromFinding));
+      const ids = new Set(members.map(f => f.id));
+      reportReviewState.findings = reportReviewState.findings.filter(x => !ids.has(x.id));
       selected = reportReviewState.findings[0]?.id || '';
       render(); await persist(); return;
     }
-    f.status = value; render(); await persist();
+    members.forEach(f => { f.status = value; }); render(); await persist();
   };
   window.restoreAcceptedReview = async function(id) {
     normalizeState();
-    reportReviewState.accepted = reportReviewState.accepted.filter(item => item.id !== id);
+    const acceptedGroup = groupedAccepted(reportReviewState.accepted).find(item => item.id === id);
+    const ids = new Set(acceptedGroup?.memberIds || [id]);
+    reportReviewState.accepted = reportReviewState.accepted.filter(item => !ids.has(item.id));
     await window.runReportReview(null);
   };
   window.setReviewNote = async function(id, value) {
-    const f = reportReviewState.findings.find(x => x.id === id); if (!f) return;
-    f.note = value; await persist();
+    const members = findingMembers(id); if (!members.length) return;
+    members.forEach(f => { f.note = value; }); await persist();
   };
   window.locateReviewSource = function(id) {
-    const f = reportReviewState.findings.find(x => x.id === id); if (!f) return;
+    const f = findingMembers(id)[0]; if (!f) return;
     if (f.rule === 'C32') { switchStep(4); activeSuggestionLayer = f.target.layer; switchReportTab(5); showToast('请核对本层面的“问题项”数量及编号条目。'); return; }
     switchStep(f.object.planOnly ? 2 : 3);
     if (f.object.planOnly) { showToast('请在第二步测评对象中核对：' + f.object.name); return; }
@@ -149,7 +200,7 @@ let reportReviewState = { findings: [], accepted: [], ranAt: '', scope: null, si
     expandOnsiteRecord(f.object.layer, f.object.item, f.object.index);
   };
   window.locateReviewTarget = async function(id) {
-    const f = reportReviewState.findings.find(x => x.id === id); if (!f) return;
+    const f = findingMembers(id)[0]; if (!f) return;
     let panel;
     if (f.target.section === 8) {
       switchStep(2);
@@ -178,7 +229,7 @@ let reportReviewState = { findings: [], accepted: [], ranAt: '', scope: null, si
   }
   const escapeReg = value => String(value).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
   function rvPatterns(finding, side) {
-    const names = [finding.object.name].concat(finding.object.aliases || []);
+    const names = (finding.members || [finding.object]).flatMap(object => [object.name].concat(object.aliases || []));
     const list = names.filter(n => n && String(n).length > 1).map(n => new RegExp(escapeReg(n), 'g'));
     const p = finding.params;
     if (p && p.attr) {
@@ -205,18 +256,19 @@ let reportReviewState = { findings: [], accepted: [], ranAt: '', scope: null, si
   function render() {
     const panel = document.getElementById('report-panel-7'); if (!panel) return;
     normalizeState();
-    const state = reportReviewState, f = state.findings.find(x => x.id === selected) || state.findings[0];
+    const state = reportReviewState, visible = groupedFindings(state.findings);
+    const f = visible.find(x => x.id === selected || x.memberIds?.includes(selected)) || visible[0];
     const stale = state.ranAt && (state.signature !== signature(snapshot()) || state.findings.some(x => x.stale));
-    const counts = STATUSES.map(s => state.findings.filter(x => x.status === s).length);
-    const list = reviewFilter === '全部' ? state.findings : state.findings.filter(x => x.status === reviewFilter);
+    const counts = STATUSES.map(s => visible.filter(x => x.status === s).length);
+    const list = reviewFilter === '全部' ? visible : visible.filter(x => x.status === reviewFilter);
     const scopeLabel = state.scope == null ? '整份报告' : labels[state.scope];
     const statusText = state.ranAt
-      ? '上次审核 ' + new Date(state.ranAt).toLocaleString() + ' · ' + scopeLabel + ' · 发现 ' + state.findings.length + ' 项'
+      ? '上次审核 ' + new Date(state.ranAt).toLocaleString() + ' · ' + scopeLabel + ' · 发现 ' + visible.length + ' 项'
       : '尚未开始审核';
     const statusbar = '<div class="review-statusbar' + (stale ? ' warn' : '') + '"><span class="review-meta">' + esc(statusText) + '</span>' +
       (stale ? '<span class="review-tag">内容已变化</span>' : '') +
       '<button type="button" class="btn btn-primary review-run" onclick="runReportReview(null)">' + (state.ranAt ? '重新审核' : '开始审核') + '</button></div>';
-    const filters = '<div class="review-filters"><button type="button" class="review-chip' + (reviewFilter === '全部' ? ' on' : '') + '" onclick="setReviewFilter(\'全部\')">全部 ' + state.findings.length + '</button>' +
+    const filters = '<div class="review-filters"><button type="button" class="review-chip' + (reviewFilter === '全部' ? ' on' : '') + '" onclick="setReviewFilter(\'全部\')">全部 ' + visible.length + '</button>' +
       STATUSES.map((s, i) => '<button type="button" class="review-chip' + (reviewFilter === s ? ' on' : '') + (counts[i] ? '' : ' empty') + '" onclick="setReviewFilter(\'' + s + '\')">' + s + ' ' + counts[i] + '</button>').join('') + '</div>';
     const detail = f ? (function() {
       const hasObject = String(f.target.text || '').indexOf(f.object.name) >= 0;
@@ -228,7 +280,9 @@ let reportReviewState = { findings: [], accepted: [], ranAt: '', scope: null, si
           '<span>所属层面 <b>' + esc(ONSITE_LAYERS[f.object.layer].name) + '</b></span>' +
         '</div>' +
         '<div class="review-compare">' +
-          '<div><div class="review-compare-head"><span>现场结果记录 / 第二步对象</span><button type="button" onclick="locateReviewSource(\'' + f.id + '\')">定位现场对象</button></div>' +
+          '<div><div class="review-compare-head"><span>现场结果记录 / 第二步对象</span>' +
+          (f.memberIds ? f.memberIds.map((id, i) => '<button type="button" onclick="locateReviewSource(\'' + id + '\')">定位' + esc(f.members[i].name) + '</button>').join('') :
+            '<button type="button" onclick="locateReviewSource(\'' + f.id + '\')">定位现场对象</button>') + '</div>' +
           '<pre>' + rvMarkText(f.baseline || f.object.name, rvPatterns(f, 'left'), 'rv-ok') + '</pre></div>' +
           '<div><div class="review-compare-head"><span>' + esc(labels[f.target.section]) + '原文</span><button type="button" onclick="locateReviewTarget(\'' + f.id + '\')">定位报告原文</button></div>' +
           (hasObject || f.rule === 'C32' || f.type === '无法核对' ? '' : '<div class="review-missing">未找到「' + esc(f.object.name) + '」相关描述</div>') +
@@ -238,16 +292,16 @@ let reportReviewState = { findings: [], accepted: [], ranAt: '', scope: null, si
         '<label>处理说明<textarea class="text-area" onchange="setReviewNote(\'' + f.id + '\',this.value)">' + esc(f.note) + '</textarea></label>';
     })() : '<p>选择左侧问题查看原文对照。</p>';
     panel.innerHTML = '<h3>报告审核</h3><p>根据第二步对象与第三步现场记录，核对密码应用概况四个层面的应用情况描述、单元测评结果分析和总体评价等目标。允许同类服务器、数据库达到3个时合并称呼；重要数据资产达到3项时可称“重要数据”。</p>' +
-      '<p class="review-hint">安全问题及改进建议仅检查各层面问题描述中的低分对象和编号末项，不对比改进建议；风险分析不参与对比。复杂语义及截图代码仍需人工复核。</p>' +
+      '<p class="review-hint">安全问题及改进建议仅检查各层面问题描述中的低分对象和编号末项；同指标无法定位的对象合并显示，仍可分别定位。改进建议与风险分析不参与对比；复杂语义及截图代码仍需人工复核。</p>' +
       statusbar +
-      (state.accepted.length ? '<details class="review-accepted"><summary>已确认合理差异（' + state.accepted.length + '，不计入问题数）</summary>' +
-        state.accepted.map(item => '<div class="review-accepted-item"><span>' + esc(item.rule + ' · ' + item.title + ' · ' + item.objectName + ' · ' + (labels[item.targetSection] || '报告内容')) +
+      (state.accepted.length ? '<details class="review-accepted"><summary>已确认合理差异（' + groupedAccepted(state.accepted).length + '，不计入问题数）</summary>' +
+        groupedAccepted(state.accepted).map(item => '<div class="review-accepted-item"><span>' + esc(item.rule + ' · ' + item.title + ' · ' + item.objectName + ' · ' + (labels[item.targetSection] || '报告内容')) +
           (item.note ? '<small>说明：' + esc(item.note) + '</small>' : '') + '</span><button type="button" class="btn" onclick="restoreAcceptedReview(\'' + item.id + '\')">撤销确认</button></div>').join('') +
         '</details>' : '') +
       filters +
       '<div class="review-grid"><div>' + list.map(x => '<button class="review-item ' + (f?.id === x.id ? 'selected' : '') + '" onclick="selectReviewFinding(\'' + x.id + '\')"><strong>' + esc(x.title) + '</strong><small>' + esc(labels[x.target.section] + ' · ' + ONSITE_LAYERS[x.object.layer].name) + '<span class="review-badge st-' + esc(x.status) + '">' + esc(x.status) + '</span></small></button>').join('') +
-      (state.ranAt && !state.findings.length ? '<p>本次规则检查未发现问题；未覆盖的语义和证据项仍需人工审核。</p>' : '') +
-      (state.findings.length && !list.length ? '<p>当前筛选下没有问题。</p>' : '') + '</div><div>' + detail + '</div></div>';
+      (state.ranAt && !visible.length ? '<p>本次规则检查未发现问题；未覆盖的语义和证据项仍需人工审核。</p>' : '') +
+      (visible.length && !list.length ? '<p>当前筛选下没有问题。</p>' : '') + '</div><div>' + detail + '</div></div>';
   }
   window.renderReportReview = render;
   const style = document.createElement('style');

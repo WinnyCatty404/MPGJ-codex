@@ -44,6 +44,20 @@
     return mentioned(text, object.name) || safeAliases(object, allNames).some(a => mentioned(text, a)) ||
       nameVariants(object.name, allNames).some(v => mentioned(text, v));
   }
+  function uniqueChannelMentioned(text, object, allNames) {
+    const match = /^(.{3,}?)(?:扫码|访问|接入)通道$/.exec(norm(object.name));
+    if (!match) return false;
+    const root = match[1];
+    if (allNames.some(name => name !== object.name && norm(name).includes(root))) return false;
+    const line = norm(text), start = line.indexOf(root);
+    return start >= 0 && line.slice(start + root.length, start + root.length + 6).includes('通道');
+  }
+  function coordinatedChannelMentioned(text, object) {
+    const match = /^(.*?)(非国密访问|国密访问|扫码|访问)通道$/.exec(norm(object.name));
+    if (!match || match[1].length < 4) return false;
+    const line = norm(text);
+    return line.includes(match[1]) && new RegExp('(?:^|[、，,；;])' + match[2] + '通道(?=$|[、，,。；;的])').test(line);
+  }
   function groupMentioned(text, object, peers, input) {
     const group = category(object, input);
     if (!group) return false;
@@ -62,18 +76,35 @@
     return markers.map((match, index) => ({ number: Number(match[1]),
       text: source.slice(match.index + match[0].length, index + 1 < markers.length ? markers[index + 1].index : source.length).trim() }));
   }
+  function problemNorm(text) {
+    return norm(text).replace(/的/g, '').replace(/视频(?:音像|图像)监控/g, '视频监控');
+  }
   function problemMentionsUnit(text, unit) {
-    const name = norm(unit);
+    const name = problemNorm(unit);
     const parts = /^(.*?)(传输|存储|来源)?(完整性|机密性|真实性)$/.exec(name);
     return String(text || '').split(/[。！？；;\n]/).some(sentence => {
-      const line = norm(sentence);
+      const line = problemNorm(sentence);
       if (line.includes(name)) return true;
+      if (name === '通信过程中重要数据机密性')
+        return line.includes('机密性') && /数据传输|通信报文|通信过程/.test(line);
+      if (name === '通信数据完整性')
+        return line.includes('完整性') && /通信数据|数据传输|通信报文/.test(line);
+      if (name === '网络边界访问控制信息完整性')
+        return line.includes('边界访问控制信息') && line.includes('完整性');
+      if (name === '远程管理通道安全')
+        return /远程管理|远程运维|远程登录|https|ssh|明文传输/.test(line);
+      if (name === '重要可执行程序完整性、重要可执行程序来源真实性')
+        return line.includes('重要可执行程序') && line.includes('完整性') && line.includes('来源真实性');
+      if (name === '定期修订安全管理制度')
+        return line.includes('制度') && line.includes('定期') && line.includes('修订');
       if (!parts) return false;
-      const subject = parts[1].replace(/的$/, '');
-      const property = (parts[2] || '') + parts[3];
+      const subject = parts[1];
       if (subject.length < 4) return false;
       const start = line.indexOf(subject);
-      return start >= 0 && line.slice(start + subject.length, start + subject.length + 50).includes(property);
+      if (start < 0) return false;
+      const tail = line.slice(start + subject.length, start + subject.length + 50);
+      const qualifier = parts[2] ? tail.indexOf(parts[2]) : 0;
+      return qualifier >= 0 && tail.indexOf(parts[3], qualifier + (parts[2] || '').length) >= 0;
     });
   }
   function analyze(input) {
@@ -111,8 +142,14 @@
           if (!matchingEntries.length) {
             add('C31', target, o, '无法定位低分对象对应的问题条目：' + o.name,
               '现场该对象在“' + o.unit + '”指标中得分低于1，但编号条目未明确对应此指标；请人工核对，不能据此断定问题已遗漏。', '', '无法核对');
-          } else if (!matchingEntries.some(entry => objectMentioned(entry.text, o, allNames) || groupMentioned(entry.text, o,
-            input.objects.filter(x => x.layer === target.layer && x.applicable && !x.summaryCount), input))) {
+          } else if (!matchingEntries.some(entry => {
+            const peers = input.objects.filter(x => x.layer === target.layer && x.applicable && !x.summaryCount);
+            const unitPeers = peers.filter(x => x.unit === o.unit);
+            return objectMentioned(entry.text, o, allNames) || uniqueChannelMentioned(entry.text, o, allNames) ||
+              coordinatedChannelMentioned(entry.text, o) ||
+              groupMentioned(entry.text, o, peers, input) ||
+              (target.layer >= 4 && target.layer <= 5 && unitPeers.length === 1 && /未|不|缺|无/.test(entry.text));
+          })) {
             add('C31', target, o, '问题描述可能遗漏低分对象：' + o.name,
               '现场该对象在“' + o.unit + '”指标中得分低于1，对应编号条目没有找到对象名称、有效别名或允许的合并称谓。', '', '覆盖检查');
           }
