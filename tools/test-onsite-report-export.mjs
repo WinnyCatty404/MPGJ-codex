@@ -82,6 +82,7 @@ xml = await writeReportEvidence(xml, zip, {
   '7|0|0': { evidence: [{ no: '图A-8.1', name: '应急截图', dataUrl: tallPng }] },
 }, [
   { layer: 2, no: '图A-3.1', name: '多张并排测试', images: [widePng, widePng, widePng].map(dataUrl => ({ dataUrl })) },
+  { layer: 2, no: '图A-3.2', name: '连续编号测试', images: [{ dataUrl: png }] },
   { layer: 3, no: '图A-4.1', name: '非整数比例测试', images: [{ dataUrl: fractionalPng }] },
   { layer: 4, no: '图A-5.1', name: '四张分两行', images: Array.from({ length: 4 }, () => ({ dataUrl: squarePng })) },
   { layer: 5, no: '图A-6.1', name: '细长截图', images: [{ dataUrl: tallPng }, { dataUrl: tallPng }] },
@@ -97,16 +98,22 @@ assert.deepEqual(multiImageRows.map(paragraph => (paragraph.match(/<w:drawing>/g
   '三张宽图应优先两张并排，再让剩余截图单独成行');
 assert.ok(multiImageRows.every(paragraph => paragraph.includes('<w:ind w:left="0" w:right="0" w:firstLine="0" w:firstLineChars="0"/>')),
   '图片行不能继承正文首行缩进');
-assert.ok(multiImageRows.every(paragraph => paragraph.includes('<w:keepNext/>')),
-  '每张图片必须与各自的图题同页');
-for (const paragraph of multiImageRows) {
-  assert.equal(evidenceParagraphs[evidenceParagraphs.indexOf(paragraph) + 1].includes('图A-3.1 多张并排测试'), true,
-    '同编号的每张截图后都应有图题');
-}
+assert.equal(multiImageRows[0].includes('<w:keepNext/>'), false,
+  '同一编号的非末行图片不应与图题绑定');
+assert.equal(multiImageRows[1].includes('<w:keepNext/>'), true,
+  '同一编号的最后一行图片必须与唯一图题同页');
+const multiImageCaptions = evidenceParagraphs.filter(paragraph => text(paragraph).trim() === '图A-3.1 多张并排测试');
+assert.equal(multiImageCaptions.length, 1, '同一编号拆成多行后只能生成一次图题');
+assert.equal(evidenceParagraphs[evidenceParagraphs.indexOf(multiImageRows.at(-1)) + 1], multiImageCaptions[0],
+  '唯一图题应紧跟同一编号的最后一行图片');
+assert.equal(evidenceParagraphs.filter(paragraph => text(paragraph).trim() === '图A-3.2 连续编号测试').length, 1,
+  '连续的不同证据编号应各自生成一次图题');
 const fourImageRows = evidenceParagraphs.filter(paragraph => paragraph.includes('<w:drawing>') &&
   paragraph.includes('图A-5.1 四张分两行'));
 assert.deepEqual(fourImageRows.map(paragraph => (paragraph.match(/<w:drawing>/g) || []).length), [2, 2],
   '四张截图应在并排尺寸允许时排成两行、每行两张');
+assert.equal(evidenceParagraphs.filter(paragraph => text(paragraph).trim() === '图A-5.1 四张分两行').length, 1,
+  '四张截图分成两行后只能生成一次图题');
 const tallImageRows = evidenceParagraphs.filter(paragraph => paragraph.includes('<w:drawing>') &&
   paragraph.includes('图A-6.1 细长截图'));
 assert.deepEqual(tallImageRows.map(paragraph => (paragraph.match(/<w:drawing>/g) || []).length), [1, 1],

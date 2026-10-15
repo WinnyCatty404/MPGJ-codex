@@ -208,13 +208,13 @@ export async function writeReportEvidence(xml: string, zip: JSZip, records: Reco
         }
       }
       if (!images.length) continue;
-      // 每张图片（或经确认可读的图片行）均有自己的图题。图片与图题同页，
-      // 同编号不同截图之间不强行绑定，可分别跨页，减少整组被推到下一页的留白。
+      // 同一编号只生成一个图题。多行图片可以自然跨页，仅最后一行与图题保持同页，
+      // 避免同一编号和名称在连续页面重复出现而造成多个证据编号的歧义。
       const rows = evidenceImageRows(sizedImages);
-      rows.forEach(row => {
-        paragraphs.push(evidenceImageRowParagraph(row, description, true));
-        paragraphs.push(evidenceCaptionParagraph(description));
+      rows.forEach((row, rowIndex) => {
+        paragraphs.push(evidenceImageRowParagraph(row, description, rowIndex === rows.length - 1));
       });
+      paragraphs.push(evidenceCaptionParagraph(description));
     }
     inserts.push(paragraphs.join(''));
   }
