@@ -47,6 +47,11 @@ const pool = new Pool({
     process.env.DATABASE_URL ||
     'postgresql://bb_miping_app:BbMiping-App-2026!@127.0.0.1:54328/bb_miping',
 });
+// 数据库重启或恢复操作会断开空闲连接。pg 会将该连接移出连接池；
+// 监听错误可避免未处理的 error 事件直接结束整个后端进程。
+pool.on('error', error => {
+  console.error('PostgreSQL 空闲连接已断开，后续请求将重新建立连接：', error);
+});
 
 type AuthRequest = Request & { user?: { id: string; username: string; role: string } };
 

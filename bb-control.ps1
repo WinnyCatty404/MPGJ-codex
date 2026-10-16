@@ -44,6 +44,14 @@ function Test-Port([int]$Port) {
   return $false
 }
 
+function Test-BBWebReady {
+  if (-not (Test-Port $webPort)) { return $false }
+  try {
+    $health = Invoke-RestMethod -Uri ('http://127.0.0.1:' + $webPort + '/api/health') -TimeoutSec 2
+    return ($health.ok -eq $true -and $health.database -eq 'bb_miping')
+  } catch { return $false }
+}
+
 function Invoke-Script([string]$Name) {
   Start-Process -FilePath 'powershell.exe' `
     -ArgumentList @('-NoProfile','-ExecutionPolicy','Bypass','-File',(Join-Path $AppRoot $Name)) `
@@ -177,15 +185,38 @@ $btnOpen    = New-Btn '打开系统' $C_PRIMARY([System.Drawing.Color]::FromArgb
 $btnBackup  = New-Btn '备份数据' ([System.Drawing.Color]::FromArgb(240, 150, 30)) ([System.Drawing.Color]::FromArgb(214, 130, 20)) 382
 $btnRestore = New-Btn '恢复数据' ([System.Drawing.Color]::FromArgb(120, 90, 200)) ([System.Drawing.Color]::FromArgb(102, 76, 172)) 504
 $btnExit    = New-Btn '退出'     $C_GRAY   ([System.Drawing.Color]::FromArgb(116, 121, 128)) 626
+$script:launchStartedAt = $null
+$script:launchFailed = $false
+$startLogPath = Join-Path $env:TEMP 'bb-miping-logs\start.log'
 
 $btnStart.Add_Click({
-  $btnStart.Enabled = $false
+  if (Test-BBWebReady) {
+    Write-Log '系统已运行，正在打开浏览器。' $C_GREEN
+    try { Start-Process ('http://127.0.0.1:' + $webPort) }
+    catch { Write-Log ('无法打开浏览器，请手动访问 http://127.0.0.1:' + $webPort) $C_RED }
+    return
+  }
+  if ($script:launchStartedAt -and ((Get-Date) - $script:launchStartedAt).TotalSeconds -lt 120) {
+    Write-Log '启动任务仍在运行，请稍候；若未成功，请查看启动日志。' $C_PRIMARY
+    return
+  }
+  $script:launchStartedAt = Get-Date
+  $script:launchFailed = $false
   $statusPill.Text = '● 正在启动，请稍候（首次约 1-2 分钟）…'
   $statusPill.ForeColor = $C_PRIMARY
   $statusPill.BackColor = [System.Drawing.Color]::FromArgb(232, 240, 252)
   Write-Log '启动中：初始化数据库并拉起前后端服务…' $C_PRIMARY
-  Invoke-ScriptSilent 'bb-start.ps1' @('-Silent')
-  Write-Log '启动脚本已在后台执行，完成后浏览器自动打开。' $C_TEXT
+  try {
+    Invoke-ScriptSilent 'bb-start.ps1' @('-Silent')
+    Write-Log '启动脚本已在后台执行；状态将在此处自动更新。' $C_TEXT
+  } catch {
+    $script:launchStartedAt = $null
+    $script:launchFailed = $true
+    Write-Log ('无法执行启动脚本：' + $_.Exception.Message) $C_RED
+    $statusPill.Text = '● 启动失败，请查看下方提示'
+    $statusPill.ForeColor = $C_RED
+    $statusPill.BackColor = $C_STOPBG
+  }
 })
 $btnStop.Add_Click({
   $btnStop.Enabled = $false
@@ -236,20 +267,55 @@ $btnExit.Add_Click({ $form.Close() })
 $timer = New-Object Windows.Forms.Timer
 $timer.Interval = 2000
 $timer.Add_Tick({
-  if (Test-Port $webPort) {
+  if (Test-BBWebReady) {
+    if ($script:launchStartedAt) { Write-Log '启动成功，网页和后端均已就绪。' $C_GREEN }
+    $script:launchStartedAt = $null
+    $script:launchFailed = $false
     $statusPill.Text = '● 系统运行中    Web  http://127.0.0.1:' + $webPort
     $statusPill.ForeColor = $C_GREEN
     $statusPill.BackColor = $C_OKBG
-    $btnStart.Enabled = $false; $btnStop.Enabled = $true
-  } elseif ((Test-Port $apiPort) -or (Test-Port $pgPort)) {
-    $statusPill.Text = '● 正在启动，服务未就绪…'
-    $statusPill.ForeColor = $C_PRIMARY
-    $statusPill.BackColor = [System.Drawing.Color]::FromArgb(232, 240, 252)
-    $btnStart.Enabled = $false; $btnStop.Enabled = $true
+    $btnStart.Enabled = $true; $btnStop.Enabled = $true
+  } elseif ($script:launchStartedAt -and ((Get-Date) - $script:launchStartedAt).TotalSeconds -lt 120) {
+    $recentError = $null
+    if (Test-Path -LiteralPath $startLogPath) {
+      $logFile = Get-Item -LiteralPath $startLogPath
+      if ($logFile.LastWriteTime -ge $script:launchStartedAt) {
+        $recentError = Get-Content -LiteralPath $startLogPath -Tail 12 -ErrorAction SilentlyContinue |
+          Where-Object { $_ -match '\[ERROR\]' } | Select-Object -Last 1
+      }
+    }
+    if ($recentError) {
+      Write-Log ('启动失败：' + $recentError) $C_RED
+      $script:launchStartedAt = $null
+      $script:launchFailed = $true
+      $statusPill.Text = '● 启动失败，可再次点击启动系统'
+      $statusPill.ForeColor = $C_RED
+      $statusPill.BackColor = $C_STOPBG
+    } else {
+      $statusPill.Text = '● 正在启动，请稍候（首次约 1-2 分钟）…'
+      $statusPill.ForeColor = $C_PRIMARY
+      $statusPill.BackColor = [System.Drawing.Color]::FromArgb(232, 240, 252)
+    }
+    $btnStart.Enabled = $true; $btnStop.Enabled = $true
+  } elseif ((Test-Port $webPort) -or (Test-Port $apiPort) -or (Test-Port $pgPort)) {
+    if ($script:launchStartedAt) {
+      Write-Log ('启动超时，请查看：' + $startLogPath) $C_RED
+      $script:launchFailed = $true
+    }
+    $script:launchStartedAt = $null
+    $statusPill.Text = if ($script:launchFailed) { '● 启动失败，可再次点击启动系统' } else { '● 部分服务已启动，网页未就绪；可点击启动系统重试' }
+    $statusPill.ForeColor = if ($script:launchFailed) { $C_RED } else { $C_PRIMARY }
+    $statusPill.BackColor = if ($script:launchFailed) { $C_STOPBG } else { [System.Drawing.Color]::FromArgb(232, 240, 252) }
+    $btnStart.Enabled = $true; $btnStop.Enabled = $true
   } else {
-    $statusPill.Text = '● 系统未启动'
-    $statusPill.ForeColor = $C_GRAY
-    $statusPill.BackColor = [System.Drawing.Color]::FromArgb(240, 241, 243)
+    if ($script:launchStartedAt) {
+      Write-Log ('启动超时，请查看：' + $startLogPath) $C_RED
+      $script:launchFailed = $true
+    }
+    $script:launchStartedAt = $null
+    $statusPill.Text = if ($script:launchFailed) { '● 启动失败，可再次点击启动系统' } else { '● 系统未启动' }
+    $statusPill.ForeColor = if ($script:launchFailed) { $C_RED } else { $C_GRAY }
+    $statusPill.BackColor = if ($script:launchFailed) { $C_STOPBG } else { [System.Drawing.Color]::FromArgb(240, 241, 243) }
     $btnStart.Enabled = $true; $btnStop.Enabled = $false
   }
 })
