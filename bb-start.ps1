@@ -98,6 +98,20 @@ try {
     Write-BBLog "PostgreSQL 启动超时（端口 $($p.PgPort) 未监听）。日志：$(Join-Path $p.PgData 'postgresql.log')" 'ERROR'
     if (-not $Silent) { Read-Host '按回车退出' }; exit 1
   }
+  # 端口若已被另一个 PostgreSQL 实例占用（另一套 BMPBGS 或开发集群），pg_ctl start 会失败、
+  # 但端口仍处于监听状态。此时若继续，后续所有读写都会落到“隔壁库”——页面会突然显示另一批数据。
+  # 因此这里必须确认端口背后的实例确实服务于本应用的数据目录。
+  $startPsql = Join-Path $p.PgRoot 'bin\psql.exe'
+  $env:PGPASSWORD = 'BbMiping-Local-2026!'
+  try {
+    $startDir = Get-BBTargetInstanceDataDir -Psql $startPsql -PgPort $p.PgPort
+  } finally {
+    Remove-Item Env:\PGPASSWORD -ErrorAction SilentlyContinue
+  }
+  if ($startDir -and -not (Test-BBSamePath $startDir $p.PgData)) {
+    Write-BBLog "端口 $($p.PgPort) 已被另一个 PostgreSQL 实例占用：它的数据目录是 $startDir，而本应用的数据目录是 $($p.PgData)。请先停止占用该端口的实例后重试。" 'ERROR'
+    if (-not $Silent) { Read-Host '按回车退出' }; exit 1
+  }
   Write-BBLog 'PostgreSQL 已就绪'
 } catch {
   Write-BBLog "PostgreSQL 启动异常：$($_.Exception.Message)" 'ERROR'

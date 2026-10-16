@@ -107,6 +107,37 @@ function Get-BBBackupRoot {
   return Join-Path $AppRoot 'data\backups'
 }
 
+# 读取端口上正在运行的 PostgreSQL 实例的数据目录。
+# 读不到则返回 $null（服务未运行 / 认证失败 / 权限不足），由调用方决定是中止还是仅告警。
+function Get-BBTargetInstanceDataDir {
+  param(
+    [string]$Psql,
+    [int]$PgPort,
+    [string]$DbUser = 'postgres'
+  )
+  if (-not $Psql -or -not (Test-Path -LiteralPath $Psql)) { return $null }
+  $actual = ''
+  try {
+    $actual = (& $Psql -h 127.0.0.1 -p $PgPort -U $DbUser -d postgres -tAc "SHOW data_directory" 2>$null |
+               Select-Object -First 1)
+  } catch { return $null }
+  $actual = ([string]$actual).Trim()
+  if (-not $actual) { return $null }
+  return $actual
+}
+
+# 数据目录归一化比较：PG 返回正斜杠（D:/x/pgdata），配置里是反斜杠（D:\x\pgdata），
+# 盘符大小写、尾部斜杠都要抹平后再比。
+function Test-BBSamePath {
+  param([string]$A, [string]$B)
+  if (-not $A -or -not $B) { return $false }
+  $norm = {
+    param([string]$p)
+    (($p -replace '\\', '/').Trim() -replace '/+$', '').ToLowerInvariant()
+  }
+  return ((& $norm $A) -eq (& $norm $B))
+}
+
 # 返回 bb-config.json 的绝对路径（端口与密钥的持久化文件，位于安装目录根）。
 function Get-BBConfigPath {
   param([string]$AppRoot)

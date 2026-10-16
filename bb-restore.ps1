@@ -43,6 +43,19 @@ $sqlFile = Get-Item (Join-Path $BackupSet "$DbName-*.dump") -ErrorAction Silentl
 if (-not $sqlFile) { Write-Error '备份集中未找到数据库 dump 文件。'; if (-not $Silent) { Read-Host '按回车退出' }; exit 1 }
 
 $env:PGPASSWORD = $PgPassword
+
+# 恢复是破坏性操作（DROP DATABASE），必须先确认端口上的实例确实服务于本应用的数据目录，
+# 否则会把别人的库删掉再建一个。
+$actualDataDir = Get-BBTargetInstanceDataDir -Psql $psql -PgPort $p.PgPort -DbUser $SuperUser
+if (-not $actualDataDir) {
+  Write-Error "无法校验 PostgreSQL 实例身份：请确认端口 $($p.PgPort) 上的 PostgreSQL 正在运行、且超级用户 $SuperUser 口令正确。"
+  if (-not $Silent) { Read-Host '按回车退出' }; exit 1
+}
+if (-not (Test-BBSamePath $actualDataDir $p.PgData)) {
+  Write-Error "端口 $($p.PgPort) 上的 PostgreSQL 实例不是本应用的数据目录，已中止恢复。期望：$($p.PgData)  实际：$actualDataDir（继续下去会误删该实例的 bb_miping 库）"
+  if (-not $Silent) { Read-Host '按回车退出' }; exit 1
+}
+
 # 终止连接并重建数据库
 & $psql -h 127.0.0.1 -p $p.PgPort -U $SuperUser -d postgres -c "SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE datname='$DbName' AND pid <> pg_backend_pid();" 2>$null
 & $psql -h 127.0.0.1 -p $p.PgPort -U $SuperUser -d postgres -c "DROP DATABASE IF EXISTS $DbName;"
@@ -56,5 +69,7 @@ foreach ($d in @('storage', 'uploads')) {
   if (Test-Path -LiteralPath $src) { robocopy $src (Join-Path $p.DataRoot $d) /E /R:1 /W:1 /NFL /NDL /NJH /NJS | Out-Null }
 }
 
+# robocopy 用位图表示结果（1=复制了文件），直接泄漏会让本脚本以非零退出码结束。
+$global:LASTEXITCODE = 0
 Write-Host "恢复完成：$BackupSet（恢复后请重启 BMPBGS）"
 if (-not $Silent) { Read-Host '按回车退出' }
