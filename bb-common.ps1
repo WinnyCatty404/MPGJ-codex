@@ -185,3 +185,129 @@ function Get-PGPortFromConf {
   if ($m) { return [int]$m.Matches.Groups[1].Value }
   return $null
 }
+
+# 原生命令在 Windows PowerShell 5.1 中即使退出码非零也不一定触发 catch，统一显式检查。
+function Assert-BBNativeSuccess {
+  param([string]$Step, [int]$ExitCode = $global:LASTEXITCODE)
+  if ($ExitCode -ne 0) { throw "$Step 失败，退出码：$ExitCode" }
+}
+
+function Test-BBDirectoryEmpty {
+  param([string]$Path)
+  if (-not (Test-Path -LiteralPath $Path)) { return $true }
+  return -not (Get-ChildItem -LiteralPath $Path -Force -ErrorAction Stop | Select-Object -First 1)
+}
+
+function Get-BBDirectoryStats {
+  param([string]$Path)
+  if (-not (Test-Path -LiteralPath $Path)) { return [PSCustomObject]@{ Count = 0; Bytes = 0 } }
+  $measure = Get-ChildItem -LiteralPath $Path -Recurse -File -Force -ErrorAction SilentlyContinue |
+    Measure-Object -Property Length -Sum
+  return [PSCustomObject]@{ Count = [int]$measure.Count; Bytes = [int64]($measure.Sum -as [int64]) }
+}
+
+function Invoke-BBRobocopy {
+  param([string]$Source, [string]$Destination, [switch]$Mirror)
+  New-Item -ItemType Directory -Path $Destination -Force | Out-Null
+  if (-not (Test-Path -LiteralPath $Source)) { return }
+  $mode = if ($Mirror) { '/MIR' } else { '/E' }
+  & robocopy $Source $Destination $mode /R:1 /W:1 /NFL /NDL /NJH /NJS | Out-Null
+  $code = $LASTEXITCODE
+  if ($code -ge 8) { throw "复制目录失败：$Source -> $Destination（robocopy 退出码 $code）" }
+  $global:LASTEXITCODE = 0
+}
+
+# 只初始化 PostgreSQL 集群，不创建业务数据库。恢复脚本可在 pgdata 被删除时安全复用。
+function Initialize-BBPostgresCluster {
+  param(
+    [string]$PgRoot,
+    [string]$PgData,
+    [int]$PgPort,
+    [string]$SuperUser = 'postgres',
+    [string]$SuperuserPassword = 'BbMiping-Local-2026!'
+  )
+  if (Test-Path -LiteralPath (Join-Path $PgData 'PG_VERSION')) { return $false }
+  if (-not (Test-BBDirectoryEmpty -Path $PgData)) {
+    throw "数据库目录非空但缺少 PG_VERSION，可能存在损坏或残留数据，拒绝自动初始化：$PgData"
+  }
+  $initdb = Join-Path $PgRoot 'bin\initdb.exe'
+  if (-not (Test-Path -LiteralPath $initdb)) { throw "未找到 initdb：$initdb" }
+  New-Item -ItemType Directory -Path $PgData -Force | Out-Null
+  $passwordFile = Join-Path ([IO.Path]::GetTempPath()) ('bb-miping-pg-password-' + [guid]::NewGuid().ToString('N') + '.txt')
+  try {
+    [IO.File]::WriteAllText($passwordFile, $SuperuserPassword, [Text.UTF8Encoding]::new($false))
+    & $initdb -D $PgData -U $SuperUser -A scram-sha-256 --pwfile=$passwordFile --encoding=UTF8 --locale-provider=libc --locale=C
+    Assert-BBNativeSuccess '初始化 PostgreSQL 数据目录'
+    Add-Content -LiteralPath (Join-Path $PgData 'postgresql.conf') -Value "`nport = $PgPort`nlisten_addresses = '127.0.0.1'`n"
+  } finally {
+    Remove-Item -LiteralPath $passwordFile -Force -ErrorAction SilentlyContinue
+  }
+  return $true
+}
+
+function Start-BBPostgres {
+  param(
+    $Paths,
+    [string]$SuperUser = 'postgres',
+    [string]$PgPassword = 'BbMiping-Local-2026!',
+    [switch]$AllowInitialize
+  )
+  $pgCtl = Join-Path $Paths.PgRoot 'bin\pg_ctl.exe'
+  $psql = Join-Path $Paths.PgRoot 'bin\psql.exe'
+  if (-not (Test-Path -LiteralPath $pgCtl)) { throw "未找到 pg_ctl：$pgCtl" }
+  $initialized = $false
+  if (-not (Test-Path -LiteralPath (Join-Path $Paths.PgData 'PG_VERSION'))) {
+    if (-not $AllowInitialize) { throw "数据库目录尚未初始化：$($Paths.PgData)" }
+    $initialized = Initialize-BBPostgresCluster -PgRoot $Paths.PgRoot -PgData $Paths.PgData -PgPort $Paths.PgPort -SuperUser $SuperUser -SuperuserPassword $PgPassword
+  }
+  $env:PGPASSWORD = $PgPassword
+  try {
+    $existing = Get-BBTargetInstanceDataDir -Psql $psql -PgPort $Paths.PgPort -DbUser $SuperUser
+    if ($existing -and -not (Test-BBSamePath $existing $Paths.PgData)) {
+      throw "端口 $($Paths.PgPort) 已被其他 PostgreSQL 实例占用。期望：$($Paths.PgData)；实际：$existing"
+    }
+    if (-not $existing) {
+      & $pgCtl -D $Paths.PgData status 2>&1 | Out-Null
+      if ($LASTEXITCODE -ne 0) {
+        & $pgCtl -D $Paths.PgData -l (Join-Path $Paths.PgData 'postgresql.log') start
+        Assert-BBNativeSuccess '启动 PostgreSQL'
+      }
+    }
+    for ($i = 0; $i -lt 30; $i++) {
+      $actual = Get-BBTargetInstanceDataDir -Psql $psql -PgPort $Paths.PgPort -DbUser $SuperUser
+      if ($actual) {
+        if (-not (Test-BBSamePath $actual $Paths.PgData)) {
+          throw "端口 $($Paths.PgPort) 上的 PostgreSQL 实例身份不符。期望：$($Paths.PgData)；实际：$actual"
+        }
+        return [PSCustomObject]@{ Initialized = [bool]$initialized; DataDirectory = $actual }
+      }
+      Start-Sleep -Seconds 1
+    }
+    throw "PostgreSQL 启动超时：端口 $($Paths.PgPort) 未能通过实例身份校验"
+  } finally {
+    Remove-Item Env:\PGPASSWORD -ErrorAction SilentlyContinue
+  }
+}
+
+function Ensure-BBAppRole {
+  param(
+    $Paths,
+    [string]$SuperUser = 'postgres',
+    [string]$PgPassword = 'BbMiping-Local-2026!',
+    [string]$AppUser = 'bb_miping_app',
+    [string]$AppPassword = 'BbMiping-App-2026!'
+  )
+  $psql = Join-Path $Paths.PgRoot 'bin\psql.exe'
+  $env:PGPASSWORD = $PgPassword
+  try {
+    $exists = (& $psql -h 127.0.0.1 -p $Paths.PgPort -U $SuperUser -d postgres -tAc "SELECT 1 FROM pg_roles WHERE rolname='$AppUser'" 2>$null | Select-Object -First 1)
+    Assert-BBNativeSuccess '检查应用数据库角色'
+    if (([string]$exists).Trim() -ne '1') {
+      $safePassword = $AppPassword.Replace("'", "''")
+      & $psql -h 127.0.0.1 -p $Paths.PgPort -U $SuperUser -d postgres -v ON_ERROR_STOP=1 -c "CREATE ROLE $AppUser LOGIN PASSWORD '$safePassword'"
+      Assert-BBNativeSuccess '创建应用数据库角色'
+    }
+  } finally {
+    Remove-Item Env:\PGPASSWORD -ErrorAction SilentlyContinue
+  }
+}

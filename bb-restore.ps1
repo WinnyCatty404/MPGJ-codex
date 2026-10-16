@@ -42,34 +42,135 @@ if (-not $BackupSet) {
 $sqlFile = Get-Item (Join-Path $BackupSet "$DbName-*.dump") -ErrorAction SilentlyContinue | Select-Object -First 1
 if (-not $sqlFile) { Write-Error '备份集中未找到数据库 dump 文件。'; if (-not $Silent) { Read-Host '按回车退出' }; exit 1 }
 
+function Invoke-RestoreSql {
+  param([string]$Database, [string]$Sql, [string]$Step, [switch]$ReturnValue)
+  $result = & $psql -h 127.0.0.1 -p $p.PgPort -U $SuperUser -d $Database -v ON_ERROR_STOP=1 -tAc $Sql
+  Assert-BBNativeSuccess $Step
+  if ($ReturnValue) { return ([string]($result | Select-Object -First 1)).Trim() }
+}
+
+# 在停止服务和修改数据前先验证归档目录，损坏备份不会进入破坏性阶段。
+Write-Host "正在预检备份集：$BackupSet"
+$manifestPath = Join-Path $BackupSet 'backup-manifest.json'
+if (Test-Path -LiteralPath $manifestPath) {
+  try {
+    $manifest = Get-Content -LiteralPath $manifestPath -Raw -Encoding UTF8 | ConvertFrom-Json
+    if ($manifest.database.dumpFile -and $manifest.database.dumpFile -ne $sqlFile.Name) { throw '清单中的 dump 文件名与实际文件不一致' }
+    if ($manifest.database.bytes -and [int64]$manifest.database.bytes -ne [int64]$sqlFile.Length) { throw '数据库 dump 文件大小与清单不一致' }
+    if ($manifest.database.sha256) {
+      $actualHash = (Get-FileHash -LiteralPath $sqlFile.FullName -Algorithm SHA256).Hash
+      if ($actualHash -ne [string]$manifest.database.sha256) { throw '数据库 dump 校验值与清单不一致' }
+    }
+  } catch { Write-Error "备份清单校验失败：$($_.Exception.Message)"; if (-not $Silent) { Read-Host '按回车退出' }; exit 1 }
+}
+& $pgRestore -l $sqlFile.FullName 2>$null | Out-Null
+if ($LASTEXITCODE -ne 0) { Write-Error '数据库 dump 无法读取，恢复已中止，现有数据未修改。'; if (-not $Silent) { Read-Host '按回车退出' }; exit 1 }
+
+$tag = (Get-Date -Format 'yyyyMMddHHmmss') + '_' + [guid]::NewGuid().ToString('N').Substring(0, 8)
+$tempDb = 'bb_restore_' + $tag
+$oldDb = 'bb_before_' + $tag
+$stageRoot = Join-Path $p.DataRoot ('.restore-stage-' + $tag)
+$rollbackRoot = Join-Path $p.DataRoot ('.restore-rollback-' + $tag)
+$hadOriginalDb = $false
+$oldDbRenamed = $false
+$dbSwapped = $false
+$initializedForRestore = $false
+$movedOriginal = @{}
+$activated = @{}
 $env:PGPASSWORD = $PgPassword
 
-# 恢复是破坏性操作（DROP DATABASE），必须先确认端口上的实例确实服务于本应用的数据目录，
-# 否则会把别人的库删掉再建一个。
-$actualDataDir = Get-BBTargetInstanceDataDir -Psql $psql -PgPort $p.PgPort -DbUser $SuperUser
-if (-not $actualDataDir) {
-  Write-Error "无法校验 PostgreSQL 实例身份：请确认端口 $($p.PgPort) 上的 PostgreSQL 正在运行、且超级用户 $SuperUser 口令正确。"
-  if (-not $Silent) { Read-Host '按回车退出' }; exit 1
-}
-if (-not (Test-BBSamePath $actualDataDir $p.PgData)) {
-  Write-Error "端口 $($p.PgPort) 上的 PostgreSQL 实例不是本应用的数据目录，已中止恢复。期望：$($p.PgData)  实际：$actualDataDir（继续下去会误删该实例的 bb_miping 库）"
-  if (-not $Silent) { Read-Host '按回车退出' }; exit 1
-}
+try {
+  Write-Host '正在停止 Web/API，PostgreSQL 将保持或自动恢复运行...'
+  & (Join-Path $AppRoot 'bb-stop.ps1') -AppRoot $AppRoot -Silent -KeepPostgres
+  Assert-BBNativeSuccess '停止 Web/API'
 
-# 终止连接并重建数据库
-& $psql -h 127.0.0.1 -p $p.PgPort -U $SuperUser -d postgres -c "SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE datname='$DbName' AND pid <> pg_backend_pid();" 2>$null
-& $psql -h 127.0.0.1 -p $p.PgPort -U $SuperUser -d postgres -c "DROP DATABASE IF EXISTS $DbName;"
-& $psql -h 127.0.0.1 -p $p.PgPort -U $SuperUser -d postgres -c "CREATE DATABASE $DbName OWNER $AppUser ENCODING 'UTF8';"
-& $pgRestore -h 127.0.0.1 -p $p.PgPort -U $SuperUser -d $DbName -F c $sqlFile.FullName
-if ($LASTEXITCODE -ne 0) { Write-Error '数据库恢复失败（请确认 PostgreSQL 正在运行、postgres 密码正确）。'; if (-not $Silent) { Read-Host '按回车退出' }; exit 1 }
+  Write-Host '正在准备 PostgreSQL...'
+  $pgState = Start-BBPostgres -Paths $p -SuperUser $SuperUser -PgPassword $PgPassword -AllowInitialize
+  $initializedForRestore = [bool]$pgState.Initialized
+  if ($pgState.Initialized) { Write-Host '检测到 pgdata 已删除，已初始化新的最小 PostgreSQL 集群。' }
+  Ensure-BBAppRole -Paths $p -SuperUser $SuperUser -PgPassword $PgPassword -AppUser $AppUser
 
-# 恢复文件目录
-foreach ($d in @('storage', 'uploads')) {
-  $src = Join-Path $BackupSet $d
-  if (Test-Path -LiteralPath $src) { robocopy $src (Join-Path $p.DataRoot $d) /E /R:1 /W:1 /NFL /NDL /NJH /NJS | Out-Null }
+  Write-Host '正在暂存 storage/uploads...'
+  New-Item -ItemType Directory -Path $stageRoot -Force | Out-Null
+  foreach ($d in @('storage', 'uploads')) {
+    Invoke-BBRobocopy -Source (Join-Path $BackupSet $d) -Destination (Join-Path $stageRoot $d) -Mirror
+  }
+  $hadOriginalDb = (Invoke-RestoreSql -Database postgres -Sql "SELECT EXISTS(SELECT 1 FROM pg_database WHERE datname='$DbName')" -Step '检查当前数据库' -ReturnValue) -eq 't'
+  Invoke-RestoreSql -Database postgres -Sql "CREATE DATABASE $tempDb OWNER $AppUser ENCODING 'UTF8'" -Step '创建临时恢复数据库'
+  Write-Host '正在恢复数据库到临时库...'
+  & $pgRestore -h 127.0.0.1 -p $p.PgPort -U $SuperUser -d $tempDb -F c --exit-on-error $sqlFile.FullName
+  Assert-BBNativeSuccess '恢复数据库归档'
+  $coreCount = Invoke-RestoreSql -Database $tempDb -Sql "SELECT count(*) FROM (VALUES ('users'),('projects'),('project_stage_records'),('system_settings')) AS required(name) WHERE to_regclass('public.' || name) IS NOT NULL" -Step '校验恢复数据库' -ReturnValue
+  if ($coreCount -ne '4') { throw "恢复后的数据库缺少核心表（通过 $coreCount/4）" }
+
+  Write-Host '正在切换数据库...'
+  if ($hadOriginalDb) {
+    Invoke-RestoreSql -Database postgres -Sql "SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE datname='$DbName' AND pid <> pg_backend_pid()" -Step '终止原数据库连接'
+    Invoke-RestoreSql -Database postgres -Sql "ALTER DATABASE $DbName RENAME TO $oldDb" -Step '保留原数据库用于回退'
+    $oldDbRenamed = $true
+  }
+  Invoke-RestoreSql -Database postgres -Sql "ALTER DATABASE $tempDb RENAME TO $DbName" -Step '启用恢复数据库'
+  $dbSwapped = $true
+
+  Write-Host '正在切换 storage/uploads...'
+  New-Item -ItemType Directory -Path $rollbackRoot -Force | Out-Null
+  foreach ($d in @('storage', 'uploads')) {
+    $active = Join-Path $p.DataRoot $d
+    $stagedDir = Join-Path $stageRoot $d
+    $rollbackDir = Join-Path $rollbackRoot $d
+    $movedOriginal[$d] = $false
+    $activated[$d] = $false
+    if (Test-Path -LiteralPath $active) {
+      Move-Item -LiteralPath $active -Destination $rollbackDir
+      $movedOriginal[$d] = $true
+    }
+    Move-Item -LiteralPath $stagedDir -Destination $active
+    $activated[$d] = $true
+  }
+
+  if ($hadOriginalDb) {
+    Invoke-RestoreSql -Database postgres -Sql "DROP DATABASE $oldDb" -Step '清理原数据库副本'
+  }
+  Remove-Item -LiteralPath $rollbackRoot -Recurse -Force -ErrorAction SilentlyContinue
+  Remove-Item -LiteralPath $stageRoot -Recurse -Force -ErrorAction SilentlyContinue
+  Write-Host "恢复完成：$BackupSet"
+  Write-Host 'Web/API 当前保持停止，请在控制台点击“启动系统”。'
+} catch {
+  $failure = $_.Exception.Message
+  Write-Host "恢复失败，正在回退：$failure"
+  foreach ($d in @('uploads', 'storage')) {
+    $active = Join-Path $p.DataRoot $d
+    $rollbackDir = Join-Path $rollbackRoot $d
+    if ($activated[$d] -and (Test-Path -LiteralPath $active)) { Remove-Item -LiteralPath $active -Recurse -Force -ErrorAction SilentlyContinue }
+    if ($movedOriginal[$d] -and (Test-Path -LiteralPath $rollbackDir)) { Move-Item -LiteralPath $rollbackDir -Destination $active -ErrorAction SilentlyContinue }
+  }
+  if ($dbSwapped) {
+    try {
+      Invoke-RestoreSql -Database postgres -Sql "SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE datname='$DbName' AND pid <> pg_backend_pid()" -Step '终止失败恢复库连接'
+      Invoke-RestoreSql -Database postgres -Sql "DROP DATABASE IF EXISTS $DbName" -Step '移除失败恢复库'
+      if ($hadOriginalDb) { Invoke-RestoreSql -Database postgres -Sql "ALTER DATABASE $oldDb RENAME TO $DbName" -Step '恢复原数据库' }
+    } catch { Write-Host "数据库自动回退失败：$($_.Exception.Message)" }
+  } else {
+    try {
+      Invoke-RestoreSql -Database postgres -Sql "DROP DATABASE IF EXISTS $tempDb" -Step '清理临时恢复库'
+      if ($oldDbRenamed) { Invoke-RestoreSql -Database postgres -Sql "ALTER DATABASE $oldDb RENAME TO $DbName" -Step '恢复原数据库名称' }
+    } catch { Write-Host "数据库自动回退失败：$($_.Exception.Message)" }
+  }
+  Remove-Item -LiteralPath $stageRoot -Recurse -Force -ErrorAction SilentlyContinue
+  Remove-Item -LiteralPath $rollbackRoot -Recurse -Force -ErrorAction SilentlyContinue
+  if ($initializedForRestore -and (Test-Path -LiteralPath (Join-Path $p.PgData 'PG_VERSION'))) {
+    try {
+      $pgCtl = Join-Path $p.PgRoot 'bin\pg_ctl.exe'
+      & $pgCtl -D $p.PgData stop -m fast 2>$null | Out-Null
+      if ($LASTEXITCODE -ne 0) { throw "pg_ctl 退出码 $LASTEXITCODE" }
+      Remove-Item -LiteralPath $p.PgData -Recurse -Force
+      Write-Host '已移除本次恢复临时初始化的 PostgreSQL 数据目录。'
+    } catch { Write-Host "清理本次初始化的 PostgreSQL 目录失败：$($_.Exception.Message)" }
+  }
+  Write-Error "恢复失败：$failure。现有数据已尽可能回退，Web/API 保持停止。"
+  if (-not $Silent) { Read-Host '按回车退出' }
+  exit 1
+} finally {
+  Remove-Item Env:\PGPASSWORD -ErrorAction SilentlyContinue
 }
-
-# robocopy 用位图表示结果（1=复制了文件），直接泄漏会让本脚本以非零退出码结束。
-$global:LASTEXITCODE = 0
-Write-Host "恢复完成：$BackupSet（恢复后请重启 BMPBGS）"
 if (-not $Silent) { Read-Host '按回车退出' }

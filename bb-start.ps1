@@ -68,49 +68,15 @@ if (-not (Test-Path -LiteralPath $pgCtl)) {
   if (-not $Silent) { Read-Host '按回车退出' }; exit 1
 }
 
-# 3) 首次启动：初始化数据库
-if (-not (Test-Path -LiteralPath (Join-Path $p.PgData 'PG_VERSION'))) {
-  Write-BBLog '首次启动：正在初始化数据库（首次约需 1-2 分钟）...'
-  try {
-    & (Join-Path $AppRoot 'database\setup.ps1') -PostgresRoot $p.PgRoot -DataDir $p.PgData -Port $p.PgPort
-    if ($LASTEXITCODE -ne 0) { throw "setup.ps1 退出码 $LASTEXITCODE" }
-    Write-BBLog '数据库初始化完成'
-  } catch {
-    Write-BBLog "数据库初始化失败：$($_.Exception.Message)" 'ERROR'
-    Write-BBLog "请查看：$(Join-Path $p.PgData 'postgresql.log')" 'ERROR'
-    if (-not $Silent) { Read-Host '按回车退出' }; exit 1
-  }
-}
-
-# 4) 启动 PostgreSQL 并等待其真正接受连接
+# 3-4) 初始化（如需要）并启动 PostgreSQL；恢复脚本复用同一套安全检查。
 Write-BBLog '启动 PostgreSQL...'
 try {
-  & $pgCtl -D $p.PgData status 2>&1 | Out-Null
-  if ($LASTEXITCODE -ne 0) {
-    & $pgCtl -D $p.PgData -l (Join-Path $p.PgData 'postgresql.log') start
-  }
-  $ready = $false
-  for ($i = 0; $i -lt 30; $i++) {
-    if (Get-NetTCPConnection -LocalPort $p.PgPort -ErrorAction SilentlyContinue) { $ready = $true; break }
-    Start-Sleep -Seconds 1
-  }
-  if (-not $ready) {
-    Write-BBLog "PostgreSQL 启动超时（端口 $($p.PgPort) 未监听）。日志：$(Join-Path $p.PgData 'postgresql.log')" 'ERROR'
-    if (-not $Silent) { Read-Host '按回车退出' }; exit 1
-  }
-  # 端口若已被另一个 PostgreSQL 实例占用（另一套 BMPBGS 或开发集群），pg_ctl start 会失败、
-  # 但端口仍处于监听状态。此时若继续，后续所有读写都会落到“隔壁库”——页面会突然显示另一批数据。
-  # 因此这里必须确认端口背后的实例确实服务于本应用的数据目录。
-  $startPsql = Join-Path $p.PgRoot 'bin\psql.exe'
-  $env:PGPASSWORD = 'BbMiping-Local-2026!'
-  try {
-    $startDir = Get-BBTargetInstanceDataDir -Psql $startPsql -PgPort $p.PgPort
-  } finally {
-    Remove-Item Env:\PGPASSWORD -ErrorAction SilentlyContinue
-  }
-  if ($startDir -and -not (Test-BBSamePath $startDir $p.PgData)) {
-    Write-BBLog "端口 $($p.PgPort) 已被另一个 PostgreSQL 实例占用：它的数据目录是 $startDir，而本应用的数据目录是 $($p.PgData)。请先停止占用该端口的实例后重试。" 'ERROR'
-    if (-not $Silent) { Read-Host '按回车退出' }; exit 1
+  $wasNewCluster = -not (Test-Path -LiteralPath (Join-Path $p.PgData 'PG_VERSION'))
+  $pgState = Start-BBPostgres -Paths $p -PgPassword 'BbMiping-Local-2026!' -AllowInitialize
+  if ($wasNewCluster -or $pgState.Initialized) {
+    Write-BBLog '首次启动：正在创建业务数据库与初始数据（首次约需 1-2 分钟）...'
+    & (Join-Path $AppRoot 'database\setup.ps1') -PostgresRoot $p.PgRoot -DataDir $p.PgData -Port $p.PgPort
+    Assert-BBNativeSuccess '初始化业务数据库'
   }
   Write-BBLog 'PostgreSQL 已就绪'
 } catch {
@@ -251,4 +217,8 @@ Write-Host '   停止请使用快捷方式"停止BMPBGS"'
 Write-Host '================================================'
 Write-Host ''
 
+if (-not $apiOk -or -not $webOk) {
+  if (-not $Silent) { Read-Host '启动未完成，按回车关闭窗口' }
+  exit 1
+}
 if (-not $Silent) { Read-Host '按回车关闭本窗口（工具继续在后台运行）' }

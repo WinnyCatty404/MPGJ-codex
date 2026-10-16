@@ -38,20 +38,46 @@ if (-not (Test-BBSamePath $actualDataDir $p.PgData)) {
 
 $ts = Get-Date -Format 'yyyyMMdd-HHmmss'
 $setDir = Join-Path $BackupRoot $ts
-New-Item -ItemType Directory -Path $setDir -Force | Out-Null
+$pendingDir = Join-Path $BackupRoot ('.pending-' + $ts + '-' + [guid]::NewGuid().ToString('N'))
+if (Test-Path -LiteralPath $setDir) { throw "备份集已存在，请稍后重试：$setDir" }
+New-Item -ItemType Directory -Path $pendingDir -Force | Out-Null
 
-$sqlFile = Join-Path $setDir "$DbName-$ts.dump"
-$env:PGPASSWORD = $PgPassword
-& $pgDump -h 127.0.0.1 -p $p.PgPort -U $DbUser -F c -f $sqlFile $DbName
-if ($LASTEXITCODE -ne 0) { Write-Error '数据库备份失败（请确认 PostgreSQL 正在运行、postgres 密码正确）。'; if (-not $Silent) { Read-Host '按回车退出' }; exit 1 }
+try {
+  $sqlFile = Join-Path $pendingDir "$DbName-$ts.dump"
+  Write-Host '正在备份数据库...'
+  & $pgDump -h 127.0.0.1 -p $p.PgPort -U $DbUser -F c -f $sqlFile $DbName
+  Assert-BBNativeSuccess '数据库备份'
+  if (-not (Test-Path -LiteralPath $sqlFile) -or (Get-Item -LiteralPath $sqlFile).Length -le 0) { throw '数据库备份文件为空。' }
 
-# 备份文件目录（若存在）
-foreach ($d in @('storage', 'uploads')) {
-  $src = Join-Path $p.DataRoot $d
-  if (Test-Path -LiteralPath $src) { robocopy $src (Join-Path $setDir $d) /E /R:1 /W:1 /NFL /NDL /NJH /NJS | Out-Null }
+  foreach ($d in @('storage', 'uploads')) {
+    Write-Host "正在备份 $d..."
+    Invoke-BBRobocopy -Source (Join-Path $p.DataRoot $d) -Destination (Join-Path $pendingDir $d)
+  }
+
+  $storageStats = Get-BBDirectoryStats (Join-Path $pendingDir 'storage')
+  $uploadStats = Get-BBDirectoryStats (Join-Path $pendingDir 'uploads')
+  $dumpItem = Get-Item -LiteralPath $sqlFile
+  $manifest = [ordered]@{
+    formatVersion = 1
+    createdAt = (Get-Date).ToString('o')
+    database = [ordered]@{
+      name = $DbName
+      dumpFile = $dumpItem.Name
+      bytes = [int64]$dumpItem.Length
+      sha256 = (Get-FileHash -LiteralPath $sqlFile -Algorithm SHA256).Hash
+    }
+    storage = [ordered]@{ files = $storageStats.Count; bytes = $storageStats.Bytes }
+    uploads = [ordered]@{ files = $uploadStats.Count; bytes = $uploadStats.Bytes }
+  }
+  $manifest | ConvertTo-Json -Depth 5 | Set-Content -LiteralPath (Join-Path $pendingDir 'backup-manifest.json') -Encoding UTF8
+  Move-Item -LiteralPath $pendingDir -Destination $setDir
+  Write-Host "备份完成：$setDir"
+} catch {
+  Remove-Item -LiteralPath $pendingDir -Recurse -Force -ErrorAction SilentlyContinue
+  Write-Error "备份失败：$($_.Exception.Message)"
+  if (-not $Silent) { Read-Host '按回车退出' }
+  exit 1
+} finally {
+  Remove-Item Env:\PGPASSWORD -ErrorAction SilentlyContinue
 }
-
-# robocopy 用位图表示结果（1=复制了文件），直接泄漏会让本脚本以非零退出码结束。
-$global:LASTEXITCODE = 0
-Write-Host "备份完成：$setDir"
 if (-not $Silent) { Read-Host '按回车退出' }
