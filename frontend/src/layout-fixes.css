@@ -72,7 +72,7 @@
 
 .data-table:not(.user-table) .table-head,
 .data-table:not(.user-table) .table-row {
-  grid-template-columns: minmax(250px, 2fr) 66px 58px 88px 74px 98px minmax(300px, 1.6fr);
+  grid-template-columns: minmax(230px, 2fr) 62px 54px 116px 84px 70px 88px minmax(300px, 1.6fr);
 }
 
 .project-row {

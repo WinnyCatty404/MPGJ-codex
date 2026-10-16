@@ -2326,26 +2326,7 @@
                       <th style="width:140px;" data-page-node-id="KQwhFMYroBWosUvcI8oUIK">是否通过密评人员考核</th>
                     </tr>
                   </thead>
-                  <tbody data-page-node-id="TedqR8Pr9OZYk4NEk6mL7h">
-                    <tr data-page-node-id="ywFycWq3pDYPJn4ni8vjHf">
-                      <td data-page-node-id="N8F21hbe5UR5kMKsRFFGA5"><input type="text" id="plan-member-1-role" class="full-input" value="项目负责人" data-page-node-id="mF1v5GPoxVBSw1m6Rz6Oub" /></td>
-                      <td data-page-node-id="nlrxsVYfO9U20lFFzU4pKh"><select id="plan-member-1-name" class="full-input eval-user-select" data-page-node-id="sjg2TTixquOyUlI69UsTUr"></select></td>
-                      <td data-page-node-id="ALqW38BtNMgOhCBxMFtTxz"><input type="text" id="plan-member-1-task" class="full-input" value="物理和环境安全、网络和通信安全、设备和计算安全、应用和数据安全" data-page-node-id="Dg4lQkAnOBheVkiAfq9TBh" /></td>
-                      <td style="text-align:center;" data-page-node-id="Ymvf2jYarwiA3aG2eiZ1xu">
-                        <label class="cb-label" data-page-node-id="HXEwKMkvrtOFkFRFSUvyUL"><input type="radio" id="plan-member-1-exam-yes" name="exam1" checked data-page-node-id="d2bDKG4cq4wZ4Why3f4dRC" /> 是</label>
-                        <label class="cb-label" data-page-node-id="aiGPizbLBHsvk3fk0CN4GW"><input type="radio" id="plan-member-1-exam-no" name="exam1" data-page-node-id="rJPAPNZfr8CQtBFPBoAy4j" /> 否</label>
-                      </td>
-                    </tr>
-                    <tr data-page-node-id="EmvXVLq33ATdOP6eruL9R9">
-                      <td data-page-node-id="YHFGJMjE7oHrIm7qHPvCxg"><input type="text" id="plan-member-2-role" class="full-input" value="测评项目组成员" data-page-node-id="2nvJtrmQgJLhcYzaiIHYOX" /></td>
-                      <td data-page-node-id="QN4fnzj1ywVDCGlWjdDdH7"><select id="plan-member-2-name" class="full-input eval-user-select" data-page-node-id="YFPrn8Tqvm8IRniOJHGoRi"></select></td>
-                      <td data-page-node-id="IU50lRwHDqwaDwcQZfgw8s"><input type="text" id="plan-member-2-task" class="full-input" value="管理制度、人员管理、建设运行、应急处置" data-page-node-id="C91VjgauoCv6OtSo6b4Vkd" /></td>
-                      <td style="text-align:center;" data-page-node-id="VtztFv3Lh5aqZpiOb5Ptdd">
-                        <label class="cb-label" data-page-node-id="bKdWfBQ76btY8NaPRc5mtS"><input type="radio" id="plan-member-2-exam-yes" name="exam2" checked data-page-node-id="E3lhT6BoS8dqjn3Fe8qKxk" /> 是</label>
-                        <label class="cb-label" data-page-node-id="gHIg75vlvbXvTutvo0bMcA"><input type="radio" id="plan-member-2-exam-no" name="exam2" data-page-node-id="PZtM9C31zClLWD98zc96x0" /> 否</label>
-                      </td>
-                    </tr>
-                    </tbody>
+                  <tbody id="plan-member-body" data-page-node-id="TedqR8Pr9OZYk4NEk6mL7h"></tbody>
                 </table>
               </div>
 
@@ -2767,17 +2748,6 @@
           </select>
         </div>
       </div>
-      <div class="form-row" data-page-node-id="oNvEXIEGC7ECVRBG6ptwnS">
-        <div class="form-group" data-page-node-id="TbDVupXc3IK5wvTHXnQp0Y">
-          <label data-page-node-id="M9XgleVnaAOywzQZbteMFh">项目开始时间</label>
-          <input type="date" id="input-start-date" style="cursor:pointer;" data-page-node-id="fQC40eig2kSOz4NovJi7on" />
-        </div>
-        <div class="form-group" data-page-node-id="TOFXNDFIPNH7rtdfjhEDxb">
-          <label data-page-node-id="oeAKJvJue8CXHS4lFG3FRT">项目结束时间</label>
-          <input type="date" id="input-end-date" style="cursor:pointer;" data-page-node-id="HBL9uCwdOrFMeJG9rbv0dz" />
-        </div>
-      </div>
-
     </div>
     <div class="modal-footer" data-page-node-id="o1kJ4dGKOq8lzY9untigYs">
       <button class="btn btn-secondary" style="width:auto; padding:0 28px;" onclick="closeModal('modal-project')" data-page-node-id="x4YkRzkLypVBr6H6I6ZI0Q">取消</button>
@@ -3121,8 +3091,6 @@
     document.getElementById('input-system-name').value = '';
     document.getElementById('input-org').value = '';
     document.getElementById('input-level').value = '三级';
-    document.getElementById('input-start-date').value = '';
-    document.getElementById('input-end-date').value = '';
     document.getElementById('project-save-btn').textContent = '确认添加';
     openModal('modal-project');
   }
@@ -3138,8 +3106,6 @@
     document.getElementById('input-org').value = p.org;
     document.getElementById('input-year').value = String(p.year);
     document.getElementById('input-level').value = p.level;
-    document.getElementById('input-start-date').value = p.startDate || '';
-    document.getElementById('input-end-date').value = p.endDate || '';
     document.getElementById('project-save-btn').textContent = '保存修改';
     openModal('modal-project');
   }
@@ -3152,9 +3118,6 @@
     const org = document.getElementById('input-org').value.trim();
     const year = document.getElementById('input-year').value;
     const level = document.getElementById('input-level').value;
-    const startDate = document.getElementById('input-start-date').value;
-    const endDate = document.getElementById('input-end-date').value;
-
     if (!reportCode || !systemName || !org || !year || !level) {
       showToast('请填写完整项目信息（报告编号为必填项）', true); return;
     }
@@ -3168,8 +3131,6 @@
         p.org = org;
         p.year = parseInt(year);
         p.level = level;
-        p.startDate = startDate;
-        p.endDate = endDate;
         showToast('项目信息已更新');
       }
       closeModal('modal-project');
@@ -3184,8 +3145,8 @@
         org,
         year: parseInt(year),
         level,
-        startDate,
-        endDate,
+        startDate: '',
+        endDate: '',
         createdAt: new Date().toISOString().slice(0, 10)
       };
       projects.push(newProject);
@@ -3218,7 +3179,8 @@
 
   // ===== 渲染测评人员下拉选项（仅读取用户管理中的人员，不默认选择） =====
   function renderEvalUserSelects() {
-    document.querySelectorAll('.eval-user-select').forEach(sel => {
+    if (document.getElementById('plan-member-body')) renderPlanMembers();
+    document.querySelectorAll('.eval-user-select:not([data-plan-member-select])').forEach(sel => {
       const selected = sel.classList.contains('apb-user-select')
         ? apbVal(sel.dataset.apbKey || '', sel.dataset.apbDefault || '')
         : (sel.value || '');
@@ -3273,6 +3235,56 @@
   // ===== 测评实施 =====
   // 当前测评实施对应的项目引用
   let currentImplementProject = null;
+  let planMembers = [];
+
+  function newPlanMember(values) {
+    values = values || {};
+    return {
+      id: values.id || ('pm-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 8)),
+      role: String(values.role || ''), name: String(values.name || ''), task: String(values.task || ''),
+      passed: String(values.passed || '是') === '否' ? '否' : '是', importedName: String(values.importedName || '')
+    };
+  }
+
+  function defaultPlanMembers() {
+    return [
+      newPlanMember({ role: '项目负责人', task: '物理和环境安全、网络和通信安全、设备和计算安全、应用和数据安全', passed: '是' }),
+      newPlanMember({ role: '测评项目组成员', task: '管理制度、人员管理、建设运行、应急处置', passed: '是' })
+    ];
+  }
+
+  function updatePlanMemberField(id, field, value) {
+    const member = planMembers.find(item => item.id === id);
+    if (!member) return;
+    member[field] = value;
+    if (field === 'name' && value) member.importedName = '';
+  }
+
+  function renderPlanMembers() {
+    const body = document.getElementById('plan-member-body');
+    if (!body) return;
+    if (!planMembers.length) planMembers = defaultPlanMembers();
+    const names = getEvalUserNameList();
+    planMembers.forEach(member => {
+      if (!member.name && member.importedName && names.includes(member.importedName)) {
+        member.name = member.importedName;
+        member.importedName = '';
+      }
+    });
+    body.innerHTML = planMembers.map(function(member) {
+      const options = '<option value="">请选择人员</option>' + names.map(function(name) {
+        return '<option value="' + onsiteEsc(name) + '"' + (name === member.name ? ' selected' : '') + '>' + onsiteEsc(name) + '</option>';
+      }).join('');
+      const warning = member.importedName
+        ? '<div style="margin-top:4px;color:#b45309;font-size:11px;line-height:1.4;">' + onsiteEsc(member.importedName) + '：系统用户表中不存在此数据，请补充。</div>' : '';
+      return '<tr data-plan-member-id="' + onsiteEsc(member.id) + '">' +
+        '<td><input type="text" class="full-input" value="' + onsiteEsc(member.role) + '" oninput="updatePlanMemberField(\'' + member.id + '\',\'role\',this.value)" /></td>' +
+        '<td><select class="full-input eval-user-select" data-plan-member-select onchange="updatePlanMemberField(\'' + member.id + '\',\'name\',this.value)">' + options + '</select>' + warning + '</td>' +
+        '<td><input type="text" class="full-input" value="' + onsiteEsc(member.task) + '" oninput="updatePlanMemberField(\'' + member.id + '\',\'task\',this.value)" /></td>' +
+        '<td style="text-align:center;"><label class="cb-label"><input type="radio" name="plan-exam-' + onsiteEsc(member.id) + '"' + (member.passed === '是' ? ' checked' : '') + ' onchange="updatePlanMemberField(\'' + member.id + '\',\'passed\',\'是\')" /> 是</label>' +
+        '<label class="cb-label"><input type="radio" name="plan-exam-' + onsiteEsc(member.id) + '"' + (member.passed === '否' ? ' checked' : '') + ' onchange="updatePlanMemberField(\'' + member.id + '\',\'passed\',\'否\')" /> 否</label></td></tr>';
+    }).join('');
+  }
 
   function openImplement(id) {
     const p = projects.find(x => x.id === id);
@@ -3547,15 +3559,9 @@
     const startDate = p.startDate || '';
     const endDate = p.endDate || '';
 
-    // 固定成员行每次进入项目时先恢复默认值，项目快照随后再按稳定 ID 覆盖用户已保存内容。
-    document.getElementById('plan-member-1-role').value = '项目负责人';
-    document.getElementById('plan-member-1-task').value = '物理和环境安全、网络和通信安全、设备和计算安全、应用和数据安全';
-    document.getElementById('plan-member-1-exam-yes').checked = true;
-    document.getElementById('plan-member-1-exam-no').checked = false;
-    document.getElementById('plan-member-2-role').value = '测评项目组成员';
-    document.getElementById('plan-member-2-task').value = '管理制度、人员管理、建设运行、应急处置';
-    document.getElementById('plan-member-2-exam-yes').checked = true;
-    document.getElementById('plan-member-2-exam-no').checked = false;
+    // 成员改为结构化动态行；项目快照随后恢复实际人数和内容。
+    planMembers = defaultPlanMembers();
+    renderPlanMembers();
 
     // 测评准备阶段
     document.getElementById('plan-phase-1-content').value =
@@ -7227,17 +7233,9 @@
 
   // 测评项目组成员（读取第二步「测评过程」人员表：项目负责人 + 测评项目组成员）
   function getPlanMembers() {
-    const out = [];
-    document.querySelectorAll('#plan-tab-7 table.mi-table tbody tr').forEach(tr => {
-      const roleInp = tr.cells[0] && tr.cells[0].querySelector('input');
-      const nameSel = tr.cells[1] && tr.cells[1].querySelector('select');
-      const radios = tr.cells[3] ? tr.cells[3].querySelectorAll('input[type="radio"]') : [];
-      const passed = radios.length ? (radios[0].checked ? '是' : '否') : '——';
-      const name = nameSel ? nameSel.value : '';
-      if (!name) return;
-      out.push({ role: roleInp ? roleInp.value : '', name: name, passed: passed });
-    });
-    return out;
+    return planMembers.filter(member => member.name).map(member => ({
+      role: member.role || '', name: member.name || '', task: member.task || '', passed: member.passed || '——'
+    }));
   }
 
   const APPENDIX_B_SELECTABLE_ROLES = [
@@ -8628,12 +8626,13 @@
         _impLvlMap = null;
         try { _impBuildLvlMap(dec8.decode(_impZipRead(buf8, 'word/styles.xml'))); } catch (e2) { /* 无styles.xml时退回启发式 */ }
         const blocks = _impExtractBlocks(docXml);
+        if (typeof refreshEvalUserDirectory === 'function') await refreshEvalUserDirectory();
         let evidenceImport = { groups: [], layerCounts: new Array(8).fill(0), skipped: 0, selectedLayers: options.evidenceLayers };
         if (options.evidenceLayers.length) {
           const relsXml = dec8.decode(_impZipRead(buf8, 'word/_rels/document.xml.rels'));
           evidenceImport = Object.assign(evidenceImport, await _impReadOnsiteEvidence(blocks, buf8, relsXml, options.evidenceLayers));
         }
-        const log = applyWordImport(blocks, file.name, evidenceImport);
+        const log = applyWordImport(blocks, file.name, evidenceImport, options);
         _impRestoreUnselected(retained, options);
         log.sections.unshift({ title: '本次导入范围', lines: [
           { msg: '项目准备与基本信息：' + (options.basic ? 'Word 覆盖' : '保留原值'), warn: false },
@@ -8680,8 +8679,87 @@
   }
 
   // ===== 导入主流程 =====
-  function applyWordImport(blocks, fileName, evidenceImport) {
+  function _impIsoDate(year, month, day) {
+    const y = Number(year), m = Number(month), d = Number(day);
+    const date = new Date(Date.UTC(y, m - 1, d));
+    if (date.getUTCFullYear() !== y || date.getUTCMonth() !== m - 1 || date.getUTCDate() !== d) return '';
+    return String(y).padStart(4, '0') + '-' + String(m).padStart(2, '0') + '-' + String(d).padStart(2, '0');
+  }
+
+  function _impParsePhaseSchedule(blocks) {
+    const labels = ['测评准备阶段', '方案编制阶段', '现场测评阶段', '分析与报告编制阶段'];
+    const all = blocks || [];
+    const sectionStart = all.findIndex(function(block) {
+      if (block.type !== 'p') return false;
+      return /^(?:1[.．]3)?测评过程$/.test(String(block.text || '').replace(/[\s　]/g, ''));
+    });
+    if (sectionStart < 0) return { ok: false, phases: [], errors: ['未找到“1.3 测评过程”'] };
+    const sectionLevel = _impHLevel(all[sectionStart].style);
+    let sectionEnd = all.length;
+    for (let index = sectionStart + 1; index < all.length; index += 1) {
+      if (all[index].type !== 'p') continue;
+      const text = String(all[index].text || '').replace(/[\s　]/g, '');
+      const level = _impHLevel(all[index].style);
+      if (/^1[.．]4(?:\D|$)/.test(text) || (sectionLevel > 0 && level > 0 && level <= sectionLevel)) {
+        sectionEnd = index;
+        break;
+      }
+    }
+    const paragraphs = all.slice(sectionStart + 1, sectionEnd)
+      .filter(block => block.type === 'p').map(block => String(block.text || '').trim());
+    const range = /(\d{4})\s*年\s*(\d{1,2})\s*月\s*(\d{1,2})\s*日?\s*(?:-|—|–|至|~|～)\s*(\d{4})\s*年\s*(\d{1,2})\s*月\s*(\d{1,2})\s*日?/;
+    const phases = [];
+    const errors = [];
+    labels.forEach(function(label, index) {
+      const text = paragraphs.find(function(paragraph) {
+        const compact = paragraph.replace(/\s/g, '');
+        return compact.indexOf(label + '时间') >= 0 && range.test(paragraph);
+      }) || '';
+      const match = range.exec(text);
+      if (!match) { errors.push('未找到“' + label + '时间”'); return; }
+      const start = _impIsoDate(match[1], match[2], match[3]);
+      const end = _impIsoDate(match[4], match[5], match[6]);
+      if (!start || !end) { errors.push('“' + label + '”日期无效'); return; }
+      if (start > end) { errors.push('“' + label + '”结束时间早于开始时间'); return; }
+      if (index > 0 && phases[index - 1] && phases[index - 1].end > start) errors.push('“' + label + '”开始时间早于上一阶段结束时间');
+      phases[index] = { label: label, start: start, end: end };
+    });
+    return { ok: errors.length === 0 && phases.length === 4 && phases.every(Boolean), phases: phases, errors: errors };
+  }
+
+  function syncProjectBoundaryText(oldStart, newStart, oldEnd, newEnd) {
+    function forms(value, placeholder) {
+      if (!value) return [placeholder];
+      const parts = String(value).split('-');
+      return [value, formatCnDate(value), Number(parts[0]) + '年' + Number(parts[1]) + '月' + Number(parts[2]) + '日'];
+    }
+    [['plan-eval-intro'], ['plan-eval-purpose']].forEach(function(entry) {
+      const el = document.getElementById(entry[0]);
+      if (!el) return;
+      let text = String(el.value || '');
+      const startReplacement = newStart ? formatCnDate(newStart) : '{测评开始日期}';
+      const endReplacement = newEnd ? formatCnDate(newEnd) : '{测评结束日期}';
+      forms(oldStart, '{测评开始日期}').forEach(value => { if (value) text = text.split(value).join(startReplacement); });
+      forms(oldEnd, '{测评结束日期}').forEach(value => { if (value) text = text.split(value).join(endReplacement); });
+      el.value = text;
+    });
+    if (bbProject) { bbProject.start_date = newStart || null; bbProject.end_date = newEnd || null; }
+    if (currentImplementProject) { currentImplementProject.startDate = newStart || ''; currentImplementProject.endDate = newEnd || ''; }
+  }
+
+  function applyPhaseSchedule(phases) {
+    const oldStart = document.getElementById('plan-phase-1-start')?.value || '';
+    const oldEnd = document.getElementById('plan-phase-4-end')?.value || '';
+    phases.forEach(function(phase, index) {
+      document.getElementById('plan-phase-' + (index + 1) + '-start').value = phase.start;
+      document.getElementById('plan-phase-' + (index + 1) + '-end').value = phase.end;
+    });
+    syncProjectBoundaryText(oldStart, phases[0].start, oldEnd, phases[3].end);
+  }
+
+  function applyWordImport(blocks, fileName, evidenceImport, importOptions) {
     const sections = [];
+    const includePlanning = !importOptions || importOptions.planning !== false;
     function sec(title) { const s = { title: title, lines: [] }; sections.push(s); return s; }
     function add(s, msg, warn) { s.lines.push({ msg: msg, warn: !!warn }); }
 
@@ -9186,10 +9264,44 @@
       }
       add(s2, '测评依据：依据标准 ' + (std.length ? '导入' : '未找到') + '，参考标准 ' + ref.length + ' 条', !n);
     })();
-    // 测评计划日期仅使用项目起止日期和用户在系统中填写的值，不从导入 Word 回填。
-    (function () {
-      add(s2, '测评计划时间：不从Word导入，保留项目时间和系统内填写值');
-    })();
+    // 1.3 测评过程：四段日期作为项目日期的唯一来源，必须整组校验、整组覆盖。
+    if (includePlanning) (function () {
+      const schedule = _impParsePhaseSchedule(blocks);
+      if (!schedule.ok) {
+        add(s2, '测评过程时间：' + schedule.errors.join('；') + '，8个日期均未覆盖', true);
+        return;
+      }
+      applyPhaseSchedule(schedule.phases);
+      add(s2, '测评过程时间：已导入四个阶段共8个日期，项目周期为 ' + schedule.phases[0].start + ' 至 ' + schedule.phases[3].end);
+    })(); else add(s2, '测评过程时间：本次未选择导入测评准备与方案，保留原值');
+    // 表1-1：按实际人数生成结构化成员行，只能选择系统用户。
+    if (includePlanning) (function () {
+      const team = findTN('测评项目组成员');
+      if (!team || !team.rows.length) { add(s2, '表1-1测评项目组成员：未找到，保留现有人员', true); return; }
+      const compact = value => String(value || '').replace(/[\s\n]/g, '');
+      const headerIndex = team.rows.findIndex(row => row.some(cell => compact(cell) === '姓名'));
+      if (headerIndex < 0) { add(s2, '表1-1测评项目组成员：缺少“姓名”列', true); return; }
+      const header = team.rows[headerIndex].map(compact);
+      const column = label => header.findIndex(value => value === label || value.indexOf(label) >= 0);
+      const roleColumn = column('角色'), nameColumn = column('姓名'), taskColumn = column('任务分工'), examColumn = column('是否通过密评人员考核');
+      if (roleColumn < 0 || nameColumn < 0 || taskColumn < 0 || examColumn < 0) { add(s2, '表1-1测评项目组成员：表头不完整', true); return; }
+      const userNames = getEvalUserNameList();
+      const imported = [];
+      team.rows.slice(headerIndex + 1).forEach(function(row) {
+        const sourceName = String(row[nameColumn] || '').trim();
+        if (!sourceName) return;
+        const exists = userNames.includes(sourceName);
+        imported.push(newPlanMember({
+          role: String(row[roleColumn] || '').trim(), name: exists ? sourceName : '', importedName: exists ? '' : sourceName,
+          task: String(row[taskColumn] || '').trim(), passed: compact(row[examColumn]) === '否' ? '否' : '是'
+        }));
+        if (!exists) add(s2, sourceName + '：系统用户表中不存在此数据，请补充。', true);
+      });
+      if (!imported.length) { add(s2, '表1-1测评项目组成员：没有可导入的数据行', true); return; }
+      planMembers = imported;
+      renderPlanMembers();
+      add(s2, '表1-1测评项目组成员：导入 ' + imported.length + ' 人，已匹配系统用户 ' + imported.filter(member => member.name).length + ' 人');
+    })(); else add(s2, '表1-1测评项目组成员：本次未选择导入测评准备与方案，保留原值');
     // 前次测评情况（"本次测评是被测信息系统进行的第 N 次商用密码应用安全性评估，上次评估时间为…，密评机构为：…，评估结论为：…，综合得分为：…"）
     (function () {
       const zs = grabZone('前次测评情况');
@@ -10345,7 +10457,7 @@
   // 否则 Word 导入改变行数后，后续字段会整体错位并反向污染 objData/toolData/accessPoints。
   function isStructuredField(el) {
     return !!(el && el.closest(
-      '#plan-reference-list, #object-rename-review, [id^="asset-tbody-"], #app-user-tbody, [id^="obj-tbody-"], #tool-tbody, #access-point-list, #topology-block-list, #crypto-asymmetric-body, #crypto-symmetric-body, #crypto-service-body, [id^="onsite-panel-"], #onsite-record-modal, #onsite-evidence-drawer, [id^="report-panel-"]'
+      '#plan-reference-list, #plan-member-body, #object-rename-review, [id^="asset-tbody-"], #app-user-tbody, [id^="obj-tbody-"], #tool-tbody, #access-point-list, #topology-block-list, #crypto-asymmetric-body, #crypto-symmetric-body, #crypto-service-body, [id^="onsite-panel-"], #onsite-record-modal, #onsite-evidence-drawer, [id^="report-panel-"]'
     ));
   }
 
@@ -10496,16 +10608,17 @@
   function snapshot(step) {
     const root = panelForStep(step);
     const data = {
-      prototypeVersion: 3,
+      prototypeVersion: 4,
       assessmentLevel: assessmentLevel(),
       projectDates: {
-        startDate: String(bbProject?.start_date || '').slice(0, 10),
-        endDate: String(bbProject?.end_date || '').slice(0, 10)
+        startDate: String(document.getElementById('plan-phase-1-start')?.value || '').slice(0, 10),
+        endDate: String(document.getElementById('plan-phase-4-end')?.value || '').slice(0, 10)
       },
       fields: captureFields(root),
       images: captureImages(root)
     };
     if (step === 2) {
+      data.planMembers = clone(planMembers);
       data.previousAssessment = {
         count: document.getElementById('prev-eval-count').value,
         time: document.getElementById('prev-eval-time').value.trim(),
@@ -10698,6 +10811,9 @@
 
   function collectReportExportContent() {
     const tables = [];
+    const projectMembers = getPlanMembers();
+    tables.push({ caption: '测评项目组成员', skip: 1, repeat: true, required: true,
+      rows: projectMembers.map(member => [member.role || '', member.name || '', member.task || '', member.passed || '']) });
     ['asymmetric', 'symmetric'].forEach(function (kind) {
       const caption = kind === 'asymmetric' ? '{{系统名称}}非对称密钥列表' : '{{系统名称}}对称密钥列表';
       const rows = (cryptoKeyTables[kind] || []).map(function (row) {
@@ -10986,6 +11102,21 @@
     if (saved) saved = migrateAssessmentSnapshot(saved);
     if (!saved || !saved.prototypeVersion) return;
     if (step === 2) {
+      if (Array.isArray(saved.planMembers)) {
+        planMembers = saved.planMembers.map(newPlanMember);
+      } else {
+        const legacy = Array.isArray(saved.fields) ? saved.fields : [];
+        const field = id => legacy.find(item => item.id === id);
+        const migrated = [1, 2].map(function(index) {
+          const role = String(field('plan-member-' + index + '-role')?.value || '');
+          const name = String(field('plan-member-' + index + '-name')?.value || '');
+          const task = String(field('plan-member-' + index + '-task')?.value || '');
+          const no = !!field('plan-member-' + index + '-exam-no')?.checked;
+          return (role || name || task) ? newPlanMember({ role: role, name: name, task: task, passed: no ? '否' : '是' }) : null;
+        }).filter(Boolean);
+        planMembers = migrated.length ? migrated : defaultPlanMembers();
+      }
+      renderPlanMembers();
       if (saved.cryptoKeyTables) cryptoKeyTables = clone(saved.cryptoKeyTables);
       renderCryptoKeyTables();
       if (saved.cryptoServices) cryptoServices = clone(saved.cryptoServices);
@@ -11078,6 +11209,14 @@
         body: JSON.stringify({ data: snapshot(step), completion: completion })
       });
       if (stage) Object.assign(stage, updated);
+      if (step === 2 && updated.projectDates) {
+        bbProject.start_date = updated.projectDates.startDate || null;
+        bbProject.end_date = updated.projectDates.endDate || null;
+        if (currentImplementProject) {
+          currentImplementProject.startDate = updated.projectDates.startDate || '';
+          currentImplementProject.endDate = updated.projectDates.endDate || '';
+        }
+      }
       if (step === 3 && Array.isArray(updated?.data?.onsiteEvidenceGroups)) {
         onsiteEvidenceGroups = clone(updated.data.onsiteEvidenceGroups);
       }
@@ -11294,9 +11433,7 @@
             systemName: systemName,
             orgName: orgName,
             assessmentYear: Number(project.assessment_year),
-            systemLevel: Number(project.system_level),
-            startDate: project.start_date || null,
-            endDate: project.end_date || null
+            systemLevel: Number(project.system_level)
           })
         });
       }
@@ -11428,6 +11565,12 @@
   document.addEventListener('input', function (event) {
     if (!event.target || !event.target.closest || !event.target.closest('#page-implement')) return;
     if (bbHydrating) return;
+    if (event.target.id === 'plan-phase-1-start' || event.target.id === 'plan-phase-4-end') {
+      const nextStart = document.getElementById('plan-phase-1-start')?.value || '';
+      const nextEnd = document.getElementById('plan-phase-4-end')?.value || '';
+      syncProjectBoundaryText(String(bbProject?.start_date || '').slice(0, 10), nextStart,
+        String(bbProject?.end_date || '').slice(0, 10), nextEnd);
+    }
     bbDirty = true;
     const active = document.querySelector('#step-panel-2 .tab-item.active');
     if (bbCurrentStep === 2 && active) active.dataset.started = '1';
@@ -11528,11 +11671,7 @@
       const step = stageKeys.indexOf(stage.stage_key) + 1;
       if (step > 0) hydrate(step, stage.data);
     });
-    // 项目管理中的起止日期是整个报告的统一来源，编辑项目后必须覆盖旧快照日期。
-    const phase1Start = document.getElementById('plan-phase-1-start');
-    const phase4End = document.getElementById('plan-phase-4-end');
-    if (phase1Start) phase1Start.value = project.start_date || '';
-    if (phase4End) phase4End.value = project.end_date || '';
+    // 项目起止日期由测评过程首尾字段派生，加载时以规划阶段快照为准。
     renderAppendixB();
     const authoritativeSystemName = document.getElementById('mi-sys-name');
     if (authoritativeSystemName) authoritativeSystemName.value = project.system_name || '';

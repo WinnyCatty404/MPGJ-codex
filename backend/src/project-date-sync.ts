@@ -54,6 +54,14 @@ function setField(data: JsonRecord, id: string, value: string) {
 
 export function syncProjectDatesInStageData(data: JsonRecord | null | undefined, oldStart: unknown,
   newStart: unknown, oldEnd: unknown, newEnd: unknown): JsonRecord {
+  const phaseDateIds = Array.from({ length: 4 }, (_, index) => index + 1)
+    .flatMap(index => [`plan-phase-${index}-start`, `plan-phase-${index}-end`]);
+  const preservedPhaseDates = new Map<string, unknown>();
+  if (Array.isArray(data?.fields)) {
+    for (const field of data.fields as any[]) {
+      if (phaseDateIds.includes(String(field?.id || ''))) preservedPhaseDates.set(String(field.id), field.value);
+    }
+  }
   const start = dateParts(newStart);
   const end = dateParts(newEnd);
   const replacements = [
@@ -62,7 +70,11 @@ export function syncProjectDatesInStageData(data: JsonRecord | null | undefined,
   ];
   const synced = replaceDeep(data || {}, replacements);
 
-  // 测评计划中的项目边界日期始终以项目管理中最后保存的日期为准。
+  // 项目边界日期只对应第一阶段开始和第四阶段结束。深层文本替换不能顺带
+  // 改写恰好与旧边界同一天的其他六个阶段日期。
+  for (const [id, value] of preservedPhaseDates) setField(synced, id, String(value ?? ''));
+
+  // 项目表中的日期是测评过程边界的派生副本。
   setField(synced, 'plan-phase-1-start', start?.iso || '');
   setField(synced, 'plan-phase-4-end', end?.iso || '');
 

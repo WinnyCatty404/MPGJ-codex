@@ -616,6 +616,7 @@ app.post('/api/projects', auth, asyncRoute(async (req, res) => {
     orgName: z.string().min(2).max(200),
     assessmentYear: z.number().int().min(2000).max(2100),
     systemLevel: z.union([z.literal(2), z.literal(3)]),
+    // 兼容旧客户端提交，但项目日期仅由测评过程派生，不在新建弹窗维护。
     startDate: z.string().optional().nullable(),
     endDate: z.string().optional().nullable(),
   }).parse(req.body);
@@ -632,7 +633,7 @@ app.post('/api/projects', auth, asyncRoute(async (req, res) => {
     const project = await client.query(
       `INSERT INTO projects (code, report_code, system_name, org_name, assessment_year, system_level, start_date, end_date, owner_id, created_by)
        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$9) RETURNING *`,
-      [projectCode, input.reportCode || null, input.systemName, input.orgName, input.assessmentYear, input.systemLevel, input.startDate || null, input.endDate || null, req.user!.id],
+      [projectCode, input.reportCode || null, input.systemName, input.orgName, input.assessmentYear, input.systemLevel, null, null, req.user!.id],
     );
     await client.query(
       `INSERT INTO project_stage_records(project_id, stage_key, title) SELECT $1, * FROM (VALUES
@@ -671,24 +672,10 @@ app.put('/api/projects/:id', auth, asyncRoute(async (req, res) => {
     }
     const result = await client.query(
       `UPDATE projects SET report_code=$1,system_name=$2,org_name=$3,assessment_year=$4,
-        system_level=$5,start_date=$6,end_date=$7,updated_at=now() WHERE id=$8 RETURNING *`,
+        system_level=$5,updated_at=now() WHERE id=$6 RETURNING *`,
       [input.reportCode || null, input.systemName, input.orgName, input.assessmentYear,
-        input.systemLevel, input.startDate || null, input.endDate || null, req.params.id],
+        input.systemLevel, req.params.id],
     );
-    const oldStart = previous.start_date ? String(previous.start_date).slice(0, 10) : '';
-    const oldEnd = previous.end_date ? String(previous.end_date).slice(0, 10) : '';
-    const newStart = input.startDate || '';
-    const newEnd = input.endDate || '';
-    if (oldStart !== newStart || oldEnd !== newEnd) {
-      const stages = await client.query('SELECT stage_key,data FROM project_stage_records WHERE project_id=$1 FOR UPDATE', [req.params.id]);
-      for (const stage of stages.rows) {
-        const data = syncProjectDatesInStageData(stage.data || {}, oldStart, newStart, oldEnd, newEnd);
-        await client.query(
-          'UPDATE project_stage_records SET data=$1,updated_at=now(),updated_by=$2 WHERE project_id=$3 AND stage_key=$4',
-          [data, req.user!.id, req.params.id, stage.stage_key],
-        );
-      }
-    }
     await client.query('COMMIT');
     res.json(result.rows[0]);
   } catch (error) {
@@ -711,9 +698,7 @@ app.post('/api/projects/:id/copy', auth, asyncRoute(async (req, res) => {
     systemName: z.string().trim().min(1).max(255),
     reportCode: z.string().trim().max(60).optional().default(''),
     assessmentYear: z.number().int().min(2000).max(2100),
-    startDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
-    endDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
-  }).refine(value => value.endDate >= value.startDate, { message: '结束时间不能早于开始时间', path: ['endDate'] }).parse(req.body);
+  }).parse(req.body);
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
@@ -729,9 +714,9 @@ app.post('/api/projects/:id/copy', auth, asyncRoute(async (req, res) => {
     const code = `MP-${input.assessmentYear}-${String(sequence.rows[0].next_no).padStart(3, '0')}`;
     const copied = await client.query(
       `INSERT INTO projects(code,report_code,system_name,org_name,assessment_year,system_level,status,current_stage,progress,start_date,end_date,owner_id,created_by)
-       SELECT $1,$2,$3,org_name,$4,system_level,'draft',1,0,$5,$6,owner_id,$7
-       FROM projects WHERE id=$8 RETURNING *`,
-      [code, input.reportCode || null, input.systemName, input.assessmentYear, input.startDate, input.endDate, req.user!.id, projectId],
+       SELECT $1,$2,$3,org_name,$4,system_level,'draft',1,0,start_date,end_date,owner_id,$5
+       FROM projects WHERE id=$6 RETURNING *`,
+      [code, input.reportCode || null, input.systemName, input.assessmentYear, req.user!.id, projectId],
     );
     const newId = copied.rows[0].id;
     const evidenceIdMap = new Map<string, string>();
@@ -760,10 +745,8 @@ app.post('/api/projects/:id/copy', auth, asyncRoute(async (req, res) => {
       'SELECT stage_key,title,data FROM project_stage_records WHERE project_id=$1 ORDER BY updated_at,stage_key',
       [projectId],
     );
-    const oldStart = source.start_date ? String(source.start_date).slice(0, 10) : '';
-    const oldEnd = source.end_date ? String(source.end_date).slice(0, 10) : '';
     for (const stage of stageRows.rows) {
-      let data = syncProjectDatesInStageData(structuredClone(stage.data || {}), oldStart, input.startDate, oldEnd, input.endDate);
+      let data = structuredClone(stage.data || {});
       data = replaceProjectTextInStageData(data, source.system_name, input.systemName);
       data = replaceProjectTextInStageData(data, source.report_code || '', input.reportCode || '');
       if (stage.stage_key === 'onsite') {
@@ -873,12 +856,53 @@ app.get('/api/projects/:id/export/:format', auth, asyncRoute(async (req, res) =>
   return res.send(refreshed);
 }));
 
+function planningFieldValue(data: Record<string, unknown>, id: string) {
+  const fields = Array.isArray(data.fields) ? data.fields as Array<Record<string, unknown>> : [];
+  return String(fields.find(field => field?.id === id)?.value || '').trim();
+}
+
+function planningPhaseDates(data: Record<string, unknown>) {
+  return Array.from({ length: 4 }, (_, offset) => {
+    const phase = offset + 1;
+    return {
+      start: planningFieldValue(data, `plan-phase-${phase}-start`),
+      end: planningFieldValue(data, `plan-phase-${phase}-end`),
+    };
+  });
+}
+
+function validatePlanningPhaseDates(phases: Array<{ start: string; end: string }>) {
+  const iso = /^\d{4}-\d{2}-\d{2}$/;
+  const validIsoDate = (value: string) => {
+    if (!iso.test(value)) return false;
+    const [year, month, day] = value.split('-').map(Number);
+    const parsed = new Date(Date.UTC(year, month - 1, day));
+    return parsed.getUTCFullYear() === year && parsed.getUTCMonth() === month - 1 && parsed.getUTCDate() === day;
+  };
+  let previous = '';
+  for (let index = 0; index < phases.length; index += 1) {
+    const phase = phases[index];
+    if ((phase.start && !validIsoDate(phase.start)) || (phase.end && !validIsoDate(phase.end))) return `第${index + 1}阶段日期格式不正确`;
+    if (phase.start && phase.end && phase.start > phase.end) return `第${index + 1}阶段结束时间不能早于开始时间`;
+    for (const value of [phase.start, phase.end]) {
+      if (!value) continue;
+      if (previous && previous > value) return `第${index + 1}阶段日期不能早于前序阶段日期`;
+      previous = value;
+    }
+  }
+  return '';
+}
+
 app.put('/api/projects/:id/stages/:stageKey', auth, asyncRoute(async (req, res) => {
   const input = z.object({ data: z.record(z.string(), z.unknown()), completion: z.number().int().min(0).max(100) }).parse(req.body);
+  const isPlanning = String(req.params.stageKey) === 'planning';
+  const phaseDates = isPlanning ? planningPhaseDates(input.data) : [];
+  const phaseDateError = isPlanning ? validatePlanningPhaseDates(phaseDates) : '';
+  if (phaseDateError) return res.status(400).json({ message: phaseDateError });
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
-    const projectResult = await client.query('SELECT start_date,end_date FROM projects WHERE id=$1 FOR SHARE', [req.params.id]);
+    const projectResult = await client.query('SELECT start_date,end_date FROM projects WHERE id=$1 FOR UPDATE', [req.params.id]);
     const project = projectResult.rows[0];
     if (!project) {
       await client.query('ROLLBACK');
@@ -886,9 +910,28 @@ app.put('/api/projects/:id/stages/:stageKey', auth, asyncRoute(async (req, res) 
     }
     const currentStart = project.start_date ? String(project.start_date).slice(0, 10) : '';
     const currentEnd = project.end_date ? String(project.end_date).slice(0, 10) : '';
+    const derivedStart = isPlanning ? phaseDates[0].start : currentStart;
+    const derivedEnd = isPlanning ? phaseDates[3].end : currentEnd;
     const sourceDates = (input.data.projectDates || {}) as Record<string, unknown>;
+    const sourceStart = isPlanning ? currentStart : (sourceDates.startDate ?? currentStart);
+    const sourceEnd = isPlanning ? currentEnd : (sourceDates.endDate ?? currentEnd);
     const data = syncProjectDatesInStageData(input.data,
-      sourceDates.startDate ?? currentStart, currentStart, sourceDates.endDate ?? currentEnd, currentEnd);
+      sourceStart, derivedStart, sourceEnd, derivedEnd);
+    if (isPlanning && (derivedStart !== currentStart || derivedEnd !== currentEnd)) {
+      await client.query('UPDATE projects SET start_date=$1,end_date=$2,updated_at=now() WHERE id=$3',
+        [derivedStart || null, derivedEnd || null, req.params.id]);
+      const otherStages = await client.query(
+        'SELECT stage_key,data FROM project_stage_records WHERE project_id=$1 AND stage_key<>$2 FOR UPDATE',
+        [req.params.id, req.params.stageKey],
+      );
+      for (const stage of otherStages.rows) {
+        const synced = syncProjectDatesInStageData(stage.data || {}, currentStart, derivedStart, currentEnd, derivedEnd);
+        await client.query(
+          'UPDATE project_stage_records SET data=$1,updated_at=now(),updated_by=$2 WHERE project_id=$3 AND stage_key=$4',
+          [synced, req.user!.id, req.params.id, stage.stage_key],
+        );
+      }
+    }
     if (String(req.params.stageKey) === 'onsite') {
       data.onsiteEvidenceGroups = await materializeEvidenceGroups(client, String(req.params.id), data.onsiteEvidenceGroups, req.user!.id);
     }
@@ -908,7 +951,7 @@ app.put('/api/projects/:id/stages/:stageKey', auth, asyncRoute(async (req, res) 
       status=CASE WHEN status='archived' THEN status ELSE $4 END,updated_at=now() WHERE id=$1`,
       [req.params.id, summary.progress, summary.currentStage, summary.status]);
     await client.query('COMMIT');
-    res.json(result.rows[0]);
+    res.json({ ...result.rows[0], projectDates: { startDate: derivedStart, endDate: derivedEnd } });
   } catch (error) {
     await client.query('ROLLBACK');
     throw error;

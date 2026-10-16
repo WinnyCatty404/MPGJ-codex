@@ -104,8 +104,12 @@ function buildContext(source: RawRecordSource) {
   const project = source.project;
   const institution = source.institution || {};
   const projectNo = project.report_code || project.code;
-  const leader = fields['plan-member-1-name'] || values['项目负责人'] || project.owner_name || '';
+  const planMembers = Array.isArray(planning.planMembers) ? planning.planMembers : [];
+  const selectedMembers = planMembers.filter((member: JsonRecord) => String(member?.name || '').trim());
+  const leaderRow = selectedMembers.find((member: JsonRecord) => /负责人/.test(String(member.role || '')));
+  const leader = String(leaderRow?.name || fields['plan-member-1-name'] || values['项目负责人'] || project.owner_name || '');
   const memberNames = nonEmpty([
+    ...selectedMembers.filter((member: JsonRecord) => member !== leaderRow).map((member: JsonRecord) => member.name),
     fields['plan-member-2-name'],
     ...(String(values['测评人员'] || '').split(/[、,，;；\s]+/)),
   ]).filter((name, index, all) => name !== leader && all.indexOf(name) === index);
@@ -157,7 +161,9 @@ function buildContext(source: RawRecordSource) {
     sys_cryptographic_product: values['系统使用密码产品情况'] || '',
     sys_cryptographic_algorithm: values['系统使用的密码算法情况'] || values['系统使用密码算法情况'] || '',
     evaluate_group_leader: leader, evaluate_member1: member1, evaluate_member2: member2,
-    evaluate_group_leader_work: fields['plan-member-1-task'] || '', evaluate_member1_work: fields['plan-member-2-task'] || '', evaluate_member2_work: '',
+    evaluate_group_leader_work: String(leaderRow?.task || fields['plan-member-1-task'] || ''),
+    evaluate_member1_work: String(selectedMembers.find((member: JsonRecord) => member !== leaderRow)?.task || fields['plan-member-2-task'] || ''),
+    evaluate_member2_work: String(selectedMembers.filter((member: JsonRecord) => member !== leaderRow)[1]?.task || ''),
     evaluate_tech_member: nonEmpty([leader, member1]).join('、'), evaluate_mana_member: member2 || member1,
     project_quality_supervisor: institution.contact || '',
     project_starttime: cnDate(project.start_date || phase1Start), project_endtime: cnDate(project.end_date || phase4End),

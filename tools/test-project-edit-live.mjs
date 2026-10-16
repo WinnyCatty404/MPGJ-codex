@@ -57,19 +57,20 @@ try {
   assert.equal(actual.report_code, changed.reportCode);
   assert.equal(actual.system_name, changed.systemName);
   assert.equal(actual.org_name, changed.orgName);
-  assert.equal(actual.start_date, changed.startDate);
-  assert.equal(actual.end_date, changed.endDate);
+  assert.equal(actual.start_date || '', original.start_date || '');
+  assert.equal(actual.end_date || '', original.end_date || '');
   for (const stage of actual.stages || []) {
-    assert.deepEqual(stage.data?.projectDates, { startDate: changed.startDate, endDate: changed.endDate },
-      `${stage.stage_key} 阶段日期没有同步`);
+    if (!stage.data?.projectDates) continue;
+    assert.deepEqual(stage.data.projectDates, { startDate: original.start_date || '', endDate: original.end_date || '' },
+      `${stage.stage_key} 阶段日期不应被项目编辑修改`);
   }
   const stored = (await client.query(`SELECT report_code,system_name,org_name,start_date::text AS start_date,
     end_date::text AS end_date FROM projects WHERE id=$1`, [original.id])).rows[0];
   assert.deepEqual(stored, {
     report_code: changed.reportCode, system_name: changed.systemName, org_name: changed.orgName,
-    start_date: changed.startDate, end_date: changed.endDate,
+    start_date: original.start_date, end_date: original.end_date,
   });
-  console.log('PASS: live project edit persisted through API and database.');
+  console.log('PASS: live project metadata edit preserves derived project dates.');
 } finally {
   await update(restoreBody);
   const restored = await read();
