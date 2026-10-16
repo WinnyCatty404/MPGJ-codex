@@ -102,6 +102,49 @@ async function exportImage(dataUrl: string, label: string) {
   return { bytes, ext, size };
 }
 
+// 仅用于正式报告附录 A、B。压缩级别只影响 PNG 的编码，不降低像素质量；
+// 色彩配置或解码像素有任何差异时，直接沿用原图。
+const PNG_COLOR_CHUNKS = new Set(['iCCP', 'sRGB', 'gAMA', 'cHRM', 'sBIT']);
+
+function pngColorChunks(bytes: Buffer): string[] {
+  const chunks: string[] = [];
+  if (!bytes.subarray(0, 8).equals(Buffer.from('89504e470d0a1a0a', 'hex'))) return chunks;
+  for (let offset = 8; offset + 12 <= bytes.length;) {
+    const length = bytes.readUInt32BE(offset);
+    if (offset + 12 + length > bytes.length) break;
+    const type = bytes.toString('ascii', offset + 4, offset + 8);
+    if (PNG_COLOR_CHUNKS.has(type)) chunks.push(`${type}:${bytes.subarray(offset + 8, offset + 8 + length).toString('base64')}`);
+    offset += 12 + length;
+    if (type === 'IEND') break;
+  }
+  return chunks.sort();
+}
+
+export async function optimizeAppendixPng(bytes: Buffer): Promise<Buffer> {
+  try {
+    const metadata = await sharp(bytes, { failOn: 'error' }).metadata();
+    if (metadata.format !== 'png' || metadata.depth !== 'uchar' || (metadata.pages || 1) !== 1) return bytes;
+    const stats = await sharp(bytes, { failOn: 'error' }).stats();
+    const opaqueAlpha = metadata.hasAlpha && stats.channels[3]?.min === 255;
+    let encoder = sharp(bytes, { failOn: 'error' }).keepMetadata();
+    if (opaqueAlpha) encoder = encoder.removeAlpha();
+    const optimized = await encoder.png({ compressionLevel: 9, adaptiveFiltering: true, palette: false }).toBuffer();
+    if (optimized.length >= bytes.length ||
+      JSON.stringify(pngColorChunks(bytes)) !== JSON.stringify(pngColorChunks(optimized))) return bytes;
+    const [originalPixels, optimizedPixels] = await Promise.all([
+      sharp(bytes, { failOn: 'error' }).ensureAlpha().raw().toBuffer({ resolveWithObject: true }),
+      sharp(optimized, { failOn: 'error' }).ensureAlpha().raw().toBuffer({ resolveWithObject: true }),
+    ]);
+    if (originalPixels.info.width !== optimizedPixels.info.width ||
+      originalPixels.info.height !== optimizedPixels.info.height ||
+      !originalPixels.data.equals(optimizedPixels.data)) return bytes;
+    return optimized;
+  } catch {
+    // 优化失败不应中断本来可以完成的报告导出。
+    return bytes;
+  }
+}
+
 function imageRun(rid: string, id: number, width: number, height: number, description: string,
   targetWidth = REPORT_IMAGE_WIDTH_EMU, maxHeight = 0): string {
   // Word 中以目标宽度为上限，高度按原图比例计算；超高图片再按最大高度等比例缩小。
@@ -194,8 +237,9 @@ export async function writeReportEvidence(xml: string, zip: JSZip, records: Reco
       const images = (group.images || []).filter(image => image.dataUrl);
       const sizedImages: SizedEvidenceImage[] = [];
       for (let imageIndex = 0; imageIndex < images.length; imageIndex++) {
-        const { bytes, ext, size } = await exportImage(images[imageIndex].dataUrl || '',
+        const { bytes: originalBytes, ext, size } = await exportImage(images[imageIndex].dataUrl || '',
           `${description}第${imageIndex + 1}张`);
+        const bytes = ext === 'png' ? await optimizeAppendixPng(originalBytes) : originalBytes;
         const filename = `bb-evidence-${layer + 1}-${groupIndex + 1}-${imageIndex + 1}.${ext === 'jpeg' ? 'jpg' : ext}`;
         zip.file(`word/media/${filename}`, bytes);
         const relationId = `rId${rid++}`;
@@ -394,7 +438,8 @@ export async function writeAppendixBImages(xml: string, zip: JSZip, saved: Recor
         ? APPENDIX_B4_IMAGE_WIDTH_EMU
           : (!/^b9(?:-|$)/.test(key) ? APPENDIX_B_IMAGE_WIDTH_EMU : APPENDIX_B_OTHER_IMAGE_WIDTH_EMU)));
     for (let index = 0; index < images.length; index++) {
-      const { bytes, ext, size } = await exportImage(images[index], `${label}第${index + 1}张`);
+      const { bytes: originalBytes, ext, size } = await exportImage(images[index], `${label}第${index + 1}张`);
+      const bytes = ext === 'png' ? await optimizeAppendixPng(originalBytes) : originalBytes;
       const suffix = ext === 'jpeg' ? 'jpg' : ext;
       const filename = `bb-appendix-${key}-${index + 1}.${suffix}`;
       zip.file(`word/media/${filename}`, bytes);
