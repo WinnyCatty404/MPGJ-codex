@@ -184,7 +184,9 @@ try {
     if ($health.ok -ne $true -or $health.database -ne $DbName -or $health.instanceId -ne $instanceId) { throw '恢复后的应用健康检查返回了错误的数据库或实例身份' }
   } finally {
     & (Join-Path $AppRoot 'bb-stop.ps1') -AppRoot $AppRoot -Silent -KeepPostgres
-    $healthStopLeftover = Wait-BBPortsReleased -Ports @($apiPort, $webPort) -TimeoutSeconds 5
+    # node 退出到端口真正可重新绑定需要几秒；这里比流程开头的停止多给一些余量，
+    # 判定依据是 Test-BBPortBindable（能否自行绑定），不再受过期 TCB 干扰。
+    $healthStopLeftover = Wait-BBPortsReleased -Ports @($apiPort, $webPort) -TimeoutSeconds 12
     if ($healthStopLeftover) { throw "健康检查后停止 Web/API 失败：端口 $($healthStopLeftover.LocalPort) 仍在监听" }
   }
 

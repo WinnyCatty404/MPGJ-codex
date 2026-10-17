@@ -211,15 +211,45 @@ function Test-BBPortListening {
   return [bool](Get-NetTCPConnection -LocalPort $Port -State Listen -ErrorAction SilentlyContinue | Select-Object -First 1)
 }
 
+# 端口是否真的空闲，以"能否自行绑定"为准，而不是靠连接表推断。
+# Get-NetTCPConnection 会列出 OwningProcess=0 的过期 TCB（进程已退出、连接处于
+# TIME_WAIT 或残留监听项），这些条目不代表端口仍被占用；据此判定"仍在监听"会让
+# 恢复在健康检查后的停止步骤误判失败（2026-10-17 实测：端口 3100 实际已释放，
+# 但连接表里残留一条 PID 0 的 Listen 项，恢复因此判定失败并回退）。
+function Test-BBPortBindable {
+  param([int]$Port)
+  $listener = $null
+  try {
+    $listener = [Net.Sockets.TcpListener]::new([Net.IPAddress]::Loopback, $Port)
+    $listener.ExclusiveAddressUse = $true
+    $listener.Start()
+    return $true
+  } catch {
+    return $false
+  } finally {
+    if ($listener) { try { $listener.Stop() } catch { } }
+  }
+}
+
 function Wait-BBPortsReleased {
   param([int[]]$Ports, [int]$TimeoutSeconds = 5)
   $deadline = (Get-Date).AddSeconds($TimeoutSeconds)
   do {
-    $leftover = @($Ports | ForEach-Object {
-      Get-NetTCPConnection -LocalPort $_ -State Listen -ErrorAction SilentlyContinue
-    } | Select-Object -First 1)
-    if ($leftover.Count -eq 0) { return $null }
-    if ((Get-Date) -ge $deadline) { return $leftover[0] }
+    $busy = New-Object 'System.Collections.Generic.List[object]'
+    foreach ($port in $Ports) {
+      if (-not (Test-BBPortBindable $port)) {
+        $busy.Add([PSCustomObject]@{ LocalPort = $port })
+      }
+    }
+    if ($busy.Count -eq 0) { return $null }
+    if ((Get-Date) -ge $deadline) {
+      $blocking = @($busy | Where-Object {
+        @(Get-NetTCPConnection -LocalPort $_.LocalPort -State Listen -ErrorAction SilentlyContinue |
+          Where-Object { $_.OwningProcess -gt 0 }).Count -gt 0
+      })
+      if ($blocking.Count -gt 0) { return $blocking[0] }
+      return $busy[0]
+    }
     Start-Sleep -Milliseconds 250
   } while ($true)
 }

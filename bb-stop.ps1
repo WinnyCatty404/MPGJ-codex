@@ -44,8 +44,11 @@ if (Test-Path -LiteralPath $pidFile) {
 
 # 兜底：按监听端口结束（防止 pid 文件丢失时残留）
 foreach ($port in @($apiPort, $webPort)) {
-  Get-NetTCPConnection -LocalPort $port -ErrorAction SilentlyContinue | ForEach-Object {
+  # 只处理真正处于 Listen 的连接：进程退出后会残留 OwningProcess=0 的 TIME_WAIT 项，
+  # 把它们当成"监听者"会刷出一串无法确认归属的告警（2026-10-17 实测）。
+  Get-NetTCPConnection -LocalPort $port -State Listen -ErrorAction SilentlyContinue | ForEach-Object {
     $pidv = [int]$_.OwningProcess
+    if ($pidv -le 0) { return }
     $role = if ($port -eq $apiPort) { 'backend' } else { 'frontend' }
     if (-not $ownedPids[$pidv] -and (Test-BBAppProcess -ProcessId $pidv -Role $role -AppRoot $AppRoot -WebPort $webPort)) {
       & taskkill /PID $pidv /T /F 2>$null | Out-Null
