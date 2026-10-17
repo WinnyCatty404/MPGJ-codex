@@ -24,6 +24,13 @@ $psql = Join-Path $p.PgRoot 'bin\psql.exe'
 $pgRestore = Join-Path $p.PgRoot 'bin\pg_restore.exe'
 if (-not (Test-Path -LiteralPath $pgRestore)) { Write-Error "未找到 pg_restore：$pgRestore"; if (-not $Silent) { Read-Host '按回车退出' }; exit 1 }
 
+$remoteRestoreStage = $null
+function Remove-BBRemoteRestoreStage {
+  if ($script:remoteRestoreStage -and (Test-Path -LiteralPath $script:remoteRestoreStage)) {
+    Remove-Item -LiteralPath $script:remoteRestoreStage -Recurse -Force -ErrorAction SilentlyContinue
+  }
+}
+
 # 选择备份集
 if (-not $BackupSet) {
   $sets = Get-ChildItem -Directory $BackupRoot -ErrorAction SilentlyContinue | Sort-Object Name -Descending
@@ -39,8 +46,28 @@ if (-not $BackupSet) {
   }
 }
 
+# NAS 备份先完整下载并校验，在此之前不停止任何服务。
+if (Test-BBUncPath $BackupSet) {
+  $remoteSource = $BackupSet
+  $remoteRestoreStage = Join-Path $p.DataRoot ('.remote-restore-download-' + [guid]::NewGuid().ToString('N'))
+  $script:remoteRestoreStage = $remoteRestoreStage
+  try {
+    Write-Host "正在从 NAS 下载备份集：$remoteSource"
+    Invoke-BBRobocopy -Source $remoteSource -Destination $remoteRestoreStage -Mirror
+    $downloadInfo = Get-BBBackupSetInfo -Path $remoteRestoreStage -DbName $DbName -Deep
+    if (-not $downloadInfo.Valid) { throw $downloadInfo.Error }
+    $BackupSet = $remoteRestoreStage
+    Write-Host '远程备份已下载并通过清单校验。'
+  } catch {
+    Remove-BBRemoteRestoreStage
+    Write-Error "NAS 备份下载或校验失败，现有数据未修改：$($_.Exception.Message)"
+    if (-not $Silent) { Read-Host '按回车退出' }
+    exit 1
+  }
+}
+
 $sqlFile = Get-Item (Join-Path $BackupSet "$DbName-*.dump") -ErrorAction SilentlyContinue | Select-Object -First 1
-if (-not $sqlFile) { Write-Error '备份集中未找到数据库 dump 文件。'; if (-not $Silent) { Read-Host '按回车退出' }; exit 1 }
+if (-not $sqlFile) { Remove-BBRemoteRestoreStage; Write-Error '备份集中未找到数据库 dump 文件。'; if (-not $Silent) { Read-Host '按回车退出' }; exit 1 }
 
 function Invoke-RestoreSql {
   param([string]$Database, [string]$Sql, [string]$Step, [switch]$ReturnValue)
@@ -61,10 +88,10 @@ if (Test-Path -LiteralPath $manifestPath) {
       $actualHash = (Get-FileHash -LiteralPath $sqlFile.FullName -Algorithm SHA256).Hash
       if ($actualHash -ne [string]$manifest.database.sha256) { throw '数据库 dump 校验值与清单不一致' }
     }
-  } catch { Write-Error "备份清单校验失败：$($_.Exception.Message)"; if (-not $Silent) { Read-Host '按回车退出' }; exit 1 }
+  } catch { Remove-BBRemoteRestoreStage; Write-Error "备份清单校验失败：$($_.Exception.Message)"; if (-not $Silent) { Read-Host '按回车退出' }; exit 1 }
 }
 & $pgRestore -l $sqlFile.FullName 2>$null | Out-Null
-if ($LASTEXITCODE -ne 0) { Write-Error '数据库 dump 无法读取，恢复已中止，现有数据未修改。'; if (-not $Silent) { Read-Host '按回车退出' }; exit 1 }
+if ($LASTEXITCODE -ne 0) { Remove-BBRemoteRestoreStage; Write-Error '数据库 dump 无法读取，恢复已中止，现有数据未修改。'; if (-not $Silent) { Read-Host '按回车退出' }; exit 1 }
 
 $tag = (Get-Date -Format 'yyyyMMddHHmmss') + '_' + [guid]::NewGuid().ToString('N').Substring(0, 8)
 $tempDb = 'bb_restore_' + $tag
@@ -172,5 +199,6 @@ try {
   exit 1
 } finally {
   Remove-Item Env:\PGPASSWORD -ErrorAction SilentlyContinue
+  Remove-BBRemoteRestoreStage
 }
 if (-not $Silent) { Read-Host '按回车退出' }

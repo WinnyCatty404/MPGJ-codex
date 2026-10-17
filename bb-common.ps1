@@ -159,7 +159,14 @@ function Get-BBConfig {
 function Set-BBConfig {
   param([string]$AppRoot, $Config)
   $p = Get-BBConfigPath -AppRoot $AppRoot
-  $Config | ConvertTo-Json -Depth 4 | Set-Content -LiteralPath $p -Encoding UTF8
+  # 启动、备份和控制台分别维护不同配置段，写入时保留调用方未显式提供的字段。
+  $merged = [ordered]@{}
+  $existing = Get-BBConfig -AppRoot $AppRoot
+  if ($existing) {
+    foreach ($property in $existing.PSObject.Properties) { $merged[$property.Name] = $property.Value }
+  }
+  foreach ($property in $Config.PSObject.Properties) { $merged[$property.Name] = $property.Value }
+  ([PSCustomObject]$merged) | ConvertTo-Json -Depth 6 | Set-Content -LiteralPath $p -Encoding UTF8
 }
 
 # 在 [Start, End] 范围内探测第一个未被监听的 TCP 端口。
@@ -206,14 +213,107 @@ function Get-BBDirectoryStats {
   return [PSCustomObject]@{ Count = [int]$measure.Count; Bytes = [int64]($measure.Sum -as [int64]) }
 }
 
+function Test-BBUncPath {
+  param([string]$Path)
+  return [bool]($Path -and $Path.Trim() -match '^\\\\[^\\]+\\[^\\]+(?:\\.*)?$')
+}
+
+# 统一读取备份集状态；Deep 模式用于上传/恢复前的完整校验。
+function Get-BBBackupSetInfo {
+  param([string]$Path, [string]$DbName = 'bb_miping', [switch]$Deep)
+  $result = [ordered]@{
+    Path = $Path; Name = ''; Valid = $false; Error = ''; Legacy = $false
+    CreatedAt = $null; DumpFile = $null; DumpBytes = 0L; DumpSha256 = ''
+    StorageFiles = 0; StorageBytes = 0L; UploadFiles = 0; UploadBytes = 0L
+  }
+  try {
+    if (-not (Test-Path -LiteralPath $Path -PathType Container)) { throw "备份集不存在：$Path" }
+    $item = Get-Item -LiteralPath $Path
+    $result.Name = $item.Name
+    $result.CreatedAt = $item.LastWriteTime
+    $manifestPath = Join-Path $Path 'backup-manifest.json'
+    $manifest = $null
+    if (Test-Path -LiteralPath $manifestPath) {
+      $manifest = Get-Content -LiteralPath $manifestPath -Raw -Encoding UTF8 | ConvertFrom-Json
+      if ($manifest.createdAt) { $result.CreatedAt = [datetime]$manifest.createdAt }
+      if (-not $manifest.database.dumpFile) { throw '备份清单缺少 dump 文件名' }
+      $dumpPath = Join-Path $Path ([string]$manifest.database.dumpFile)
+    } else {
+      $result.Legacy = $true
+      $legacyDump = Get-ChildItem -LiteralPath $Path -Filter "$DbName-*.dump" -File -ErrorAction SilentlyContinue | Select-Object -First 1
+      $dumpPath = if ($legacyDump) { $legacyDump.FullName } else { '' }
+    }
+    if (-not $dumpPath -or -not (Test-Path -LiteralPath $dumpPath -PathType Leaf)) { throw '缺少数据库 dump 文件' }
+    $dump = Get-Item -LiteralPath $dumpPath
+    $result.DumpFile = $dump.FullName
+    $result.DumpBytes = [int64]$dump.Length
+    if ($manifest -and $manifest.database.bytes -ne $null -and [int64]$manifest.database.bytes -ne $result.DumpBytes) { throw 'dump 文件大小与清单不一致' }
+
+    if ($manifest -and -not $Deep) {
+      $storageStats = [PSCustomObject]@{ Count = [int]$manifest.storage.files; Bytes = [int64]$manifest.storage.bytes }
+      $uploadStats = [PSCustomObject]@{ Count = [int]$manifest.uploads.files; Bytes = [int64]$manifest.uploads.bytes }
+    } else {
+      $storageStats = Get-BBDirectoryStats (Join-Path $Path 'storage')
+      $uploadStats = Get-BBDirectoryStats (Join-Path $Path 'uploads')
+    }
+    $result.StorageFiles = $storageStats.Count; $result.StorageBytes = $storageStats.Bytes
+    $result.UploadFiles = $uploadStats.Count; $result.UploadBytes = $uploadStats.Bytes
+    if ($Deep -and $manifest) {
+      if ($manifest.database.sha256) {
+        $result.DumpSha256 = (Get-FileHash -LiteralPath $dump.FullName -Algorithm SHA256).Hash
+        if ($result.DumpSha256 -ne [string]$manifest.database.sha256) { throw 'dump 文件校验值与清单不一致' }
+      }
+      if ($manifest.storage) {
+        if ([int]$manifest.storage.files -ne $result.StorageFiles -or [int64]$manifest.storage.bytes -ne $result.StorageBytes) { throw 'storage 文件统计与清单不一致' }
+      }
+      if ($manifest.uploads) {
+        if ([int]$manifest.uploads.files -ne $result.UploadFiles -or [int64]$manifest.uploads.bytes -ne $result.UploadBytes) { throw 'uploads 文件统计与清单不一致' }
+      }
+    }
+    $result.Valid = $true
+  } catch { $result.Error = $_.Exception.Message }
+  return [PSCustomObject]$result
+}
+
+function Copy-BBBackupSetAtomic {
+  param([string]$Source, [string]$DestinationRoot)
+  $sourceInfo = Get-BBBackupSetInfo -Path $Source -Deep
+  if (-not $sourceInfo.Valid) { throw "本地备份集校验失败：$($sourceInfo.Error)" }
+  New-Item -ItemType Directory -Path $DestinationRoot -Force | Out-Null
+  $setName = (Get-Item -LiteralPath $Source).Name
+  $finalPath = Join-Path $DestinationRoot $setName
+  if (Test-Path -LiteralPath $finalPath) {
+    $existingInfo = Get-BBBackupSetInfo -Path $finalPath -Deep
+    if ($existingInfo.Valid -and $existingInfo.DumpBytes -eq $sourceInfo.DumpBytes -and $existingInfo.DumpSha256 -eq $sourceInfo.DumpSha256) {
+      return [PSCustomObject]@{ Path = $finalPath; AlreadyExists = $true }
+    }
+    throw "远程目录已存在同名但内容不一致的备份集：$finalPath"
+  }
+  $pending = Join-Path $DestinationRoot ('.pending-' + $setName + '-' + [guid]::NewGuid().ToString('N'))
+  try {
+    Invoke-BBRobocopy -Source $Source -Destination $pending -Mirror
+    $remoteInfo = Get-BBBackupSetInfo -Path $pending -Deep
+    if (-not $remoteInfo.Valid) { throw "远程备份集校验失败：$($remoteInfo.Error)" }
+    if ($remoteInfo.DumpBytes -ne $sourceInfo.DumpBytes -or $remoteInfo.DumpSha256 -ne $sourceInfo.DumpSha256) { throw '远程 dump 与本地备份不一致' }
+    [IO.Directory]::Move($pending, $finalPath)
+    return [PSCustomObject]@{ Path = $finalPath; AlreadyExists = $false }
+  } catch {
+    Remove-Item -LiteralPath $pending -Recurse -Force -ErrorAction SilentlyContinue
+    throw
+  }
+}
+
 function Invoke-BBRobocopy {
   param([string]$Source, [string]$Destination, [switch]$Mirror)
   New-Item -ItemType Directory -Path $Destination -Force | Out-Null
   if (-not (Test-Path -LiteralPath $Source)) { return }
   $mode = if ($Mirror) { '/MIR' } else { '/E' }
-  & robocopy $Source $Destination $mode /R:1 /W:1 /NFL /NDL /NJH /NJS | Out-Null
+  $copyOutput = @(& robocopy $Source $Destination $mode /R:1 /W:1 /NFL /NDL /NJH /NJS)
   $code = $LASTEXITCODE
-  if ($code -ge 8) { throw "复制目录失败：$Source -> $Destination（robocopy 退出码 $code）" }
+  if ($code -ge 8) {
+    $detail = (($copyOutput | Where-Object { $_ } | Select-Object -Last 5) -join ' ').Trim()
+    throw "复制目录失败：$Source -> $Destination（robocopy 退出码 $code）$(if ($detail) { '：' + $detail } else { '' })"
+  }
   $global:LASTEXITCODE = 0
 }
 

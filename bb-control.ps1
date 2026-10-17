@@ -114,6 +114,18 @@ $statusPill.ForeColor = $C_GREEN
 $statusPill.Text = '● 正在检测服务状态…'
 $statusBar.Controls.Add($statusPill)
 
+$btnSettings = New-Object Windows.Forms.Button
+$btnSettings.Text = '⚙ 设置'
+$btnSettings.Dock = 'Right'
+$btnSettings.Width = 76
+$btnSettings.FlatStyle = 'Flat'
+$btnSettings.FlatAppearance.BorderSize = 0
+$btnSettings.BackColor = $C_CARD
+$btnSettings.ForeColor = $C_PRIMARY
+$btnSettings.Cursor = 'Hand'
+$statusBar.Controls.Add($btnSettings)
+$btnSettings.BringToFront()
+
 $btnOpenLog = New-Object Windows.Forms.Button
 $btnOpenLog.Text = '打开日志'
 $btnOpenLog.Dock = 'Right'
@@ -253,13 +265,17 @@ function Set-BBButtonEnabled($Button, [bool]$Enabled) {
 
 function Test-BBHasBackupSet {
   $root = Get-BBBackupRoot $AppRoot
-  return [bool](Get-ChildItem -LiteralPath $root -Directory -ErrorAction SilentlyContinue |
+  $hasLocal = [bool](Get-ChildItem -LiteralPath $root -Directory -ErrorAction SilentlyContinue |
     Where-Object { -not $_.Name.StartsWith('.') -and (Get-ChildItem -LiteralPath $_.FullName -Filter 'bb_miping-*.dump' -File -ErrorAction SilentlyContinue | Select-Object -First 1) } |
     Select-Object -First 1)
+  if ($hasLocal) { return $true }
+  $latest = Get-BBConfig -AppRoot $AppRoot
+  return [bool]($latest -and $latest.remoteBackup -and $latest.remoteBackup.enabled -and $latest.remoteBackup.path)
 }
 
 function Set-ControlState([string]$State) {
-  $busy = $State -in @('starting', 'stopping', 'backingup', 'restoring')
+  $busy = $State -in @('starting', 'stopping', 'backingup', 'remoteupload', 'restoring')
+  $btnSettings.Enabled = -not $busy
   if ($busy) {
     foreach ($button in @($btnStart, $btnStop, $btnOpen, $btnBackup, $btnRestore)) { Set-BBButtonEnabled $button $false }
     return
@@ -292,16 +308,96 @@ function Format-BBSize([int64]$Bytes) {
   return "$Bytes B"
 }
 
-function Select-BBBackupSet {
-  $root = Get-BBBackupRoot $AppRoot
-  $sets = @(Get-ChildItem -LiteralPath $root -Directory -ErrorAction SilentlyContinue |
-    Where-Object { -not $_.Name.StartsWith('.') } | Sort-Object Name -Descending)
-  if (-not $sets.Count) { Write-Log ('未找到任何备份集：' + $root) $C_RED; return $null }
+function Test-BBRemoteWriteAccess([string]$Path) {
+  if (-not (Test-BBUncPath $Path)) { throw '请输入完整的 NAS UNC 路径，例如 \\\\192.168.43.68\\信息安全\\个人文件夹\\BMPBGS备份。' }
+  New-Item -ItemType Directory -Path $Path -Force | Out-Null
+  $probe = Join-Path $Path ('.bmpbgs-write-test-' + [guid]::NewGuid().ToString('N') + '.tmp')
+  try {
+    [IO.File]::WriteAllText($probe, 'BMPBGS NAS write test', [Text.UTF8Encoding]::new($false))
+    if (-not (Test-Path -LiteralPath $probe)) { throw '写入测试文件失败' }
+  } finally { Remove-Item -LiteralPath $probe -Force -ErrorAction SilentlyContinue }
+  return $true
+}
 
+function Show-BBRemoteBackupSettings {
+  $currentConfig = Get-BBConfig -AppRoot $AppRoot
+  $current = if ($currentConfig -and $currentConfig.remoteBackup) { $currentConfig.remoteBackup } else { $null }
+  $dialog = New-Object Windows.Forms.Form
+  $dialog.Text = '远程备份设置'
+  $dialog.Size = New-Object Drawing.Size(720, 360)
+  $dialog.MinimumSize = New-Object Drawing.Size(650, 340)
+  $dialog.StartPosition = 'CenterParent'; $dialog.ShowIcon = $false; $dialog.MaximizeBox = $false; $dialog.Font = $form.Font
+
+  $enabled = New-Object Windows.Forms.CheckBox
+  $enabled.Text = '启用 NAS 远程备份（每次本地备份成功后自动上传）'
+  $enabled.Location = New-Object Drawing.Point(24, 22); $enabled.AutoSize = $true; $enabled.Checked = [bool]($current -and $current.enabled)
+  $dialog.Controls.Add($enabled)
+
+  $pathLabel = New-Object Windows.Forms.Label
+  $pathLabel.Text = 'NAS 备份目录'; $pathLabel.Location = New-Object Drawing.Point(24, 62); $pathLabel.AutoSize = $true
+  $dialog.Controls.Add($pathLabel)
+  $pathBox = New-Object Windows.Forms.TextBox
+  $pathBox.Location = New-Object Drawing.Point(24, 86); $pathBox.Size = New-Object Drawing.Size(530, 28)
+  $pathBox.Anchor = 'Top,Left,Right'; $pathBox.Text = if ($current -and $current.path) { [string]$current.path } else { '' }
+  $dialog.Controls.Add($pathBox)
+  $browse = New-Object Windows.Forms.Button
+  $browse.Text = '浏览…'; $browse.Location = New-Object Drawing.Point(568, 83); $browse.Size = New-Object Drawing.Size(105, 32); $browse.Anchor = 'Top,Right'
+  $dialog.Controls.Add($browse)
+
+  $help = New-Object Windows.Forms.Label
+  $help.Location = New-Object Drawing.Point(24, 124); $help.Size = New-Object Drawing.Size(650, 48); $help.Anchor = 'Top,Left,Right'
+  $help.ForeColor = $C_SUBTEXT
+  $help.Text = '请选择你自己的最终备份文件夹。BMPBGS 不保存 NAS 密码，直接使用 Windows 已记住的网络凭据。'
+  $dialog.Controls.Add($help)
+
+  $status = New-Object Windows.Forms.Label
+  $status.Location = New-Object Drawing.Point(24, 175); $status.Size = New-Object Drawing.Size(650, 42); $status.Anchor = 'Top,Left,Right'
+  $status.Text = if ($current -and $current.lastStatus) { '最近结果：' + [string]$current.lastMessage } else { '尚未执行远程备份。' }
+  $status.ForeColor = $C_SUBTEXT; $dialog.Controls.Add($status)
+
+  $test = New-Object Windows.Forms.Button; $test.Text = '检测连接'; $test.Location = New-Object Drawing.Point(24, 225); $test.Size = New-Object Drawing.Size(110, 34)
+  $login = New-Object Windows.Forms.Button; $login.Text = '打开 NAS 并登录'; $login.Location = New-Object Drawing.Point(144, 225); $login.Size = New-Object Drawing.Size(145, 34)
+  $open = New-Object Windows.Forms.Button; $open.Text = '打开备份目录'; $open.Location = New-Object Drawing.Point(299, 225); $open.Size = New-Object Drawing.Size(130, 34)
+  $dialog.Controls.Add($test); $dialog.Controls.Add($login); $dialog.Controls.Add($open)
+
+  $save = New-Object Windows.Forms.Button; $save.Text = '保存'; $save.Location = New-Object Drawing.Point(482, 274); $save.Size = New-Object Drawing.Size(92, 36); $save.Anchor = 'Bottom,Right'
+  $cancel = New-Object Windows.Forms.Button; $cancel.Text = '取消'; $cancel.Location = New-Object Drawing.Point(582, 274); $cancel.Size = New-Object Drawing.Size(92, 36); $cancel.Anchor = 'Bottom,Right'; $cancel.DialogResult = [Windows.Forms.DialogResult]::Cancel
+  $dialog.Controls.Add($save); $dialog.Controls.Add($cancel); $dialog.CancelButton = $cancel
+
+  $browse.Add_Click({
+    $picker = New-Object Windows.Forms.FolderBrowserDialog
+    $picker.Description = '选择 NAS 远程备份目录'; $picker.ShowNewFolderButton = $true
+    if ($pathBox.Text -and (Test-Path -LiteralPath $pathBox.Text -ErrorAction SilentlyContinue)) { $picker.SelectedPath = $pathBox.Text }
+    if ($picker.ShowDialog($dialog) -eq [Windows.Forms.DialogResult]::OK) { $pathBox.Text = $picker.SelectedPath }
+  })
+  $login.Add_Click({ if ($pathBox.Text.Trim()) { Start-Process explorer.exe -ArgumentList ('"' + $pathBox.Text.Trim() + '"') } else { [void][Windows.Forms.MessageBox]::Show('请先输入 NAS 路径。', '远程备份') } })
+  $open.Add_Click({ if ($pathBox.Text.Trim()) { Start-Process explorer.exe -ArgumentList ('"' + $pathBox.Text.Trim() + '"') } })
+  $test.Add_Click({
+    $dialog.UseWaitCursor = $true
+    try { [void](Test-BBRemoteWriteAccess $pathBox.Text.Trim()); $status.Text = '连接成功：目录可读写。'; $status.ForeColor = $C_GREEN }
+    catch {
+      $message = $_.Exception.Message
+      if ($message -match '1219|multiple connections|多个连接') { $message += '。Windows 已用另一套账号连接同一 NAS，请先在资源管理器中处理该连接。' }
+      $status.Text = '连接失败：' + $message; $status.ForeColor = $C_RED
+    }
+    finally { $dialog.UseWaitCursor = $false }
+  })
+  $save.Add_Click({
+    $path = $pathBox.Text.Trim().TrimEnd('\')
+    if ($enabled.Checked -and -not (Test-BBUncPath $path)) { [void][Windows.Forms.MessageBox]::Show('启用远程备份时必须填写有效的 NAS UNC 路径。', '无法保存', 'OK', 'Warning'); return }
+    $remote = [ordered]@{ enabled = $enabled.Checked; path = $path }
+    if ($current) { foreach ($property in $current.PSObject.Properties) { if (-not $remote.Contains($property.Name)) { $remote[$property.Name] = $property.Value } } }
+    Set-BBConfig -AppRoot $AppRoot -Config ([PSCustomObject]@{ remoteBackup = [PSCustomObject]$remote })
+    $dialog.DialogResult = [Windows.Forms.DialogResult]::OK; $dialog.Close()
+  })
+  [void]$dialog.ShowDialog($form)
+}
+
+function Select-BBBackupSet {
   $dialog = New-Object Windows.Forms.Form
   $dialog.Text = '选择要恢复的备份集'
-  $dialog.Size = New-Object Drawing.Size(760, 460)
-  $dialog.MinimumSize = New-Object Drawing.Size(680, 400)
+  $dialog.Size = New-Object Drawing.Size(790, 500)
+  $dialog.MinimumSize = New-Object Drawing.Size(700, 420)
   $dialog.StartPosition = 'CenterParent'
   $dialog.ShowIcon = $false
   $dialog.MaximizeBox = $true
@@ -309,44 +405,22 @@ function Select-BBBackupSet {
   $dialog.Tag = $null
 
   $tip = New-Object Windows.Forms.Label
-  $tip.Dock = 'Top'; $tip.Height = 48; $tip.Padding = New-Object Windows.Forms.Padding(14, 12, 10, 0)
-  $tip.Text = '默认选中最新备份。旧版备份可继续使用，确认后还会执行数据库归档预检。'
+  $tip.Dock = 'Top'; $tip.Height = 42; $tip.Padding = New-Object Windows.Forms.Padding(14, 10, 10, 0)
+  $tip.Text = '远程备份会先完整下载到本地并校验，通过后才停止服务并恢复。'
   $dialog.Controls.Add($tip)
+
+  $sourcePanel = New-Object Windows.Forms.Panel
+  $sourcePanel.Dock = 'Top'; $sourcePanel.Height = 48; $sourcePanel.Padding = New-Object Windows.Forms.Padding(14, 7, 10, 5)
+  $localRadio = New-Object Windows.Forms.RadioButton; $localRadio.Text = '本地备份'; $localRadio.Location = New-Object Drawing.Point(18, 13); $localRadio.AutoSize = $true; $localRadio.Checked = $true
+  $remoteRadio = New-Object Windows.Forms.RadioButton; $remoteRadio.Text = 'NAS 备份'; $remoteRadio.Location = New-Object Drawing.Point(130, 13); $remoteRadio.AutoSize = $true
+  $refresh = New-Object Windows.Forms.Button; $refresh.Text = '刷新'; $refresh.Location = New-Object Drawing.Point(590, 8); $refresh.Size = New-Object Drawing.Size(75, 32); $refresh.Anchor = 'Top,Right'
+  $openSource = New-Object Windows.Forms.Button; $openSource.Text = '打开目录'; $openSource.Location = New-Object Drawing.Point(671, 8); $openSource.Size = New-Object Drawing.Size(90, 32); $openSource.Anchor = 'Top,Right'
+  $sourcePanel.Controls.Add($localRadio); $sourcePanel.Controls.Add($remoteRadio); $sourcePanel.Controls.Add($refresh); $sourcePanel.Controls.Add($openSource)
+  $dialog.Controls.Add($sourcePanel); $sourcePanel.BringToFront()
 
   $list = New-Object Windows.Forms.ListView
   $list.Dock = 'Fill'; $list.View = 'Details'; $list.FullRowSelect = $true; $list.GridLines = $true; $list.HideSelection = $false
   [void]$list.Columns.Add('备份集', 150); [void]$list.Columns.Add('备份时间', 145); [void]$list.Columns.Add('数据库', 95); [void]$list.Columns.Add('附件', 95); [void]$list.Columns.Add('状态', 225)
-  $defaultItem = $null
-  foreach ($set in $sets) {
-    $dump = Get-ChildItem -LiteralPath $set.FullName -Filter 'bb_miping-*.dump' -File -ErrorAction SilentlyContinue | Select-Object -First 1
-    $manifestPath = Join-Path $set.FullName 'backup-manifest.json'
-    $attachmentBytes = 0L
-    $createdAt = $set.LastWriteTime
-    $status = if ($dump) { '旧版备份；确认后执行完整性预检' } else { '不可用：缺少数据库 dump' }
-    if (Test-Path -LiteralPath $manifestPath) {
-      try {
-        $manifest = Get-Content -LiteralPath $manifestPath -Raw -Encoding UTF8 | ConvertFrom-Json
-        if ($manifest.createdAt) { $createdAt = [datetime]$manifest.createdAt }
-        if ($manifest.database.dumpFile) {
-          $expectedDump = Join-Path $set.FullName ([string]$manifest.database.dumpFile)
-          $dump = if (Test-Path -LiteralPath $expectedDump) { Get-Item -LiteralPath $expectedDump } else { $null }
-        }
-        $attachmentBytes = [int64]$manifest.storage.bytes + [int64]$manifest.uploads.bytes
-        $status = if ($dump) { '完整备份' } else { '不可用：清单中的 dump 缺失' }
-      } catch { $status = if ($dump) { '清单异常；将按旧版备份预检' } else { '不可用：清单异常且缺少 dump' } }
-    } else {
-      $attachmentBytes = (Get-BBDirectoryStats (Join-Path $set.FullName 'storage')).Bytes + (Get-BBDirectoryStats (Join-Path $set.FullName 'uploads')).Bytes
-    }
-    $item = New-Object Windows.Forms.ListViewItem($set.Name)
-    [void]$item.SubItems.Add($createdAt.ToString('yyyy-MM-dd HH:mm:ss'))
-    [void]$item.SubItems.Add($(if ($dump) { Format-BBSize $dump.Length } else { '—' }))
-    [void]$item.SubItems.Add((Format-BBSize $attachmentBytes))
-    [void]$item.SubItems.Add($status)
-    $item.Tag = [PSCustomObject]@{ Path = $set.FullName; Valid = [bool]$dump }
-    if (-not $dump) { $item.ForeColor = $C_RED }
-    [void]$list.Items.Add($item)
-    if (-not $defaultItem -and $dump) { $defaultItem = $item }
-  }
   $dialog.Controls.Add($list); $list.BringToFront()
 
   $actions = New-Object Windows.Forms.FlowLayoutPanel
@@ -358,7 +432,48 @@ function Select-BBBackupSet {
   $cancel.Add_Click({ $dialog.Close() })
   $ok.Add_Click({ if ($list.SelectedItems.Count -eq 1 -and $list.SelectedItems[0].Tag.Valid) { $dialog.Tag = $list.SelectedItems[0].Tag.Path; $dialog.Close() } })
   $list.Add_DoubleClick({ if ($ok.Enabled) { $ok.PerformClick() } })
-  if ($defaultItem) { $defaultItem.Selected = $true; $defaultItem.Focused = $true; $defaultItem.EnsureVisible() }
+
+  $getSelectedRoot = {
+    if ($remoteRadio.Checked) {
+      $latest = Get-BBConfig -AppRoot $AppRoot
+      if ($latest -and $latest.remoteBackup -and $latest.remoteBackup.path) { return ([string]$latest.remoteBackup.path).Trim().TrimEnd('\') }
+      return ''
+    }
+    return Get-BBBackupRoot $AppRoot
+  }
+  $loadSets = {
+    $list.Items.Clear(); $ok.Enabled = $false
+    $root = & $getSelectedRoot
+    if (-not $root) { [void][Windows.Forms.MessageBox]::Show('尚未配置 NAS 备份目录，请先在控制台设置中完成配置。', '未配置远程备份'); return }
+    $dialog.UseWaitCursor = $true
+    try {
+      $sets = @(Get-ChildItem -LiteralPath $root -Directory -ErrorAction Stop | Where-Object { -not $_.Name.StartsWith('.') } | Sort-Object Name -Descending)
+      $defaultItem = $null
+      foreach ($set in $sets) {
+        $info = Get-BBBackupSetInfo -Path $set.FullName
+        $item = New-Object Windows.Forms.ListViewItem($set.Name)
+        [void]$item.SubItems.Add($(if ($info.CreatedAt) { ([datetime]$info.CreatedAt).ToString('yyyy-MM-dd HH:mm:ss') } else { '—' }))
+        [void]$item.SubItems.Add($(if ($info.DumpBytes -gt 0) { Format-BBSize $info.DumpBytes } else { '—' }))
+        [void]$item.SubItems.Add((Format-BBSize ([int64]$info.StorageBytes + [int64]$info.UploadBytes)))
+        $stateText = if ($info.Valid) { if ($info.Legacy) { '旧版备份；恢复前将预检' } else { '完整备份' } } else { '不可用：' + $info.Error }
+        [void]$item.SubItems.Add($stateText)
+        $item.Tag = [PSCustomObject]@{ Path = $set.FullName; Valid = [bool]$info.Valid }
+        if (-not $info.Valid) { $item.ForeColor = $C_RED }
+        [void]$list.Items.Add($item)
+        if (-not $defaultItem -and $info.Valid) { $defaultItem = $item }
+      }
+      if ($defaultItem) { $defaultItem.Selected = $true; $defaultItem.Focused = $true; $defaultItem.EnsureVisible() }
+      if (-not $sets.Count) { $tip.Text = '当前目录没有可用备份：' + $root }
+    } catch {
+      $tip.Text = '无法读取备份目录：' + $_.Exception.Message
+      [void][Windows.Forms.MessageBox]::Show(($tip.Text + [Environment]::NewLine + '可点击“打开目录”由 Windows 完成 NAS 登录后重试。'), '读取备份失败', 'OK', 'Warning')
+    } finally { $dialog.UseWaitCursor = $false }
+  }
+  $localRadio.Add_CheckedChanged({ if ($localRadio.Checked) { & $loadSets } })
+  $remoteRadio.Add_CheckedChanged({ if ($remoteRadio.Checked) { & $loadSets } })
+  $refresh.Add_Click({ & $loadSets })
+  $openSource.Add_Click({ $root = & $getSelectedRoot; if ($root) { Start-Process explorer.exe -ArgumentList ('"' + $root + '"') } })
+  & $loadSets
   [void]$dialog.ShowDialog($form)
   return [string]$dialog.Tag
 }
@@ -375,7 +490,9 @@ function Read-ControlTaskOutput {
     $lines = @(Get-Content -LiteralPath $path -ErrorAction SilentlyContinue)
     $offset = [int]$script:activeTask.($stream.Offset)
     if ($lines.Count -gt $offset) {
-      for ($i = $offset; $i -lt $lines.Count; $i++) { if ($lines[$i]) { Write-Log ([string]$lines[$i]) $stream.Color } }
+      for ($i = $offset; $i -lt $lines.Count; $i++) {
+        if ($lines[$i] -and $lines[$i] -notmatch '^BB_(LOCAL_BACKUP_SET|REMOTE_BACKUP_FAILED)=') { Write-Log ([string]$lines[$i]) $stream.Color }
+      }
       $script:activeTask.($stream.Offset) = $lines.Count
     }
   }
@@ -395,6 +512,7 @@ function Start-ControlTask([string]$Kind, [string]$ScriptName, [string[]]$Extra)
       'starting' { '● 正在启动系统…' }
       'stopping' { '● 正在停止系统…' }
       'backingup' { '● 正在备份数据…' }
+      'remoteupload' { '● 正在重试 NAS 上传…' }
       'restoring' { '● 正在恢复数据…' }
       default { '● 正在执行维护任务…' }
     }
@@ -414,13 +532,31 @@ function Update-ControlTask {
   $process.WaitForExit(); Read-ControlTaskOutput
   $kind = $script:activeTask.Kind
   $code = $process.ExitCode
+  $taskOutput = if (Test-Path -LiteralPath $script:activeTask.OutPath) { Get-Content -LiteralPath $script:activeTask.OutPath -ErrorAction SilentlyContinue } else { @() }
+  $localSetMarker = $taskOutput | Where-Object { $_ -match '^BB_LOCAL_BACKUP_SET=(.+)$' } | Select-Object -Last 1
+  $localSet = if ($localSetMarker -and $localSetMarker -match '^BB_LOCAL_BACKUP_SET=(.+)$') { $Matches[1] } else { '' }
   $script:activeTask = $null
   if ($code -eq 0) {
     switch ($kind) {
       'starting' { $script:launchStartedAt = Get-Date; Write-Log '启动脚本执行完成，正在确认服务健康状态。' $C_GREEN }
       'stopping' { $script:restoreAwaitingStart = $false; Write-Log '系统已停止。' $C_GREEN; Set-ControlState 'stopped' }
-      'backingup' { Write-Log '备份成功完成。' $C_GREEN }
+      'backingup' {
+        Write-Log '备份成功完成。' $C_GREEN
+        if ($script:offerRemoteSetupAfterBackup) {
+          $script:offerRemoteSetupAfterBackup = $false
+          $answer = [Windows.Forms.MessageBox]::Show('本地备份已完成。是否现在配置 NAS 远程备份？', '配置远程备份', 'YesNo', 'Question')
+          if ($answer -eq [Windows.Forms.DialogResult]::Yes) { Show-BBRemoteBackupSettings }
+        }
+      }
+      'remoteupload' { Write-Log 'NAS 备份重试成功。' $C_GREEN }
       'restoring' { $script:restoreAwaitingStart = $true; Write-Log '恢复成功完成；请点击“启动系统”。' $C_GREEN; Set-ControlState 'restore-ready' }
+    }
+  } elseif ($code -eq 2 -and $kind -eq 'backingup') {
+    Write-Log ("本地备份已成功，但 NAS 备份失败。详细日志：$controlLogDir") $C_RED
+    Set-ControlState 'running'
+    if ($localSet) {
+      $retry = [Windows.Forms.MessageBox]::Show('本地备份已保留，NAS 上传失败。是否现在重试远程上传？', '远程备份失败', 'YesNo', 'Warning')
+      if ($retry -eq [Windows.Forms.DialogResult]::Yes) { Start-ControlTask 'remoteupload' 'bb-backup.ps1' @('-RemoteOnly', '-BackupSet', $localSet, '-Silent') }
     }
   } else {
     Write-Log ("任务执行失败：$kind，退出码 $code。日志：$controlLogDir") $C_RED
@@ -432,6 +568,7 @@ function Update-ControlTask {
 
 $btnLogBottom.Add_Click({ $logBox.SelectionStart = $logBox.TextLength; $logBox.SelectionLength = 0; $logBox.ScrollToCaret(); $logBox.Focus() })
 $btnOpenLog.Add_Click({ if (-not (Test-Path -LiteralPath $controlLogDir)) { New-Item -ItemType Directory -Path $controlLogDir -Force | Out-Null }; Start-Process explorer.exe -ArgumentList ('"' + $controlLogDir + '"') })
+$btnSettings.Add_Click({ if (-not $script:activeTask) { Show-BBRemoteBackupSettings } })
 
 $btnStart.Add_Click({
   $script:restoreAwaitingStart = $false
@@ -451,6 +588,8 @@ $btnStop.Add_Click({
   Start-ControlTask 'stopping' 'bb-stop.ps1' @('-Silent')
 })
 $btnBackup.Add_Click({
+  $latestConfig = Get-BBConfig -AppRoot $AppRoot
+  $script:offerRemoteSetupAfterBackup = -not ($latestConfig -and $latestConfig.remoteBackup)
   Write-Log '正在备份数据（数据库 + storage/uploads）…' ([System.Drawing.Color]::FromArgb(240, 150, 30))
   Start-ControlTask 'backingup' 'bb-backup.ps1' @('-Silent')
 })
