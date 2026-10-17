@@ -170,6 +170,22 @@ $logBox.ScrollBars = 'Both'
 $logBox.DetectUrls = $false
 $logHost.Controls.Add($logBox)
 
+# 把日志视图推到真正的最底部。仅靠 ScrollToCaret 在"末行刚追加、布局/滚动条状态
+# 刚变化"时会少滚约半行到一行（6877312 改为 BeginInvoke 后仍偶发），因此在其后
+# 再补一发 WM_VSCROLL / SB_BOTTOM，把垂直滚动位置压到滚动范围的最大值，保证
+# 最后一行完整可见。
+function Push-LogToBottom {
+  try {
+    $logBox.SelectionStart = $logBox.TextLength
+    $logBox.SelectionLength = 0
+    $logBox.ScrollToCaret()
+    if ($logBox.IsHandleCreated -and ('Native.Win' -as [type])) {
+      # WM_VSCROLL(0x0115) 的 SB_BOTTOM(7)：滚动到垂直滚动范围最底
+      [void][Native.Win]::SendMessage($logBox.Handle, 0x0115, [IntPtr]7, [IntPtr]::Zero)
+    }
+  } catch { }
+}
+
 function Write-Log([string]$msg, [System.Drawing.Color]$color) {
   $followTail = $true
   $firstVisible = 0
@@ -188,11 +204,7 @@ function Write-Log([string]$msg, [System.Drawing.Color]$color) {
   $logBox.AppendText($msg + "`r`n")
   $logBox.SelectionColor = $logBox.ForeColor
   if ($followTail) {
-    $scrollToEnd = [Action]{
-      $logBox.SelectionStart = $logBox.TextLength
-      $logBox.SelectionLength = 0
-      $logBox.ScrollToCaret()
-    }
+    $scrollToEnd = [Action]{ Push-LogToBottom }
     if ($logBox.IsHandleCreated) {
       # 同步 ScrollToCaret 在文本刚追加、布局未重算完成时会少滚一行，
       # 必须投递到消息队列等布局结束后再执行
@@ -598,7 +610,7 @@ function Update-ControlTask {
   return $false
 }
 
-$btnLogBottom.Add_Click({ $logBox.SelectionStart = $logBox.TextLength; $logBox.SelectionLength = 0; $logBox.ScrollToCaret(); $logBox.Focus() })
+$btnLogBottom.Add_Click({ Push-LogToBottom; $logBox.Focus() })
 $btnOpenLog.Add_Click({ if (-not (Test-Path -LiteralPath $controlLogDir)) { New-Item -ItemType Directory -Path $controlLogDir -Force | Out-Null }; Start-Process explorer.exe -ArgumentList ('"' + $controlLogDir + '"') })
 $btnSettings.Add_Click({ if (-not $script:activeTask) { Show-BBRemoteBackupSettings } })
 
