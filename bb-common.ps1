@@ -118,8 +118,12 @@ function Get-BBTargetInstanceDataDir {
   if (-not $Psql -or -not (Test-Path -LiteralPath $Psql)) { return $null }
   $actual = ''
   try {
-    $actual = (& $Psql -h 127.0.0.1 -p $PgPort -U $DbUser -d postgres -tAc "SHOW data_directory" 2>$null |
-               Select-Object -First 1)
+    # 先收集全部输出再取第一行：native 命令直接 "| Select-Object -First 1" 时，
+    # PowerShell 收到第一行即停止上游管道，把尚未退出的进程杀掉，$LASTEXITCODE
+    # 被污染为 -1（.NET Kill 退出码）；本函数不检查退出码所以长期无症状，
+    # 但污染值会残留给调用方（恢复脚本 Ensure-BBAppRole 随后断言退出码即误炸）。
+    $lines = @(& $Psql -h 127.0.0.1 -p $PgPort -U $DbUser -d postgres -tAc "SHOW data_directory" 2>$null)
+    $actual = if ($lines.Count -gt 0) { $lines[0] } else { $null }
   } catch { return $null }
   $actualText = [string]$actual
   if ([string]::IsNullOrWhiteSpace($actualText)) { return $null }
@@ -441,8 +445,12 @@ function Ensure-BBAppRole {
   $psql = Join-Path $Paths.PgRoot 'bin\psql.exe'
   $env:PGPASSWORD = $PgPassword
   try {
-    $exists = (& $psql -h 127.0.0.1 -p $Paths.PgPort -U $SuperUser -d postgres -tAc "SELECT 1 FROM pg_roles WHERE rolname='$AppUser'" 2>$null | Select-Object -First 1)
+    # 同 Get-BBTargetInstanceDataDir：禁用 native 命令直连 Select-Object -First 1。
+    # 2026-10-17 恢复实测：该管道模式下 psql 多数次被提前杀掉，$LASTEXITCODE = -1，
+    # 下面的断言必误炸（"检查应用数据库角色 失败，退出码：-1"）。
+    $roleLines = @(& $psql -h 127.0.0.1 -p $Paths.PgPort -U $SuperUser -d postgres -tAc "SELECT 1 FROM pg_roles WHERE rolname='$AppUser'" 2>$null)
     Assert-BBNativeSuccess '检查应用数据库角色'
+    $exists = if ($roleLines.Count -gt 0) { $roleLines[0] } else { $null }
     if (([string]$exists).Trim() -ne '1') {
       $safePassword = $AppPassword.Replace("'", "''")
       & $psql -h 127.0.0.1 -p $Paths.PgPort -U $SuperUser -d postgres -v ON_ERROR_STOP=1 -c "CREATE ROLE $AppUser LOGIN PASSWORD '$safePassword'"
