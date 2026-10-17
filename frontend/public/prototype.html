@@ -8693,7 +8693,8 @@
       forms(oldEnd, '{测评结束日期}').forEach(value => { if (value) text = text.split(value).join(endReplacement); });
       el.value = text;
     });
-    if (bbProject) { bbProject.start_date = newStart || null; bbProject.end_date = newEnd || null; }
+    const workspace = window.bbGetProjectWorkspace?.();
+    if (workspace) { workspace.start_date = newStart || null; workspace.end_date = newEnd || null; }
     if (currentImplementProject) { currentImplementProject.startDate = newStart || ''; currentImplementProject.endDate = newEnd || ''; }
   }
 
