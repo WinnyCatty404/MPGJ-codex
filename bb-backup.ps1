@@ -144,10 +144,16 @@ if ($RemoteOnly) {
       if ($LASTEXITCODE -ne 0) { $restartError = "备份数据已处理，但 Web/API 自动恢复失败，退出码：$LASTEXITCODE" }
     }
   }
-  if ($restartError) { Write-Error $restartError; exit 1 }
+  # 此处不能因"服务未自动恢复"就退出：本地备份已成功，提前退出会跳过 NAS 上传，
+  # 且控制台收不到 BB_LOCAL_BACKUP_SET 与成功标记，会把成功的备份显示成失败
+  # （2026-10-17：本轮加固引入的"假失败"回归）。警告与退出码延后到统一出口处理。
 }
 
 Write-Host "BB_LOCAL_BACKUP_SET=$setDir"
+if ($restartError) {
+  Write-Host "警告：$restartError"
+  Write-Host 'BB_BACKUP_RESTART_FAILED'
+}
 $latestConfig = Get-BBConfig -AppRoot $AppRoot
 $remoteEnabled = [bool]($latestConfig -and $latestConfig.remoteBackup -and $latestConfig.remoteBackup.enabled)
 if ($RemoteOnly -and -not $remoteEnabled) { Write-Error '远程备份尚未启用。'; if (-not $Silent) { Read-Host '按回车退出' }; exit 1 }
@@ -166,6 +172,12 @@ if ($remoteEnabled) {
     if (-not $Silent) { Read-Host '按回车退出' }
     exit 2
   }
+}
+if ($restartError) {
+  # 3 = 本地备份（含 NAS，如已启用）已完成，仅 Web/API 未自动恢复运行
+  Write-Host '请在控制台点击“启动系统”手动恢复 Web/API。'
+  if (-not $Silent) { Read-Host '按回车退出' }
+  exit 3
 }
 # 控制台据此判定任务成功（进程退出码在某些环境下读不到，不能单独依赖）
 Write-Host 'BB_TASK_OK=backingup'

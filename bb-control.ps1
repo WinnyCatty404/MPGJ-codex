@@ -502,7 +502,7 @@ function Read-ControlTaskOutput {
     $offset = [int]$script:activeTask.($stream.Offset)
     if ($lines.Count -gt $offset) {
       for ($i = $offset; $i -lt $lines.Count; $i++) {
-        if ($lines[$i] -and $lines[$i] -notmatch '^BB_(LOCAL_BACKUP_SET|REMOTE_BACKUP_FAILED|TASK_OK)=') { Write-Log ([string]$lines[$i]) $stream.Color }
+        if ($lines[$i] -and $lines[$i] -notmatch '^BB_(LOCAL_BACKUP_SET|REMOTE_BACKUP_FAILED|BACKUP_RESTART_FAILED|TASK_OK)') { Write-Log ([string]$lines[$i]) $stream.Color }
       }
       $script:activeTask.($stream.Offset) = $lines.Count
     }
@@ -553,7 +553,17 @@ function Update-ControlTask {
   # 恢复在角色检查失败回退退出，控制台却因嵌套的 BB_TASK_OK=stopping 显示"恢复成功完成"）。
   $taskOk = [bool]($taskOutput | Where-Object { $_ -match "^BB_TASK_OK=$kind\s*$" })
   $codeReadable = ($null -ne $code -and "$code".Trim() -ne '')
+  # 备份数据已落盘（本地与 NAS 均已完成），只是备份后没能把 Web/API 自动拉起：
+  # 这不是失败，不能红字报"任务执行失败"，也不能显示成"备份成功完成"让用户察觉不到系统已停。
+  $restartFailed = [bool]($taskOutput | Where-Object { $_ -match '^BB_BACKUP_RESTART_FAILED' })
+  # NAS 上传失败更严重（可重试上传），优先走退出码 2 的分支，不在此处吞掉
+  $remoteFailed = [bool]($taskOutput | Where-Object { $_ -match '^BB_REMOTE_BACKUP_FAILED=' })
   $script:activeTask = $null
+  if ($restartFailed -and -not $remoteFailed -and $kind -eq 'backingup') {
+    Write-Log '备份已完成，但 Web/API 未能自动启动。请点击“启动系统”手动恢复。' ([System.Drawing.Color]::FromArgb(240, 150, 30))
+    Set-ControlState 'stopped'
+    return $false
+  }
   if ($taskOk -and (-not $codeReadable -or $code -eq 0)) {
     switch ($kind) {
       'starting' { $script:launchStartedAt = Get-Date; Write-Log '启动脚本执行完成，正在确认服务健康状态。' $C_GREEN }

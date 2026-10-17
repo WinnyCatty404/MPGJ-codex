@@ -35,6 +35,8 @@ Assert-True ($backup -match '正在暂停 Web/API' -and $backup -match 'formatVe
 Assert-True ($stop -match 'Test-BBAppProcess' -and $stop -match '拒绝强制结束') '停止脚本未校验进程归属'
 Assert-True ($control -match 'function Select-BBBackupSet' -and $control -match '使用所选备份') '控制台缺少备份集选择'
 Assert-True ($control -match '\$taskOk -and \(-not \$codeReadable -or \$code -eq 0\)') '控制台未强制要求当前任务成功标记'
+Assert-True ($backup -match 'BB_BACKUP_RESTART_FAILED' -and $backup -notmatch '\$restartError\]\s*\{\s*Write-Error') '备份未标记"服务未自动恢复"，或仍在成功落盘前提前退出'
+Assert-True ($control -match 'BB_BACKUP_RESTART_FAILED' -and $control -match 'Web/API 未能自动启动') '控制台未区分"备份成功但服务未自动启动"'
 Assert-True ($control -notmatch '\$form\.Topmost\s*=\s*\$true' -and $control -notmatch '\$btnExit') '控制台仍然置顶或保留退出按钮'
 Assert-True ($control -match '''running''[\s\S]*Set-BBButtonEnabled \$btnStart \$false') '系统运行后启动按钮没有禁用'
 Assert-True ($control -match 'Add_FormClosing' -and $control -match '不会停止 PostgreSQL') '关闭控制台语义未明确'

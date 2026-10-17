@@ -313,9 +313,12 @@ function Get-BBBackupSetInfo {
   }
   try {
     if (-not (Test-Path -LiteralPath $Path -PathType Container)) { throw "备份集不存在：$Path" }
-    $item = Get-Item -LiteralPath $Path
-    $result.Name = $item.Name
-    $result.CreatedAt = $item.LastWriteTime
+    # 这里不能用 Get-Item：Windows PowerShell 5.1 对「UNC 路径 + 以点号开头的目录名」
+    # 会抛 ItemNotFound「找不到项」，即便目录确实存在——而本项目的 NAS 上传临时目录
+    # 恰好是 .pending-<备份集>-<guid>，导致每次 NAS 上传都被误判为失败（2026-10-17）。
+    # DirectoryInfo / Path / Directory.GetLastWriteTime 在同样路径下均正常。
+    $result.Name = [IO.Path]::GetFileName(([string]$Path).TrimEnd('\'))
+    $result.CreatedAt = [IO.Directory]::GetLastWriteTime($Path)
     $manifestPath = Join-Path $Path 'backup-manifest.json'
     $manifest = $null
     if (Test-Path -LiteralPath $manifestPath) {
@@ -329,7 +332,7 @@ function Get-BBBackupSetInfo {
       $dumpPath = if ($legacyDump) { $legacyDump.FullName } else { '' }
     }
     if (-not $dumpPath -or -not (Test-Path -LiteralPath $dumpPath -PathType Leaf)) { throw '缺少数据库 dump 文件' }
-    $dump = Get-Item -LiteralPath $dumpPath
+    $dump = [IO.FileInfo]::new($dumpPath)
     $result.DumpFile = $dump.FullName
     $result.DumpBytes = [int64]$dump.Length
     if ($manifest -and $manifest.database.bytes -ne $null -and [int64]$manifest.database.bytes -ne $result.DumpBytes) { throw 'dump 文件大小与清单不一致' }
@@ -373,7 +376,7 @@ function Copy-BBBackupSetAtomic {
   $sourceInfo = Get-BBBackupSetInfo -Path $Source -Deep
   if (-not $sourceInfo.Valid) { throw "本地备份集校验失败：$($sourceInfo.Error)" }
   New-Item -ItemType Directory -Path $DestinationRoot -Force | Out-Null
-  $setName = (Get-Item -LiteralPath $Source).Name
+  $setName = [IO.Path]::GetFileName(([string]$Source).TrimEnd('\'))
   $finalPath = Join-Path $DestinationRoot $setName
   if (Test-Path -LiteralPath $finalPath) {
     $existingInfo = Get-BBBackupSetInfo -Path $finalPath -Deep
@@ -398,14 +401,27 @@ function Copy-BBBackupSetAtomic {
 
 function Invoke-BBRobocopy {
   param([string]$Source, [string]$Destination, [switch]$Mirror)
-  New-Item -ItemType Directory -Path $Destination -Force | Out-Null
+  New-Item -ItemType Directory -Path $Destination -Force -ErrorAction Stop | Out-Null
   if (-not (Test-Path -LiteralPath $Source)) { return }
   $mode = if ($Mirror) { '/MIR' } else { '/E' }
-  $copyOutput = @(& robocopy $Source $Destination $mode /R:1 /W:1 /NFL /NDL /NJH /NJS)
+  # /Z 可断点续传：NAS 常经 Wi-Fi/热点访问，链路抖动时续传比从头再来可靠；
+  # /R:3 /W:5 给瞬时错误留出重试余地（原为 /R:1 /W:1）。
+  $copyOutput = @(& robocopy $Source $Destination $mode /R:3 /W:5 /Z /NFL /NDL /NJH /NJS)
   $code = $LASTEXITCODE
+  $detail = (($copyOutput | Where-Object { $_ } | Select-Object -Last 5) -join ' ').Trim()
   if ($code -ge 8) {
-    $detail = (($copyOutput | Where-Object { $_ } | Select-Object -Last 5) -join ' ').Trim()
     throw "复制目录失败：$Source -> $Destination（robocopy 退出码 $code）$(if ($detail) { '：' + $detail } else { '' })"
+  }
+  # 退出码 0-7 只说明"没有致命错误"，并不等于真的复制成功了。目标目录缺失、
+  # 或源非空而目标为空，都必须在此判失败——否则后续校验只会抛出难以理解的
+  # "找不到项 <临时目录>"（2026-10-17 NAS 备份失败的教训）。
+  if (-not (Test-Path -LiteralPath $Destination -PathType Container)) {
+    throw "复制目标目录未生成：$Destination（NAS 可能不可写或连接已中断；robocopy 退出码 $code）$(if ($detail) { '：' + $detail } else { '' })"
+  }
+  $sourceHasFiles = [bool](Get-ChildItem -LiteralPath $Source -Recurse -File -Force -ErrorAction SilentlyContinue | Select-Object -First 1)
+  $destHasFiles = [bool](Get-ChildItem -LiteralPath $Destination -Recurse -File -Force -ErrorAction SilentlyContinue | Select-Object -First 1)
+  if ($sourceHasFiles -and -not $destHasFiles) {
+    throw "复制结束但目标为空：$Destination（robocopy 退出码 $code）$(if ($detail) { '：' + $detail } else { '' })"
   }
   $global:LASTEXITCODE = 0
 }
