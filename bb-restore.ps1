@@ -109,7 +109,18 @@ $env:PGPASSWORD = $PgPassword
 try {
   Write-Host '正在停止 Web/API，PostgreSQL 将保持或自动恢复运行...'
   & (Join-Path $AppRoot 'bb-stop.ps1') -AppRoot $AppRoot -Silent -KeepPostgres
-  Assert-BBNativeSuccess '停止 Web/API'
+  # 停止脚本内部 taskkill 的退出码会污染 $LASTEXITCODE，Assert-BBNativeSuccess 不可靠；
+  # 以端口实际释放为准（最多重试 5 秒）。
+  $apiPort = if ($config -and $config.apiPort) { [int]$config.apiPort } else { 3100 }
+  $webPort = if ($config -and $config.webPort) { [int]$config.webPort } else { 5173 }
+  $leftover = $null
+  for ($i = 0; $i -lt 5 -and -not $leftover; $i++) {
+    if ($i -gt 0) { Start-Sleep -Seconds 1 }
+    $leftover = @($apiPort, $webPort) | ForEach-Object {
+      Get-NetTCPConnection -LocalPort $_ -State Listen -ErrorAction SilentlyContinue
+    } | Select-Object -First 1
+  }
+  if ($leftover) { throw "停止 Web/API 失败：端口 $($leftover.LocalPort) 仍在监听" }
 
   Write-Host '正在准备 PostgreSQL...'
   $pgState = Start-BBPostgres -Paths $p -SuperUser $SuperUser -PgPassword $PgPassword -AllowInitialize
@@ -161,6 +172,7 @@ try {
   Remove-Item -LiteralPath $rollbackRoot -Recurse -Force -ErrorAction SilentlyContinue
   Remove-Item -LiteralPath $stageRoot -Recurse -Force -ErrorAction SilentlyContinue
   Write-Host "恢复完成：$BackupSet"
+  Write-Host 'BB_TASK_OK=restoring'
   Write-Host 'Web/API 当前保持停止，请在控制台点击“启动系统”。'
 } catch {
   $failure = $_.Exception.Message
@@ -202,3 +214,6 @@ try {
   Remove-BBRemoteRestoreStage
 }
 if (-not $Silent) { Read-Host '按回车退出' }
+# 显式以 0 退出：内部 native 命令（robocopy/pg_ctl 等）的退出码会泄漏成进程退出码，
+# 导致控制台把成功的恢复误判为失败。
+exit 0

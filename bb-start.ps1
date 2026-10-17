@@ -226,4 +226,8 @@ if (-not $apiOk -or -not $webOk) {
   if (-not $Silent) { Read-Host '启动未完成，按回车关闭窗口' }
   exit 1
 }
+# 控制台据此判定任务成功（进程退出码在某些环境下读不到，不能单独依赖）
+Write-Host 'BB_TASK_OK=starting'
 if (-not $Silent) { Read-Host '按回车关闭本窗口（工具继续在后台运行）' }
+# 显式以 0 退出：内部 native 命令的退出码会泄漏成进程退出码，导致控制台误判失败。
+exit 0

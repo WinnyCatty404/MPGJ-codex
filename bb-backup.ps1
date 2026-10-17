@@ -139,4 +139,9 @@ if ($remoteEnabled) {
     exit 2
   }
 }
+# 控制台据此判定任务成功（进程退出码在某些环境下读不到，不能单独依赖）
+Write-Host 'BB_TASK_OK=backingup'
 if (-not $Silent) { Read-Host '按回车退出' }
+# 显式以 0 退出：robocopy 用位图作退出码（1=复制了文件），会泄漏成进程退出码，
+# 导致控制台把成功的备份误判为失败。
+exit 0

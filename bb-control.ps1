@@ -492,7 +492,7 @@ function Read-ControlTaskOutput {
     $offset = [int]$script:activeTask.($stream.Offset)
     if ($lines.Count -gt $offset) {
       for ($i = $offset; $i -lt $lines.Count; $i++) {
-        if ($lines[$i] -and $lines[$i] -notmatch '^BB_(LOCAL_BACKUP_SET|REMOTE_BACKUP_FAILED)=') { Write-Log ([string]$lines[$i]) $stream.Color }
+        if ($lines[$i] -and $lines[$i] -notmatch '^BB_(LOCAL_BACKUP_SET|REMOTE_BACKUP_FAILED|TASK_OK)=') { Write-Log ([string]$lines[$i]) $stream.Color }
       }
       $script:activeTask.($stream.Offset) = $lines.Count
     }
@@ -536,8 +536,12 @@ function Update-ControlTask {
   $taskOutput = if (Test-Path -LiteralPath $script:activeTask.OutPath) { Get-Content -LiteralPath $script:activeTask.OutPath -ErrorAction SilentlyContinue } else { @() }
   $localSetMarker = $taskOutput | Where-Object { $_ -match '^BB_LOCAL_BACKUP_SET=(.+)$' } | Select-Object -Last 1
   $localSet = if ($localSetMarker -and $localSetMarker -match '^BB_LOCAL_BACKUP_SET=(.+)$') { $Matches[1] } else { '' }
+  # 任务脚本成功时输出 BB_TASK_OK=<kind> 标记；进程退出码在部分环境下读不到（为空），
+  # 因此以显式标记为第一判据，退出码仅作兜底，两者都读不到时如实提示"无法确认"。
+  $taskOk = [bool]($taskOutput | Where-Object { $_ -match '^BB_TASK_OK=' })
+  $codeReadable = ($null -ne $code -and "$code".Trim() -ne '')
   $script:activeTask = $null
-  if ($code -eq 0) {
+  if ($taskOk -or ($codeReadable -and $code -eq 0)) {
     switch ($kind) {
       'starting' { $script:launchStartedAt = Get-Date; Write-Log '启动脚本执行完成，正在确认服务健康状态。' $C_GREEN }
       'stopping' { $script:restoreAwaitingStart = $false; Write-Log '系统已停止。' $C_GREEN; Set-ControlState 'stopped' }
@@ -552,13 +556,17 @@ function Update-ControlTask {
       'remoteupload' { Write-Log 'NAS 备份重试成功。' $C_GREEN }
       'restoring' { $script:restoreAwaitingStart = $true; Write-Log '恢复成功完成；请点击“启动系统”。' $C_GREEN; Set-ControlState 'restore-ready' }
     }
-  } elseif ($code -eq 2 -and $kind -eq 'backingup') {
+  } elseif ($codeReadable -and $code -eq 2 -and $kind -eq 'backingup') {
     Write-Log ("本地备份已成功，但 NAS 备份失败。详细日志：$controlLogDir") $C_RED
     Set-ControlState 'running'
     if ($localSet) {
       $retry = [Windows.Forms.MessageBox]::Show('本地备份已保留，NAS 上传失败。是否现在重试远程上传？', '远程备份失败', 'YesNo', 'Warning')
       if ($retry -eq [Windows.Forms.DialogResult]::Yes) { Start-ControlTask 'remoteupload' 'bb-backup.ps1' @('-RemoteOnly', '-BackupSet', $localSet, '-Silent') }
     }
+  } elseif (-not $codeReadable) {
+    Write-Log ("任务已结束，但无法确认执行结果（退出码不可用）。请依据以上日志判断，必要时重试。日志：$controlLogDir") $C_PRIMARY
+    $script:launchFailed = ($kind -eq 'starting')
+    Set-ControlState 'partial'
   } else {
     Write-Log ("任务执行失败：$kind，退出码 $code。日志：$controlLogDir") $C_RED
     $script:launchFailed = ($kind -eq 'starting')

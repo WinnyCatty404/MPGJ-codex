@@ -17,10 +17,17 @@ $pgPort  = if ($config -and $config.pgPort)  { [int]$config.pgPort }  else { 543
 $instanceId = Get-BBInstanceId -AppRoot $AppRoot -ConfiguredInstanceId $(if ($config -and $config.instanceId) { [string]$config.instanceId } else { '' })
 
 # 依据 pid 文件结束（精确结束本工具启动的进程）
+# 注意：pid 文件里同时写着 pgPort/apiPort/webPort 等端口行，绝不能当 PID 处理。
+# 历史上用 ^(\w+)=(\d+)$ 宽匹配，把 54328/3100/5173 当进程号 taskkill：
+#   1) 这些"进程"不存在时 taskkill 返回 128，污染 $LASTEXITCODE，导致
+#      bb-restore.ps1 的 Assert-BBNativeSuccess 误判"停止 Web/API 失败"，
+#      恢复在第一步就被中止（2026-10-17 安装版实际踩坑）；
+#   2) 若恰好有无关进程占用这些 PID，/T /F 会误杀整棵进程树。
+# 因此这里只认进程键（backend/frontend），端口行一律跳过。
 $pidFile = Join-Path (Get-BBRuntimeDir -AppRoot $AppRoot -InstanceId $instanceId) 'processes.pids'
 if (Test-Path -LiteralPath $pidFile) {
   Get-Content -LiteralPath $pidFile | ForEach-Object {
-    if ($_ -match '^(\w+)=(\d+)$') {
+    if ($_ -match '^(backend|frontend)=(\d+)$') {
       $pidv = [int]$Matches[2]
       & taskkill /PID $pidv /T /F 2>$null | Out-Null
     }
@@ -34,6 +41,10 @@ foreach ($port in @($apiPort, $webPort)) {
     & taskkill /PID $_.OwningProcess /T /F 2>$null | Out-Null
   }
 }
+
+# taskkill 对"进程已不存在"返回 128，对停止操作而言这是预期结果；不清零会顺着
+# $LASTEXITCODE 泄漏给调用方（bb-restore.ps1 的 Assert-BBNativeSuccess 等）。
+$global:LASTEXITCODE = 0
 
 # 恢复和一致性维护只停止 Web/API，数据库需继续提供本机恢复连接。
 if (-not $KeepPostgres) {
@@ -54,5 +65,6 @@ if (-not $KeepPostgres) {
   }
 }
 
+Write-Host 'BB_TASK_OK=stopping'
 Write-Host $(if ($KeepPostgres) { 'BMPBGS Web/API 已停止，PostgreSQL 保持运行。' } else { 'BMPBGS已停止。' })
 if (-not $Silent) { Read-Host '按回车退出' }
