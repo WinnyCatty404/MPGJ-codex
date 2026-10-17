@@ -204,7 +204,11 @@ if (-not $apiOk) {
 # 7) 打开浏览器（多种方式回退，失败会明确提示）
 $url = "http://localhost:$webPort"
 if (-not $NoBrowser) { Write-BBLog "准备打开浏览器：$url" }
-if ($apiOk -and $webOk -and -not $NoBrowser) {
+if ($NoBrowser) {
+  # 调用方（如恢复流程的 -ValidationOnly、备份前暂停后恢复）明确要求不开浏览器，
+  # 属于预期行为，不能再报成"服务未就绪"误导排查。
+  Write-BBLog "按调用参数不自动打开浏览器（服务状态：后端=$apiOk 前端=$webOk）。"
+} elseif ($apiOk -and $webOk) {
   $opened = $false
   try { Start-Process -FilePath $url -ErrorAction Stop; $opened = $true } catch { }
   if (-not $opened) {

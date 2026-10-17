@@ -170,29 +170,51 @@ $logBox.ScrollBars = 'Both'
 $logBox.DetectUrls = $false
 $logHost.Controls.Add($logBox)
 
+# 是否自动跟随日志底部。这个值只在"用户主动滚动/按键"时按当时的几何位置更新，
+# 不在追加日志时推断——追加时推断会遇到滚动是异步的（BeginInvoke）这一坑：
+# 任务日志连续刷屏时上一次滚动可能还没落地，几何判定会误认为"用户已向上滚动"，
+# 于是既不滚动、还把视图拉回原处，表现为最后一行永远差一点（2026-10-17）。
+$script:logFollowTail = $true
+
+function Update-LogFollowTail {
+  try {
+    if ($logBox.TextLength -le 0) { $script:logFollowTail = $true; return }
+    $lastPoint = $logBox.GetPositionFromCharIndex($logBox.TextLength - 1)
+    $script:logFollowTail = ($lastPoint.Y -ge 0 -and $lastPoint.Y -le ($logBox.ClientSize.Height + $logBox.Font.Height))
+  } catch { $script:logFollowTail = $true }
+}
+
 # 把日志视图推到真正的最底部。仅靠 ScrollToCaret 在"末行刚追加、布局/滚动条状态
 # 刚变化"时会少滚约半行到一行（6877312 改为 BeginInvoke 后仍偶发），因此在其后
 # 再补一发 WM_VSCROLL / SB_BOTTOM，把垂直滚动位置压到滚动范围的最大值，保证
 # 最后一行完整可见。
 function Push-LogToBottom {
   try {
+    if (-not $logBox.IsHandleCreated) { return }
+    # RichEdit 是惰性排版的：刚追加的文本可能还没参与高度计算，先用一次行号/
+    # 坐标查询强制完成排版，否则滚动会按旧的滚动范围停住。
+    [void]$logBox.GetLineFromCharIndex($logBox.TextLength)
+    [void]$logBox.GetPositionFromCharIndex([Math]::Max(0, $logBox.TextLength - 1))
     $logBox.SelectionStart = $logBox.TextLength
     $logBox.SelectionLength = 0
     $logBox.ScrollToCaret()
-    if ($logBox.IsHandleCreated -and ('Native.Win' -as [type])) {
+    if ('Native.Win' -as [type]) {
       # WM_VSCROLL(0x0115) 的 SB_BOTTOM(7)：滚动到垂直滚动范围最底
       [void][Native.Win]::SendMessage($logBox.Handle, 0x0115, [IntPtr]7, [IntPtr]::Zero)
     }
   } catch { }
 }
 
+# 用户主动滚动/操作时更新"是否跟随底部"
+$logBox.Add_VScroll({ Update-LogFollowTail })
+$logBox.Add_MouseWheel({ Update-LogFollowTail })
+$logBox.Add_KeyDown({ Update-LogFollowTail })
+$logBox.Add_MouseUp({ Update-LogFollowTail })
+
 function Write-Log([string]$msg, [System.Drawing.Color]$color) {
-  $followTail = $true
   $firstVisible = 0
   if ($logBox.TextLength -gt 0) {
     $firstVisible = $logBox.GetCharIndexFromPosition((New-Object Drawing.Point(2, 2)))
-    $lastPoint = $logBox.GetPositionFromCharIndex($logBox.TextLength - 1)
-    $followTail = ($lastPoint.Y -ge 0 -and $lastPoint.Y -le ($logBox.ClientSize.Height + $logBox.Font.Height))
   }
   $oldStart = $logBox.SelectionStart
   $oldLength = $logBox.SelectionLength
@@ -203,15 +225,11 @@ function Write-Log([string]$msg, [System.Drawing.Color]$color) {
   $logBox.SelectionColor = $color
   $logBox.AppendText($msg + "`r`n")
   $logBox.SelectionColor = $logBox.ForeColor
-  if ($followTail) {
-    $scrollToEnd = [Action]{ Push-LogToBottom }
-    if ($logBox.IsHandleCreated) {
-      # 同步 ScrollToCaret 在文本刚追加、布局未重算完成时会少滚一行，
-      # 必须投递到消息队列等布局结束后再执行
-      [void]$logBox.BeginInvoke($scrollToEnd)
-    } else {
-      $scrollToEnd.Invoke()
-    }
+  if ($script:logFollowTail) {
+    # 同步滚一次（立即生效）+ 投递到下一个消息周期再滚一次：追加文本后 RichEdit
+    # 的排版与滚动条状态可能刚变化，二次滚动用于兜底，确保末行完整贴底。
+    Push-LogToBottom
+    if ($logBox.IsHandleCreated) { [void]$logBox.BeginInvoke([Action]{ Push-LogToBottom }) }
   } else {
     $logBox.Select($firstVisible, 0)
     $logBox.ScrollToCaret()
@@ -610,7 +628,7 @@ function Update-ControlTask {
   return $false
 }
 
-$btnLogBottom.Add_Click({ Push-LogToBottom; $logBox.Focus() })
+$btnLogBottom.Add_Click({ $script:logFollowTail = $true; Push-LogToBottom; $logBox.Focus() })
 $btnOpenLog.Add_Click({ if (-not (Test-Path -LiteralPath $controlLogDir)) { New-Item -ItemType Directory -Path $controlLogDir -Force | Out-Null }; Start-Process explorer.exe -ArgumentList ('"' + $controlLogDir + '"') })
 $btnSettings.Add_Click({ if (-not $script:activeTask) { Show-BBRemoteBackupSettings } })
 
