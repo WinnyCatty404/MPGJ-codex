@@ -5,6 +5,13 @@
 ;   2) 私有 PostgreSQL：把解压后的 bin/lib/share 放入根目录 pgsql\（即 pgsql\bin\pg_ctl.exe 存在）
 #define MyAppName "BMPBGS"
 #define MyAppVersion "1.3"
+#ifdef LiteBuild
+  #define StageRoot "build\windows\app-lite"
+  #define SetupBaseName "BMPBGS-Windows-x64-Setup-Lite"
+#else
+  #define StageRoot "build\windows\app"
+  #define SetupBaseName "BMPBGS-Windows-x64-Setup"
+#endif
 
 [Setup]
 AppId={{BB-MIPING-TOOL-2026}
@@ -14,8 +21,8 @@ AppPublisher=BMPBGS团队
 DefaultDirName={localappdata}\{#MyAppName}
 DefaultGroupName={#MyAppName}
 OutputDir=out
-OutputBaseFilename=BMPBGS-Windows-x64-Setup
-SetupIconFile=build\windows\app\bmpbgs.ico
+OutputBaseFilename={#SetupBaseName}
+SetupIconFile={#StageRoot}\bmpbgs.ico
 UninstallDisplayIcon={app}\BMPBGS.exe
 Compression=lzma2
 SolidCompression=yes
@@ -32,15 +39,15 @@ Name: "chinese"; MessagesFile: "compiler:Languages\ChineseSimplified.isl"
 
 [Files]
 ; build-windows.ps1 生成干净的 build\windows\app 发布目录。
-Source: "build\windows\app\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
+Source: "{#StageRoot}\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
 ; 数据目录只补齐缺失的出厂模板；卸载不得删除这些运行数据。
-Source: "build\windows\app\storage\templates\*"; DestDir: "{code:GetDataDir}\storage\templates"; Flags: onlyifdoesntexist recursesubdirs createallsubdirs uninsneveruninstall
+Source: "{#StageRoot}\storage\templates\*"; DestDir: "{code:GetDataDir}\storage\templates"; Flags: onlyifdoesntexist recursesubdirs createallsubdirs uninsneveruninstall
 ; 本次更新的模板在重装/升级时覆盖数据目录中的同名版本，其余模板保持原样。
-Source: "build\windows\app\storage\templates\records\1-系统基本情况调查表（二级）.docx"; DestDir: "{code:GetDataDir}\storage\templates\records"; Flags: ignoreversion uninsneveruninstall
-Source: "build\windows\app\storage\templates\records\1-系统基本情况调查表（三级）.docx"; DestDir: "{code:GetDataDir}\storage\templates\records"; Flags: ignoreversion uninsneveruninstall
-Source: "build\windows\app\storage\templates\records\2-测评方案-init.docx"; DestDir: "{code:GetDataDir}\storage\templates\records"; Flags: ignoreversion uninsneveruninstall
-Source: "build\windows\app\storage\templates\records\2-测评方案-last.docx"; DestDir: "{code:GetDataDir}\storage\templates\records"; Flags: ignoreversion uninsneveruninstall
-Source: "build\windows\app\storage\templates\records\3-测评方案评审表.docx"; DestDir: "{code:GetDataDir}\storage\templates\records"; Flags: ignoreversion uninsneveruninstall
+Source: "{#StageRoot}\storage\templates\records\1-系统基本情况调查表（二级）.docx"; DestDir: "{code:GetDataDir}\storage\templates\records"; Flags: ignoreversion uninsneveruninstall
+Source: "{#StageRoot}\storage\templates\records\1-系统基本情况调查表（三级）.docx"; DestDir: "{code:GetDataDir}\storage\templates\records"; Flags: ignoreversion uninsneveruninstall
+Source: "{#StageRoot}\storage\templates\records\2-测评方案-init.docx"; DestDir: "{code:GetDataDir}\storage\templates\records"; Flags: ignoreversion uninsneveruninstall
+Source: "{#StageRoot}\storage\templates\records\2-测评方案-last.docx"; DestDir: "{code:GetDataDir}\storage\templates\records"; Flags: ignoreversion uninsneveruninstall
+Source: "{#StageRoot}\storage\templates\records\3-测评方案评审表.docx"; DestDir: "{code:GetDataDir}\storage\templates\records"; Flags: ignoreversion uninsneveruninstall
 
 [Icons]
 Name: "{group}\BMPBGS"; Filename: "{app}\BMPBGS.exe"; WorkingDir: "{app}"; IconFilename: "{app}\bmpbgs.ico"
