@@ -17,6 +17,8 @@ if (-not $BackupRoot) { $BackupRoot = Get-BBBackupRoot $AppRoot }
 
 $config  = Get-BBConfig -AppRoot $AppRoot
 $pgPort  = if ($config -and $config.pgPort) { [int]$config.pgPort } else { 54328 }
+$apiPort = if ($config -and $config.apiPort) { [int]$config.apiPort } else { 3100 }
+$webPort = if ($config -and $config.webPort) { [int]$config.webPort } else { 5173 }
 $configuredPgData = if ($config -and $config.pgData) { [string]$config.pgData } else { '' }
 $p = Resolve-BBPaths -AppRoot $AppRoot -PgPort $pgPort -ConfiguredPgData $configuredPgData
 
@@ -74,10 +76,30 @@ if ($RemoteOnly) {
   $ts = Get-Date -Format 'yyyyMMdd-HHmmss'
   $setDir = Join-Path $BackupRoot $ts
   $pendingDir = Join-Path $BackupRoot ('.pending-' + $ts + '-' + [guid]::NewGuid().ToString('N'))
+  $portsWereListening = (Test-BBPortListening -Port $apiPort) -or (Test-BBPortListening -Port $webPort)
+  $resumeServices = $false
+  $restartError = ''
   if (Test-Path -LiteralPath $setDir) { throw "备份集已存在，请稍后重试：$setDir" }
   New-Item -ItemType Directory -Path $pendingDir -Force | Out-Null
 
   try {
+    if ($portsWereListening) {
+      try {
+        $health = Invoke-RestMethod -Uri ("http://127.0.0.1:$webPort/api/health") -TimeoutSec 3
+        $instanceId = Get-BBInstanceId -AppRoot $AppRoot -ConfiguredInstanceId $(if ($config -and $config.instanceId) { [string]$config.instanceId } else { '' })
+        if ($health.ok -ne $true -or $health.database -ne $DbName -or $health.instanceId -ne $instanceId) { throw '实例身份不符' }
+        $resumeServices = $true
+      } catch {
+        throw "配置端口正在使用，但无法确认是当前 BMPBGS 实例，已拒绝停止进程：$($_.Exception.Message)"
+      }
+      Write-Host '正在暂停 Web/API，保证数据库与附件处于同一备份时间点...'
+      & (Join-Path $AppRoot 'bb-stop.ps1') -AppRoot $AppRoot -Silent -KeepPostgres
+      $leftover = Wait-BBPortsReleased -Ports @($apiPort, $webPort) -TimeoutSeconds 5
+      if ($leftover) { throw "暂停 Web/API 失败：端口 $($leftover.LocalPort) 仍在监听（PID $($leftover.OwningProcess)）" }
+    }
+    if (-not (Test-Path -LiteralPath (Join-Path $p.DataRoot 'storage') -PathType Container)) {
+      throw '数据目录缺少 storage，已中止备份，避免生成不完整备份集。'
+    }
     $sqlFile = Join-Path $pendingDir "$DbName-$ts.dump"
     Write-Host '正在备份数据库...'
     & $pgDump -h 127.0.0.1 -p $p.PgPort -U $DbUser -F c -f $sqlFile $DbName
@@ -89,11 +111,11 @@ if ($RemoteOnly) {
       Invoke-BBRobocopy -Source (Join-Path $p.DataRoot $d) -Destination (Join-Path $pendingDir $d)
     }
 
-    $storageStats = Get-BBDirectoryStats (Join-Path $pendingDir 'storage')
-    $uploadStats = Get-BBDirectoryStats (Join-Path $pendingDir 'uploads')
+    $storageStats = Get-BBDirectoryFingerprint (Join-Path $pendingDir 'storage')
+    $uploadStats = Get-BBDirectoryFingerprint (Join-Path $pendingDir 'uploads')
     $dumpItem = Get-Item -LiteralPath $sqlFile
     $manifest = [ordered]@{
-      formatVersion = 1
+      formatVersion = 2
       createdAt = (Get-Date).ToString('o')
       sourceMachine = $env:COMPUTERNAME
       instanceId = if ($config -and $config.instanceId) { [string]$config.instanceId } else { '' }
@@ -103,8 +125,8 @@ if ($RemoteOnly) {
         bytes = [int64]$dumpItem.Length
         sha256 = (Get-FileHash -LiteralPath $sqlFile -Algorithm SHA256).Hash
       }
-      storage = [ordered]@{ files = $storageStats.Count; bytes = $storageStats.Bytes }
-      uploads = [ordered]@{ files = $uploadStats.Count; bytes = $uploadStats.Bytes }
+      storage = [ordered]@{ files = $storageStats.Count; bytes = $storageStats.Bytes; sha256 = $storageStats.Sha256; sourcePresent = $true }
+      uploads = [ordered]@{ files = $uploadStats.Count; bytes = $uploadStats.Bytes; sha256 = $uploadStats.Sha256; sourcePresent = (Test-Path -LiteralPath (Join-Path $p.DataRoot 'uploads') -PathType Container) }
     }
     $manifest | ConvertTo-Json -Depth 5 | Set-Content -LiteralPath (Join-Path $pendingDir 'backup-manifest.json') -Encoding UTF8
     Move-Item -LiteralPath $pendingDir -Destination $setDir
@@ -116,7 +138,13 @@ if ($RemoteOnly) {
     exit 1
   } finally {
     Remove-Item Env:\PGPASSWORD -ErrorAction SilentlyContinue
+    if ($resumeServices) {
+      Write-Host '正在恢复备份前的 Web/API 运行状态...'
+      & powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -File (Join-Path $AppRoot 'bb-start.ps1') -AppRoot $AppRoot -Silent -NoBrowser
+      if ($LASTEXITCODE -ne 0) { $restartError = "备份数据已处理，但 Web/API 自动恢复失败，退出码：$LASTEXITCODE" }
+    }
   }
+  if ($restartError) { Write-Error $restartError; exit 1 }
 }
 
 Write-Host "BB_LOCAL_BACKUP_SET=$setDir"

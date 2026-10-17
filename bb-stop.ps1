@@ -15,6 +15,7 @@ $apiPort = if ($config -and $config.apiPort) { [int]$config.apiPort } else { 310
 $webPort = if ($config -and $config.webPort) { [int]$config.webPort } else { 5173 }
 $pgPort  = if ($config -and $config.pgPort)  { [int]$config.pgPort }  else { 54328 }
 $instanceId = Get-BBInstanceId -AppRoot $AppRoot -ConfiguredInstanceId $(if ($config -and $config.instanceId) { [string]$config.instanceId } else { '' })
+$ownedPids = @{}
 
 # 依据 pid 文件结束（精确结束本工具启动的进程）
 # 注意：pid 文件里同时写着 pgPort/apiPort/webPort 等端口行，绝不能当 PID 处理。
@@ -28,8 +29,14 @@ $pidFile = Join-Path (Get-BBRuntimeDir -AppRoot $AppRoot -InstanceId $instanceId
 if (Test-Path -LiteralPath $pidFile) {
   Get-Content -LiteralPath $pidFile | ForEach-Object {
     if ($_ -match '^(backend|frontend)=(\d+)$') {
+      $role = $Matches[1]
       $pidv = [int]$Matches[2]
-      & taskkill /PID $pidv /T /F 2>$null | Out-Null
+      if (Test-BBAppProcess -ProcessId $pidv -Role $role -AppRoot $AppRoot -WebPort $webPort) {
+        & taskkill /PID $pidv /T /F 2>$null | Out-Null
+        $ownedPids[$pidv] = $true
+      } elseif (Get-Process -Id $pidv -ErrorAction SilentlyContinue) {
+        Write-Warning "跳过 PID $pidv：无法确认它属于当前 BMPBGS $role 进程。"
+      }
     }
   }
   Remove-Item -LiteralPath $pidFile -Force -ErrorAction SilentlyContinue
@@ -38,7 +45,14 @@ if (Test-Path -LiteralPath $pidFile) {
 # 兜底：按监听端口结束（防止 pid 文件丢失时残留）
 foreach ($port in @($apiPort, $webPort)) {
   Get-NetTCPConnection -LocalPort $port -ErrorAction SilentlyContinue | ForEach-Object {
-    & taskkill /PID $_.OwningProcess /T /F 2>$null | Out-Null
+    $pidv = [int]$_.OwningProcess
+    $role = if ($port -eq $apiPort) { 'backend' } else { 'frontend' }
+    if (-not $ownedPids[$pidv] -and (Test-BBAppProcess -ProcessId $pidv -Role $role -AppRoot $AppRoot -WebPort $webPort)) {
+      & taskkill /PID $pidv /T /F 2>$null | Out-Null
+      $ownedPids[$pidv] = $true
+    } elseif (-not $ownedPids[$pidv]) {
+      Write-Warning "端口 $port 由 PID $pidv 监听，但无法确认它属于当前 BMPBGS，已拒绝强制结束。"
+    }
   }
 }
 

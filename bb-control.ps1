@@ -554,7 +554,7 @@ function Update-ControlTask {
   $taskOk = [bool]($taskOutput | Where-Object { $_ -match "^BB_TASK_OK=$kind\s*$" })
   $codeReadable = ($null -ne $code -and "$code".Trim() -ne '')
   $script:activeTask = $null
-  if ($taskOk -or ($codeReadable -and $code -eq 0)) {
+  if ($taskOk -and (-not $codeReadable -or $code -eq 0)) {
     switch ($kind) {
       'starting' { $script:launchStartedAt = Get-Date; Write-Log '启动脚本执行完成，正在确认服务健康状态。' $C_GREEN }
       'stopping' { $script:restoreAwaitingStart = $false; Write-Log '系统已停止。' $C_GREEN; Set-ControlState 'stopped' }

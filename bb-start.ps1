@@ -5,7 +5,9 @@
 # 注意：本文件含中文注释，保存时必须带 UTF-8 BOM。
 param(
   [string]$AppRoot = (Split-Path -Parent $MyInvocation.MyCommand.Definition),
-  [switch]$Silent
+  [switch]$Silent,
+  [switch]$NoBrowser,
+  [switch]$ValidationOnly
 )
 $ErrorActionPreference = 'Continue'
 . (Join-Path $AppRoot 'bb-common.ps1')
@@ -90,29 +92,31 @@ try {
 
 # 4.5) 自愈：历史版本初始化时中文行曾被跳过导致初始数据缺失（users 空表 -> 登录失败）。
 # 每次启动检查初始账号是否齐全，缺失则用 UTF-8 编码补种 seed.sql（幂等，ON CONFLICT DO NOTHING）。
-try {
-  $psqlExe = Join-Path $p.PgRoot 'bin\psql.exe'
-  if (Test-Path -LiteralPath $psqlExe) {
-    $env:PGPASSWORD = 'BbMiping-Local-2026!'
-    $env:PGCLIENTENCODING = 'UTF8'
-    $cntRaw = & $psqlExe -h 127.0.0.1 -p $p.PgPort -U postgres -d bb_miping -tAc "SELECT count(*) FROM users" 2>$null
-    $cnt = "$cntRaw".Trim()
-    if ($LASTEXITCODE -eq 0 -and $cnt -match '^\d+$' -and [int]$cnt -lt 3) {
-      Write-BBLog "检测到初始数据不完整（users=$cnt），正在补种初始数据..."
-      & $psqlExe -h 127.0.0.1 -p $p.PgPort -U postgres -d bb_miping -f (Join-Path $AppRoot 'database\seed.sql') 2>&1 | Out-Null
-      $cnt2 = & $psqlExe -h 127.0.0.1 -p $p.PgPort -U postgres -d bb_miping -tAc "SELECT count(*) FROM users" 2>$null
-      Write-BBLog "补种完成，users=$("$cnt2".Trim())"
+if (-not $ValidationOnly) {
+  try {
+    $psqlExe = Join-Path $p.PgRoot 'bin\psql.exe'
+    if (Test-Path -LiteralPath $psqlExe) {
+      $env:PGPASSWORD = 'BbMiping-Local-2026!'
+      $env:PGCLIENTENCODING = 'UTF8'
+      $cntRaw = & $psqlExe -h 127.0.0.1 -p $p.PgPort -U postgres -d bb_miping -tAc "SELECT count(*) FROM users" 2>$null
+      $cnt = "$cntRaw".Trim()
+      if ($LASTEXITCODE -eq 0 -and $cnt -match '^\d+$' -and [int]$cnt -lt 3) {
+        Write-BBLog "检测到初始数据不完整（users=$cnt），正在补种初始数据..."
+        & $psqlExe -h 127.0.0.1 -p $p.PgPort -U postgres -d bb_miping -f (Join-Path $AppRoot 'database\seed.sql') 2>&1 | Out-Null
+        $cnt2 = & $psqlExe -h 127.0.0.1 -p $p.PgPort -U postgres -d bb_miping -tAc "SELECT count(*) FROM users" 2>$null
+        Write-BBLog "补种完成，users=$("$cnt2".Trim())"
+      }
+      Remove-Item Env:\PGPASSWORD -ErrorAction SilentlyContinue
     }
-    Remove-Item Env:\PGPASSWORD -ErrorAction SilentlyContinue
+  } catch {
+    Write-BBLog "初始数据检查/补种异常（不影响启动）：$($_.Exception.Message)" 'WARN'
   }
-} catch {
-  Write-BBLog "初始数据检查/补种异常（不影响启动）：$($_.Exception.Message)" 'WARN'
 }
 
 # 5) 注入环境变量并后台启动后端与前端（使用私有 Node，不修改系统 PATH）
 $env:PORT = "$apiPort"
 $env:BB_DATA_ROOT = $p.DataRoot
-if (Test-Path -LiteralPath (Join-Path $AppRoot 'bb-data-path.txt')) {
+if (-not $ValidationOnly -and (Test-Path -LiteralPath (Join-Path $AppRoot 'bb-data-path.txt'))) {
   New-Item -ItemType Directory -Path (Join-Path $p.DataRoot 'storage') -Force | Out-Null
   if (-not (Test-Path -LiteralPath (Join-Path $p.DataRoot 'storage\templates'))) {
     Copy-Item -LiteralPath (Join-Path $AppRoot 'storage\templates') -Destination (Join-Path $p.DataRoot 'storage\templates') -Recurse
@@ -199,8 +203,8 @@ if (-not $apiOk) {
 
 # 7) 打开浏览器（多种方式回退，失败会明确提示）
 $url = "http://localhost:$webPort"
-Write-BBLog "准备打开浏览器：$url"
-if ($apiOk -and $webOk) {
+if (-not $NoBrowser) { Write-BBLog "准备打开浏览器：$url" }
+if ($apiOk -and $webOk -and -not $NoBrowser) {
   $opened = $false
   try { Start-Process -FilePath $url -ErrorAction Stop; $opened = $true } catch { }
   if (-not $opened) {

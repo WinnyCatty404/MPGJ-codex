@@ -206,6 +206,43 @@ function Get-FreePort {
   throw "在 $Start-$End 范围内未找到空闲端口。"
 }
 
+function Test-BBPortListening {
+  param([int]$Port)
+  return [bool](Get-NetTCPConnection -LocalPort $Port -State Listen -ErrorAction SilentlyContinue | Select-Object -First 1)
+}
+
+function Wait-BBPortsReleased {
+  param([int[]]$Ports, [int]$TimeoutSeconds = 5)
+  $deadline = (Get-Date).AddSeconds($TimeoutSeconds)
+  do {
+    $leftover = @($Ports | ForEach-Object {
+      Get-NetTCPConnection -LocalPort $_ -State Listen -ErrorAction SilentlyContinue
+    } | Select-Object -First 1)
+    if ($leftover.Count -eq 0) { return $null }
+    if ((Get-Date) -ge $deadline) { return $leftover[0] }
+    Start-Sleep -Milliseconds 250
+  } while ($true)
+}
+
+# 防止 PID 文件过期或端口被其他程序占用时误杀无关进程。
+function Test-BBAppProcess {
+  param(
+    [int]$ProcessId,
+    [ValidateSet('backend', 'frontend')][string]$Role,
+    [string]$AppRoot,
+    [int]$WebPort
+  )
+  try {
+    $process = Get-CimInstance Win32_Process -Filter "ProcessId=$ProcessId" -ErrorAction Stop
+    if (-not $process) { return $false }
+    $expectedNode = Resolve-BBNode -AppRoot $AppRoot
+    if (-not (Test-BBSamePath ([string]$process.ExecutablePath) $expectedNode)) { return $false }
+    $commandLine = [string]$process.CommandLine
+    if ($Role -eq 'backend') { return ($commandLine -match '(?i)dist[\\/]server\.js(?:\s|"|$)') }
+    return ($commandLine -match '(?i)bb-serve-frontend\.js' -and $commandLine -match "(?i)--port\s+`"?$WebPort(?:\s|`"|$)")
+  } catch { return $false }
+}
+
 # 从已初始化的 postgresql.conf 中读取实际监听端口（用于找回未记录配置时的真实端口）。
 function Get-PGPortFromConf {
   param([string]$PgData)
@@ -236,6 +273,30 @@ function Get-BBDirectoryStats {
   return [PSCustomObject]@{ Count = [int]$measure.Count; Bytes = [int64]($measure.Sum -as [int64]) }
 }
 
+# 对目录内容生成稳定指纹：同时覆盖相对路径、文件长度和每个文件的 SHA256。
+function Get-BBDirectoryFingerprint {
+  param([string]$Path)
+  if (-not (Test-Path -LiteralPath $Path -PathType Container)) {
+    return [PSCustomObject]@{ Count = 0; Bytes = 0L; Sha256 = ''; Exists = $false }
+  }
+  $root = [IO.Path]::GetFullPath($Path).TrimEnd('\')
+  $files = @(Get-ChildItem -LiteralPath $root -Recurse -File -Force -ErrorAction Stop | Sort-Object FullName)
+  $lines = New-Object 'System.Collections.Generic.List[string]'
+  [int64]$bytes = 0
+  foreach ($file in $files) {
+    $relative = $file.FullName.Substring($root.Length).TrimStart('\').Replace('\', '/')
+    $hash = (Get-FileHash -LiteralPath $file.FullName -Algorithm SHA256).Hash.ToLowerInvariant()
+    $bytes += [int64]$file.Length
+    $lines.Add("$relative`t$($file.Length)`t$hash")
+  }
+  $sha = [Security.Cryptography.SHA256]::Create()
+  try {
+    $payload = [Text.Encoding]::UTF8.GetBytes(($lines -join "`n"))
+    $treeHash = ([BitConverter]::ToString($sha.ComputeHash($payload))).Replace('-', '').ToLowerInvariant()
+  } finally { $sha.Dispose() }
+  return [PSCustomObject]@{ Count = $files.Count; Bytes = $bytes; Sha256 = $treeHash; Exists = $true }
+}
+
 function Test-BBUncPath {
   param([string]$Path)
   return [bool]($Path -and $Path.Trim() -match '^\\\\[^\\]+\\[^\\]+(?:\\.*)?$')
@@ -247,7 +308,8 @@ function Get-BBBackupSetInfo {
   $result = [ordered]@{
     Path = $Path; Name = ''; Valid = $false; Error = ''; Legacy = $false
     CreatedAt = $null; DumpFile = $null; DumpBytes = 0L; DumpSha256 = ''
-    StorageFiles = 0; StorageBytes = 0L; UploadFiles = 0; UploadBytes = 0L
+    StorageFiles = 0; StorageBytes = 0L; StorageSha256 = ''
+    UploadFiles = 0; UploadBytes = 0L; UploadSha256 = ''
   }
   try {
     if (-not (Test-Path -LiteralPath $Path -PathType Container)) { throw "备份集不存在：$Path" }
@@ -272,15 +334,21 @@ function Get-BBBackupSetInfo {
     $result.DumpBytes = [int64]$dump.Length
     if ($manifest -and $manifest.database.bytes -ne $null -and [int64]$manifest.database.bytes -ne $result.DumpBytes) { throw 'dump 文件大小与清单不一致' }
 
+    $storagePath = Join-Path $Path 'storage'
+    $uploadPath = Join-Path $Path 'uploads'
+    if ($manifest -and (-not (Test-Path -LiteralPath $storagePath -PathType Container) -or -not (Test-Path -LiteralPath $uploadPath -PathType Container))) {
+      throw '备份集缺少 storage 或 uploads 目录'
+    }
     if ($manifest -and -not $Deep) {
-      $storageStats = [PSCustomObject]@{ Count = [int]$manifest.storage.files; Bytes = [int64]$manifest.storage.bytes }
-      $uploadStats = [PSCustomObject]@{ Count = [int]$manifest.uploads.files; Bytes = [int64]$manifest.uploads.bytes }
+      $storageStats = [PSCustomObject]@{ Count = [int]$manifest.storage.files; Bytes = [int64]$manifest.storage.bytes; Sha256 = [string]$manifest.storage.sha256 }
+      $uploadStats = [PSCustomObject]@{ Count = [int]$manifest.uploads.files; Bytes = [int64]$manifest.uploads.bytes; Sha256 = [string]$manifest.uploads.sha256 }
     } else {
-      $storageStats = Get-BBDirectoryStats (Join-Path $Path 'storage')
-      $uploadStats = Get-BBDirectoryStats (Join-Path $Path 'uploads')
+      $storageStats = Get-BBDirectoryFingerprint $storagePath
+      $uploadStats = Get-BBDirectoryFingerprint $uploadPath
     }
     $result.StorageFiles = $storageStats.Count; $result.StorageBytes = $storageStats.Bytes
     $result.UploadFiles = $uploadStats.Count; $result.UploadBytes = $uploadStats.Bytes
+    $result.StorageSha256 = [string]$storageStats.Sha256; $result.UploadSha256 = [string]$uploadStats.Sha256
     if ($Deep -and $manifest) {
       if ($manifest.database.sha256) {
         $result.DumpSha256 = (Get-FileHash -LiteralPath $dump.FullName -Algorithm SHA256).Hash
@@ -288,9 +356,11 @@ function Get-BBBackupSetInfo {
       }
       if ($manifest.storage) {
         if ([int]$manifest.storage.files -ne $result.StorageFiles -or [int64]$manifest.storage.bytes -ne $result.StorageBytes) { throw 'storage 文件统计与清单不一致' }
+        if ($manifest.storage.sha256 -and [string]$manifest.storage.sha256 -ne $result.StorageSha256) { throw 'storage 文件校验值与清单不一致' }
       }
       if ($manifest.uploads) {
         if ([int]$manifest.uploads.files -ne $result.UploadFiles -or [int64]$manifest.uploads.bytes -ne $result.UploadBytes) { throw 'uploads 文件统计与清单不一致' }
+        if ($manifest.uploads.sha256 -and [string]$manifest.uploads.sha256 -ne $result.UploadSha256) { throw 'uploads 文件校验值与清单不一致' }
       }
     }
     $result.Valid = $true

@@ -68,6 +68,14 @@ if (Test-BBUncPath $BackupSet) {
 
 $sqlFile = Get-Item (Join-Path $BackupSet "$DbName-*.dump") -ErrorAction SilentlyContinue | Select-Object -First 1
 if (-not $sqlFile) { Remove-BBRemoteRestoreStage; Write-Error '备份集中未找到数据库 dump 文件。'; if (-not $Silent) { Read-Host '按回车退出' }; exit 1 }
+$backupInfo = Get-BBBackupSetInfo -Path $BackupSet -DbName $DbName -Deep
+if (-not $backupInfo.Valid) { Remove-BBRemoteRestoreStage; Write-Error "备份集完整性校验失败：$($backupInfo.Error)"; if (-not $Silent) { Read-Host '按回车退出' }; exit 1 }
+$sqlFile = Get-Item -LiteralPath $backupInfo.DumpFile
+foreach ($d in @('storage', 'uploads')) {
+  if (-not (Test-Path -LiteralPath (Join-Path $BackupSet $d) -PathType Container)) {
+    Remove-BBRemoteRestoreStage; Write-Error "备份集缺少 $d 目录，已中止恢复，现有数据未修改。"; if (-not $Silent) { Read-Host '按回车退出' }; exit 1
+  }
+}
 
 function Invoke-RestoreSql {
   param([string]$Database, [string]$Sql, [string]$Step, [switch]$ReturnValue)
@@ -113,14 +121,8 @@ try {
   # 以端口实际释放为准（最多重试 5 秒）。
   $apiPort = if ($config -and $config.apiPort) { [int]$config.apiPort } else { 3100 }
   $webPort = if ($config -and $config.webPort) { [int]$config.webPort } else { 5173 }
-  $leftover = $null
-  for ($i = 0; $i -lt 5 -and -not $leftover; $i++) {
-    if ($i -gt 0) { Start-Sleep -Seconds 1 }
-    $leftover = @($apiPort, $webPort) | ForEach-Object {
-      Get-NetTCPConnection -LocalPort $_ -State Listen -ErrorAction SilentlyContinue
-    } | Select-Object -First 1
-  }
-  if ($leftover) { throw "停止 Web/API 失败：端口 $($leftover.LocalPort) 仍在监听" }
+  $leftover = Wait-BBPortsReleased -Ports @($apiPort, $webPort) -TimeoutSeconds 5
+  if ($leftover) { throw "停止 Web/API 失败：端口 $($leftover.LocalPort) 仍在监听（PID $($leftover.OwningProcess)）" }
 
   Write-Host '正在准备 PostgreSQL...'
   $pgState = Start-BBPostgres -Paths $p -SuperUser $SuperUser -PgPassword $PgPassword -AllowInitialize
@@ -164,6 +166,26 @@ try {
     }
     Move-Item -LiteralPath $stagedDir -Destination $active
     $activated[$d] = $true
+  }
+
+  $activeStorage = Get-BBDirectoryFingerprint (Join-Path $p.DataRoot 'storage')
+  $activeUploads = Get-BBDirectoryFingerprint (Join-Path $p.DataRoot 'uploads')
+  if ($activeStorage.Count -ne $backupInfo.StorageFiles -or $activeStorage.Bytes -ne $backupInfo.StorageBytes) { throw '启用后的 storage 与备份集统计不一致' }
+  if ($activeUploads.Count -ne $backupInfo.UploadFiles -or $activeUploads.Bytes -ne $backupInfo.UploadBytes) { throw '启用后的 uploads 与备份集统计不一致' }
+  if ($backupInfo.StorageSha256 -and $activeStorage.Sha256 -ne $backupInfo.StorageSha256) { throw '启用后的 storage 校验值与备份集不一致' }
+  if ($backupInfo.UploadSha256 -and $activeUploads.Sha256 -ne $backupInfo.UploadSha256) { throw '启用后的 uploads 校验值与备份集不一致' }
+
+  Write-Host '正在启动应用执行恢复后健康检查...'
+  try {
+    & powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -File (Join-Path $AppRoot 'bb-start.ps1') -AppRoot $AppRoot -Silent -NoBrowser -ValidationOnly
+    Assert-BBNativeSuccess '启动恢复后的 Web/API'
+    $health = Invoke-RestMethod -Uri ("http://127.0.0.1:$webPort/api/health") -TimeoutSec 5
+    $instanceId = Get-BBInstanceId -AppRoot $AppRoot -ConfiguredInstanceId $(if ($config -and $config.instanceId) { [string]$config.instanceId } else { '' })
+    if ($health.ok -ne $true -or $health.database -ne $DbName -or $health.instanceId -ne $instanceId) { throw '恢复后的应用健康检查返回了错误的数据库或实例身份' }
+  } finally {
+    & (Join-Path $AppRoot 'bb-stop.ps1') -AppRoot $AppRoot -Silent -KeepPostgres
+    $healthStopLeftover = Wait-BBPortsReleased -Ports @($apiPort, $webPort) -TimeoutSeconds 5
+    if ($healthStopLeftover) { throw "健康检查后停止 Web/API 失败：端口 $($healthStopLeftover.LocalPort) 仍在监听" }
   }
 
   if ($hadOriginalDb) {
