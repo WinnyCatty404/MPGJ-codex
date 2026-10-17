@@ -188,8 +188,18 @@ function Write-Log([string]$msg, [System.Drawing.Color]$color) {
   $logBox.AppendText($msg + "`r`n")
   $logBox.SelectionColor = $logBox.ForeColor
   if ($followTail) {
-    $logBox.SelectionStart = $logBox.TextLength
-    $logBox.ScrollToCaret()
+    $scrollToEnd = [Action]{
+      $logBox.SelectionStart = $logBox.TextLength
+      $logBox.SelectionLength = 0
+      $logBox.ScrollToCaret()
+    }
+    if ($logBox.IsHandleCreated) {
+      # 同步 ScrollToCaret 在文本刚追加、布局未重算完成时会少滚一行，
+      # 必须投递到消息队列等布局结束后再执行
+      [void]$logBox.BeginInvoke($scrollToEnd)
+    } else {
+      $scrollToEnd.Invoke()
+    }
   } else {
     $logBox.Select($firstVisible, 0)
     $logBox.ScrollToCaret()
