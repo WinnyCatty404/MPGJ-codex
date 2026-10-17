@@ -170,66 +170,51 @@ $logBox.ScrollBars = 'Both'
 $logBox.DetectUrls = $false
 $logHost.Controls.Add($logBox)
 
-# 是否自动跟随日志底部。这个值只在"用户主动滚动/按键"时按当时的几何位置更新，
-# 不在追加日志时推断——追加时推断会遇到滚动是异步的（BeginInvoke）这一坑：
-# 任务日志连续刷屏时上一次滚动可能还没落地，几何判定会误认为"用户已向上滚动"，
-# 于是既不滚动、还把视图拉回原处，表现为最后一行永远差一点（2026-10-17）。
-$script:logFollowTail = $true
-# 程序化滚动（Push-LogToBottom）期间置位：VScroll 事件会同步触发，
-# 若此时按几何位置更新跟随标志，会在"滚动刚发出、布局未落地"的瞬间
-# 误判为"用户已向上滚动"，把自己的跟随状态关掉——这正是日志末行
-# 一直差一截治不好的闭环（2026-10-17）。
-$script:suppressFollowUpdate = $false
+# 自动滚动到底部开关（默认开）。取消勾选可在日志刷屏时向上翻阅历史。
+$script:autoScroll = $true
 
-function Update-LogFollowTail {
-  if ($script:suppressFollowUpdate) { return }
-  try {
-    if ($logBox.TextLength -le 0) { $script:logFollowTail = $true; return }
-    $lastPoint = $logBox.GetPositionFromCharIndex($logBox.TextLength - 1)
-    $script:logFollowTail = ($lastPoint.Y -ge 0 -and $lastPoint.Y -le ($logBox.ClientSize.Height + $logBox.Font.Height))
-  } catch { $script:logFollowTail = $true }
-}
-
-# 把日志视图推到真正的最底部。仅靠 ScrollToCaret 在"末行刚追加、布局/滚动条状态
-# 刚变化"时会少滚约半行到一行（6877312 改为 BeginInvoke 后仍偶发），因此在其后
-# 再补一发 WM_VSCROLL / SB_BOTTOM，把垂直滚动位置压到滚动范围的最大值，保证
-# 最后一行完整可见。
+# 把日志视图推到真正的最底部。
+# 前几版用 ScrollToCaret / BeginInvoke / 跟随标志 / WM_VSCROLL 兜底，在"末行刚追加、
+# RichEdit 惰性排版尚未落地"时都会少滚约一行，表现为最后一行永远差一截。
+# 这里改用 Win32 EM_SETSCROLLPOS 直接把垂直滚动位置压到最大值（RichEdit 会夹紧到
+# 真实底部），完全绕开 ScrollToCaret 的排版时序依赖，从根本上保证最后一行完整可见；
+# 同时把水平滚动复位到最左，确保长行首部也能看到。ScrollToCaret + WM_VSCROLL 仅作兜底。
 function Push-LogToBottom {
   try {
-    if (-not $logBox.IsHandleCreated) { return }
-    # RichEdit 是惰性排版的：刚追加的文本可能还没参与高度计算，先用一次行号/
-    # 坐标查询强制完成排版，否则滚动会按旧的滚动范围停住。
-    [void]$logBox.GetLineFromCharIndex($logBox.TextLength)
-    [void]$logBox.GetPositionFromCharIndex([Math]::Max(0, $logBox.TextLength - 1))
+    if (-not $logBox -or -not $logBox.IsHandleCreated) { return }
     $logBox.SelectionStart = $logBox.TextLength
     $logBox.SelectionLength = 0
-    # 程序化滚动会同步触发 VScroll 事件，期间屏蔽跟随标志更新（见 Update-LogFollowTail）。
-    $script:suppressFollowUpdate = $true
+    # EM_SETSCROLLPOS(0x04DE)：lParam 指向 POINT(x,y)；y 取最大即滚到最底，x=0 复位到最左
+    $ptr = [System.Runtime.InteropServices.Marshal]::AllocHGlobal(8)
     try {
-      $logBox.ScrollToCaret()
-      if ('Native.Win' -as [type]) {
-        # WM_VSCROLL(0x0115) 的 SB_BOTTOM(7)：滚动到垂直滚动范围最底
-        [void][Native.Win]::SendMessage($logBox.Handle, 0x0115, [IntPtr]7, [IntPtr]::Zero)
-      }
+      [System.Runtime.InteropServices.Marshal]::WriteInt32($ptr, 0)             # POINT.x = 0（水平复位到最左）
+      [System.Runtime.InteropServices.Marshal]::WriteInt32($ptr, 4, 0x7FFFFFFF) # POINT.y = 最大（垂直滚到最底）
+      [void][Native.Win]::SendMessage($logBox.Handle, 0x04DE, [IntPtr]::Zero, $ptr)
     } finally {
-      $script:suppressFollowUpdate = $false
+      [System.Runtime.InteropServices.Marshal]::FreeHGlobal($ptr)
+    }
+    $logBox.ScrollToCaret()
+    if ('Native.Win' -as [type]) {
+      # WM_VSCROLL(0x0115) 的 SB_BOTTOM(7)：滚动到垂直滚动范围最底
+      [void][Native.Win]::SendMessage($logBox.Handle, 0x0115, [IntPtr]7, [IntPtr]::Zero)
     }
   } catch { }
 }
 
-# 用户主动滚动/操作时更新"是否跟随底部"
-$logBox.Add_VScroll({ Update-LogFollowTail })
-$logBox.Add_MouseWheel({ Update-LogFollowTail })
-$logBox.Add_KeyDown({ Update-LogFollowTail })
-$logBox.Add_MouseUp({ Update-LogFollowTail })
+# 自动滚动复选框（位于日志区顶部，默认勾选）
+$chkAuto = New-Object Windows.Forms.CheckBox
+$chkAuto.Dock = 'Top'
+$chkAuto.Height = 22
+$chkAuto.Text = '自动滚动到底部'
+$chkAuto.Checked = $true
+$chkAuto.Font = New-Object Drawing.Font('微软雅黑', 9)
+$chkAuto.ForeColor = $C_SUBTEXT
+$chkAuto.BackColor = $C_BG
+$chkAuto.Margin = New-Object Windows.Forms.Padding(0)
+$chkAuto.Add_CheckedChanged({ $script:autoScroll = $chkAuto.Checked; if ($chkAuto.Checked) { Push-LogToBottom } })
+$logHost.Controls.Add($chkAuto)
 
 function Write-Log([string]$msg, [System.Drawing.Color]$color) {
-  $firstVisible = 0
-  if ($logBox.TextLength -gt 0) {
-    $firstVisible = $logBox.GetCharIndexFromPosition((New-Object Drawing.Point(2, 2)))
-  }
-  $oldStart = $logBox.SelectionStart
-  $oldLength = $logBox.SelectionLength
   $logBox.SelectionStart = $logBox.TextLength
   $logBox.SelectionLength = 0
   $logBox.SelectionColor = $C_SUBTEXT
@@ -237,15 +222,11 @@ function Write-Log([string]$msg, [System.Drawing.Color]$color) {
   $logBox.SelectionColor = $color
   $logBox.AppendText($msg + "`r`n")
   $logBox.SelectionColor = $logBox.ForeColor
-  if ($script:logFollowTail) {
+  if ($script:autoScroll) {
     # 同步滚一次（立即生效）+ 投递到下一个消息周期再滚一次：追加文本后 RichEdit
-    # 的排版与滚动条状态可能刚变化，二次滚动用于兜底，确保末行完整贴底。
+    # 的排版/滚动条状态可能刚变化，二次 EM_SETSCROLLPOS 用于兜底，确保末行完整贴底。
     Push-LogToBottom
     if ($logBox.IsHandleCreated) { [void]$logBox.BeginInvoke([Action]{ Push-LogToBottom }) }
-  } else {
-    $logBox.Select($firstVisible, 0)
-    $logBox.ScrollToCaret()
-    $logBox.Select($oldStart, $oldLength)
   }
   if ($script:controlLogPath) {
     try { Add-Content -LiteralPath $script:controlLogPath -Value ('[' + (Get-Date -Format 'yyyy-MM-dd HH:mm:ss') + '] ' + $msg) -Encoding UTF8 } catch { }
@@ -640,7 +621,7 @@ function Update-ControlTask {
   return $false
 }
 
-$btnLogBottom.Add_Click({ $script:logFollowTail = $true; Push-LogToBottom; $logBox.Focus() })
+$btnLogBottom.Add_Click({ $chkAuto.Checked = $true; Push-LogToBottom; $logBox.Focus() })
 $btnOpenLog.Add_Click({ if (-not (Test-Path -LiteralPath $controlLogDir)) { New-Item -ItemType Directory -Path $controlLogDir -Force | Out-Null }; Start-Process explorer.exe -ArgumentList ('"' + $controlLogDir + '"') })
 $btnSettings.Add_Click({ if (-not $script:activeTask) { Show-BBRemoteBackupSettings } })
 
