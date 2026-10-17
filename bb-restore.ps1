@@ -176,6 +176,10 @@ try {
   Write-Host 'Web/API 当前保持停止，请在控制台点击“启动系统”。'
 } catch {
   $failure = $_.Exception.Message
+  # 回退 SQL 同样需要密码：Start-BBPostgres/Ensure-BBAppRole 在异常路径可能已还原
+  # PGPASSWORD，这里显式兜底，防止回退的 psql 因无密码进入交互式等待，在控制台
+  # 隐藏窗口中永久挂起（2026-10-17 恢复卡死、控制台无法关闭的事故根因）。
+  $env:PGPASSWORD = $PgPassword
   Write-Host "恢复失败，正在回退：$failure"
   foreach ($d in @('uploads', 'storage')) {
     $active = Join-Path $p.DataRoot $d

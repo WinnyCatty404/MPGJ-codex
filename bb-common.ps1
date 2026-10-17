@@ -383,6 +383,11 @@ function Start-BBPostgres {
     if (-not $AllowInitialize) { throw "数据库目录尚未初始化：$($Paths.PgData)" }
     $initialized = Initialize-BBPostgresCluster -PgRoot $Paths.PgRoot -PgData $Paths.PgData -PgPort $Paths.PgPort -SuperUser $SuperUser -SuperuserPassword $PgPassword
   }
+  # 保存调用方已有的 PGPASSWORD 并在结束时还原（而非直接删除）：bb-restore.ps1 在
+  # 脚本级设置该变量，后续恢复/回退 SQL 仍依赖它；此前直接 Remove-Item 会让调用方
+  # 后续的 psql 因无密码进入交互式等待，在控制台隐藏窗口中永久挂起（2026-10-17
+  # 恢复卡死、控制台无法关闭的事故根因之一）。
+  $callerPgPassword = $env:PGPASSWORD
   $env:PGPASSWORD = $PgPassword
   try {
     $existing = Get-BBTargetInstanceDataDir -Psql $psql -PgPort $Paths.PgPort -DbUser $SuperUser
@@ -430,7 +435,8 @@ function Start-BBPostgres {
     }
     throw "PostgreSQL 启动超时：端口 $($Paths.PgPort) 未能通过实例身份校验"
   } finally {
-    Remove-Item Env:\PGPASSWORD -ErrorAction SilentlyContinue
+    if ($null -ne $callerPgPassword) { $env:PGPASSWORD = $callerPgPassword }
+    else { Remove-Item Env:\PGPASSWORD -ErrorAction SilentlyContinue }
   }
 }
 
@@ -443,6 +449,8 @@ function Ensure-BBAppRole {
     [string]$AppPassword = 'BbMiping-App-2026!'
   )
   $psql = Join-Path $Paths.PgRoot 'bin\psql.exe'
+  # 同 Start-BBPostgres：保存并还原调用方的 PGPASSWORD，而不是删除。
+  $callerPgPassword = $env:PGPASSWORD
   $env:PGPASSWORD = $PgPassword
   try {
     # 同 Get-BBTargetInstanceDataDir：禁用 native 命令直连 Select-Object -First 1。
@@ -457,6 +465,7 @@ function Ensure-BBAppRole {
       Assert-BBNativeSuccess '创建应用数据库角色'
     }
   } finally {
-    Remove-Item Env:\PGPASSWORD -ErrorAction SilentlyContinue
+    if ($null -ne $callerPgPassword) { $env:PGPASSWORD = $callerPgPassword }
+    else { Remove-Item Env:\PGPASSWORD -ErrorAction SilentlyContinue }
   }
 }

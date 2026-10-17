@@ -538,7 +538,10 @@ function Update-ControlTask {
   $localSet = if ($localSetMarker -and $localSetMarker -match '^BB_LOCAL_BACKUP_SET=(.+)$') { $Matches[1] } else { '' }
   # 任务脚本成功时输出 BB_TASK_OK=<kind> 标记；进程退出码在部分环境下读不到（为空），
   # 因此以显式标记为第一判据，退出码仅作兜底，两者都读不到时如实提示"无法确认"。
-  $taskOk = [bool]($taskOutput | Where-Object { $_ -match '^BB_TASK_OK=' })
+  # 只认与本任务种类一致的标记：嵌套脚本（如恢复流程内停 Web/API 的 bb-stop）也会
+  # 输出自己的 BB_TASK_OK=<kind>，不限定种类会把失败任务误判成成功（2026-10-17 实测：
+  # 恢复在角色检查失败回退退出，控制台却因嵌套的 BB_TASK_OK=stopping 显示"恢复成功完成"）。
+  $taskOk = [bool]($taskOutput | Where-Object { $_ -match "^BB_TASK_OK=$kind\s*$" })
   $codeReadable = ($null -ne $code -and "$code".Trim() -ne '')
   $script:activeTask = $null
   if ($taskOk -or ($codeReadable -and $code -eq 0)) {
