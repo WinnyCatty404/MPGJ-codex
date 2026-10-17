@@ -777,7 +777,13 @@ $timer.Add_Tick({
 })
 $timer.Start()
 
-Write-Log 'BMPBGS 控制台已就绪，点击「启动系统」开始使用。' $C_TEXT
+if (Test-BBWebReady) {
+  # 启动时先探测一次实际状态：系统已在运行（如控制台重启但服务未停）时，
+  # 不应再提示"点击启动系统"。
+  Write-Log ('BMPBGS 控制台已就绪。检测到系统正在运行（Web http://127.0.0.1:' + $webPort + '），可直接点击「打开系统」使用。') $C_TEXT
+} else {
+  Write-Log 'BMPBGS 控制台已就绪，点击「启动系统」开始使用。' $C_TEXT
+}
 $form.Topmost = $false
 
 # 强制刷新任务栏/Alt-Tab 图标：任务栏取窗口 ICON_BIG，PowerShell 宿主下默认回落为
