@@ -165,8 +165,11 @@ $logBox.ReadOnly = $true
 $logBox.BackColor = $C_LOGBG
 $logBox.BorderStyle = 'None'
 $logBox.Font = New-Object Drawing.Font('Consolas', 9.75)
-$logBox.WordWrap = $false
-$logBox.ScrollBars = 'Both'
+# 日志查看器最稳的配置：开启自动换行 + 仅垂直滚动条。
+# 原 WordWrap=False + ScrollBars=Both 会触发 RichTextBox 已知缺陷——出现水平滚动条时，
+# 垂直滚动范围的最大值算漏最后一行，导致"差一行、手动拖到最底也看不到末行"（2026-10-17 真机实测）。
+$logBox.WordWrap = $true
+$logBox.ScrollBars = 'Vertical'
 $logBox.DetectUrls = $false
 $logHost.Controls.Add($logBox)
 
