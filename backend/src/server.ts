@@ -31,6 +31,11 @@ pg.types.setTypeParser(1082, value => value);
 const port = Number(process.env.PORT || 3100);
 const jwtSecret = process.env.JWT_SECRET || 'development-only-change-me';
 const execFileAsync = promisify(execFile);
+const databaseUrl = process.env.DATABASE_URL;
+if (!databaseUrl) {
+  throw new Error('未配置 DATABASE_URL。请通过安装版控制台或源码根目录的 npm run dev 启动，禁止后端猜测数据库实例。');
+}
+const instanceId = process.env.BMPBGS_INSTANCE_ID || 'unmanaged';
 // 大量证据截图会使报告达到约 30 MB。Word 更新目录、重新分页及 PDF 转换
 // 在此体积下可能超过 3 分钟，保留充足处理时间，避免正常任务被提前终止。
 const WORD_AUTOMATION_TIMEOUT_MS = 10 * 60 * 1000;
@@ -43,9 +48,7 @@ const reportTemplateForLevel = (level: number) => level === 2 ? levelTwoReportTe
 const rawTemplateRoot = path.join(storageRoot, 'templates', 'records');
 const projectEvidenceRoot = (projectId: string) => path.join(storageRoot, 'projects', projectId, 'evidence');
 const pool = new Pool({
-  connectionString:
-    process.env.DATABASE_URL ||
-    'postgresql://bb_miping_app:BbMiping-App-2026!@127.0.0.1:54328/bb_miping',
+  connectionString: databaseUrl,
 });
 // 数据库重启或恢复操作会断开空闲连接。pg 会将该连接移出连接池；
 // 监听错误可避免未处理的 error 事件直接结束整个后端进程。
@@ -427,8 +430,9 @@ function evidenceReadAuth(req: AuthRequest, res: Response, next: NextFunction) {
 }
 
 app.get('/api/health', asyncRoute(async (_req, res) => {
-  const result = await pool.query('SELECT current_database() AS database, now() AS time');
-  res.json({ ok: true, ...result.rows[0] });
+  const result = await pool.query('SELECT current_database() AS database, inet_server_port()::int AS database_port, now() AS time');
+  const { database_port: databasePort, ...databaseState } = result.rows[0];
+  res.json({ ok: true, instanceId, databasePort, ...databaseState });
 }));
 
 app.post('/api/auth/login', asyncRoute(async (req, res) => {

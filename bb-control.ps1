@@ -19,6 +19,7 @@ $config  = Get-BBConfig -AppRoot $AppRoot
 $pgPort  = if ($config -and $config.pgPort)  { [int]$config.pgPort }  else { 54328 }
 $apiPort = if ($config -and $config.apiPort) { [int]$config.apiPort } else { 3100 }
 $webPort = if ($config -and $config.webPort) { [int]$config.webPort } else { 5173 }
+$instanceId = Get-BBInstanceId -AppRoot $AppRoot -ConfiguredInstanceId $(if ($config -and $config.instanceId) { [string]$config.instanceId } else { '' })
 
 Add-Type -AssemblyName System.Windows.Forms
 Add-Type -AssemblyName System.Drawing
@@ -48,7 +49,7 @@ function Test-BBWebReady {
   if (-not (Test-Port $webPort)) { return $false }
   try {
     $health = Invoke-RestMethod -Uri ('http://127.0.0.1:' + $webPort + '/api/health') -TimeoutSec 2
-    return ($health.ok -eq $true -and $health.database -eq 'bb_miping')
+    return ($health.ok -eq $true -and $health.database -eq 'bb_miping' -and $health.instanceId -eq $instanceId)
   } catch { return $false }
 }
 
@@ -242,7 +243,7 @@ $btnRestore = New-Btn '恢复数据' ([System.Drawing.Color]::FromArgb(120, 90, 
 $script:launchStartedAt = $null
 $script:launchFailed = $false
 $script:restoreAwaitingStart = $false
-$controlLogDir = Join-Path $env:TEMP 'bb-miping-logs'
+$controlLogDir = Get-BBRuntimeDir -AppRoot $AppRoot -InstanceId $instanceId
 New-Item -ItemType Directory -Path $controlLogDir -Force | Out-Null
 $startLogPath = Join-Path $controlLogDir 'start.log'
 $script:controlLogPath = Join-Path $controlLogDir ('control-' + (Get-Date -Format 'yyyyMMdd') + '.log')

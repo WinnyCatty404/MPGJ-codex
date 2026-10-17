@@ -11,7 +11,9 @@ $ErrorActionPreference = 'Continue'
 . (Join-Path $AppRoot 'bb-common.ps1')
 
 # ---- 日志：同时输出到屏幕与日志文件，方便远程排查 ----
-$logDir   = Join-Path $env:TEMP 'bb-miping-logs'
+$initialConfig = Get-BBConfig -AppRoot $AppRoot
+$instanceId = Get-BBInstanceId -AppRoot $AppRoot -ConfiguredInstanceId $(if ($initialConfig -and $initialConfig.instanceId) { [string]$initialConfig.instanceId } else { '' })
+$logDir   = Get-BBRuntimeDir -AppRoot $AppRoot -InstanceId $instanceId
 $startLog = Join-Path $logDir 'start.log'
 New-Item -ItemType Directory -Path $logDir -Force | Out-Null
 function Write-BBLog([string]$Msg, [string]$Level = 'INFO') {
@@ -54,8 +56,9 @@ try {
     throw "数据库目录包含中文或非英文字符：$($p.PgData)。请把 BMPBGS 安装到纯英文路径（例如 D:\BMPBGS）后再启动。"
   }
   Set-BBConfig -AppRoot $AppRoot -Config ([PSCustomObject]@{
-    pgPort = $pgPort; apiPort = $apiPort; webPort = $webPort; jwtSecret = $jwtSecret; pgData = $p.PgData
+    instanceId = $instanceId; pgPort = $pgPort; apiPort = $apiPort; webPort = $webPort; jwtSecret = $jwtSecret; pgData = $p.PgData
   })
+  Write-BBLog "实例标识：$instanceId"
   Write-BBLog "端口：PostgreSQL=$pgPort  后端=$apiPort  前端=$webPort"
   Write-BBLog "数据库目录：$($p.PgData)"
 } catch {
@@ -81,6 +84,7 @@ try {
   Write-BBLog 'PostgreSQL 已就绪'
 } catch {
   Write-BBLog "PostgreSQL 启动异常：$($_.Exception.Message)" 'ERROR'
+  if ($_.ScriptStackTrace) { Write-BBLog $_.ScriptStackTrace 'ERROR' }
   if (-not $Silent) { Read-Host '按回车退出' }; exit 1
 }
 
@@ -115,9 +119,10 @@ if (Test-Path -LiteralPath (Join-Path $AppRoot 'bb-data-path.txt')) {
   }
 }
 $env:JWT_SECRET = $jwtSecret
+$env:BMPBGS_INSTANCE_ID = $instanceId
 $env:DATABASE_URL = "postgresql://bb_miping_app:BbMiping-App-2026!@127.0.0.1:$pgPort/bb_miping"
 
-$pidFile     = Join-Path $env:TEMP 'bb-miping.pids'
+$pidFile     = Join-Path $logDir 'processes.pids'
 # 注意：Windows PowerShell 5.1 不允许 RedirectStandardOutput 与 RedirectStandardError
 # 指向同一个文件（PS7 才支持），必须分开，否则 Start-Process 直接报错。
 $backendLog  = Join-Path $logDir 'backend.out.log'

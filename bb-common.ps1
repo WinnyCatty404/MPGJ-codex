@@ -121,9 +121,9 @@ function Get-BBTargetInstanceDataDir {
     $actual = (& $Psql -h 127.0.0.1 -p $PgPort -U $DbUser -d postgres -tAc "SHOW data_directory" 2>$null |
                Select-Object -First 1)
   } catch { return $null }
-  $actual = ([string]$actual).Trim()
-  if (-not $actual) { return $null }
-  return $actual
+  $actualText = [string]$actual
+  if ([string]::IsNullOrWhiteSpace($actualText)) { return $null }
+  return $actualText.Trim()
 }
 
 # 数据目录归一化比较：PG 返回正斜杠（D:/x/pgdata），配置里是反斜杠（D:\x\pgdata），
@@ -167,6 +167,25 @@ function Set-BBConfig {
   }
   foreach ($property in $Config.PSObject.Properties) { $merged[$property.Name] = $property.Value }
   ([PSCustomObject]$merged) | ConvertTo-Json -Depth 6 | Set-Content -LiteralPath $p -Encoding UTF8
+}
+
+# 为每个安装/源码目录生成稳定实例标识，避免 PID 与日志在同一台机器上互相覆盖。
+function Get-BBInstanceId {
+  param([string]$AppRoot, [string]$ConfiguredInstanceId = '')
+  if ($ConfiguredInstanceId -and $ConfiguredInstanceId -match '^[A-Za-z0-9_-]{1,64}$') { return $ConfiguredInstanceId }
+  $fullPath = [IO.Path]::GetFullPath($AppRoot).TrimEnd('\').ToLowerInvariant()
+  $sha = [Security.Cryptography.SHA256]::Create()
+  try {
+    $hash = ([BitConverter]::ToString($sha.ComputeHash([Text.Encoding]::UTF8.GetBytes($fullPath)))).Replace('-', '').Substring(0, 8).ToLowerInvariant()
+  } finally { $sha.Dispose() }
+  $kind = if (Test-Path -LiteralPath (Join-Path $AppRoot '.git')) { 'source-dev' } else { 'installed' }
+  return "$kind-$hash"
+}
+
+function Get-BBRuntimeDir {
+  param([string]$AppRoot, [string]$InstanceId = '')
+  $resolvedId = Get-BBInstanceId -AppRoot $AppRoot -ConfiguredInstanceId $InstanceId
+  return Join-Path (Join-Path $env:TEMP 'bb-miping') $resolvedId
 }
 
 # 在 [Start, End] 范围内探测第一个未被监听的 TCP 端口。
@@ -369,8 +388,30 @@ function Start-BBPostgres {
     if (-not $existing) {
       & $pgCtl -D $Paths.PgData status 2>&1 | Out-Null
       if ($LASTEXITCODE -ne 0) {
-        & $pgCtl -D $Paths.PgData -l (Join-Path $Paths.PgData 'postgresql.log') start
-        Assert-BBNativeSuccess '启动 PostgreSQL'
+        # 命令行端口优先于历史 postgresql.conf，使同机的开发版和安装版可固定使用不同端口。
+        # 启动日志放在数据目录外，避免异常关机恢复时 fsync 与日志写入互相占用。
+        $pgLogDir = Get-BBRuntimeDir -AppRoot $Paths.AppRoot
+        New-Item -ItemType Directory -Path $pgLogDir -Force | Out-Null
+        $pgLog = Join-Path $pgLogDir 'postgresql.log'
+        # pg_ctl 启动的 postgres 会长期持有继承的标准句柄；直接用调用运算符时，
+        # PowerShell 在某些宿主中会一直等待该句柄关闭。单独等待 pg_ctl 进程可避免启动器假死。
+        $pgStartInfo = [Diagnostics.ProcessStartInfo]::new()
+        $pgStartInfo.FileName = $pgCtl
+        $pgStartInfo.Arguments = ('-D "{0}" -l "{1}" -o "-p {2}" -w -t 120 start' -f $Paths.PgData, $pgLog, $Paths.PgPort)
+        $pgStartInfo.UseShellExecute = $false
+        $pgStartInfo.CreateNoWindow = $true
+        $pgStart = [Diagnostics.Process]::new()
+        $pgStart.StartInfo = $pgStartInfo
+        if (-not $pgStart.Start()) { throw "无法启动 pg_ctl：$pgCtl" }
+        if (-not $pgStart.WaitForExit(120000)) {
+          try { $pgStart.Kill() } catch { }
+          throw "启动 PostgreSQL 超时，请查看：$pgLog"
+        }
+        $pgExitCode = $pgStart.ExitCode
+        $pgStart.Dispose()
+        if ($pgExitCode -ne 0) {
+          throw "启动 PostgreSQL 失败（退出码 $pgExitCode），请查看：$pgLog"
+        }
       }
     }
     for ($i = 0; $i -lt 30; $i++) {

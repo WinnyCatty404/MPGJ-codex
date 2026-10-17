@@ -53,29 +53,21 @@
 
 环境要求：Node.js 18+、PostgreSQL 18、PowerShell（Windows）。
 
-1. **准备环境配置**
-   ```bash
-   cp .env.example .env
-   # 编辑 .env，填写数据库口令与 JWT 密钥
-   ```
+1. **确认开发数据库**
 
-2. **初始化本地数据库**
-   ```powershell
-   database/setup.ps1
-   ```
-   默认安装目录 `D:\BBMipingDB`，端口 `54328`。
+   本机开发库固定为 `D:\BBMipingDB\data`，开发启动器只会在已有 `PG_VERSION` 时启动，不会自动初始化或覆盖该目录。
 
-3. **安装依赖并启动**
+2. **安装依赖并启动**
    ```bash
    npm install
    npm run dev
    ```
    或直接使用一键脚本 `start-local.ps1`。
 
-4. **访问系统**
-   浏览器打开 `http://localhost:5173`。
+3. **访问系统**
+   浏览器打开 `http://127.0.0.1:5174`。安装测试版仍使用 `http://127.0.0.1:5173`，两套可同时运行。
 
-> 数据库也可分别用 `database/start.ps1` / `database/stop.ps1` 启停。
+> 停止开发版使用 `npm run dev:stop`，查看状态使用 `npm run dev:status`。不要直接启动后端子工程。
 
 ## 👤 默认账号
 
@@ -118,10 +110,12 @@
 
 | 命令 | 说明 |
 |------|------|
-| `npm run dev` | 同时启动前后端（前端 5173 / 后端 API）|
+| `npm run dev` | 安全启动开发数据库、API 3101 和前端 5174 |
+| `npm run dev:stop` | 仅停止源码开发实例 |
+| `npm run dev:status` | 显示开发实例端口与数据库身份 |
 | `npm run build` | 构建前后端与后端 |
 | `npm run start` | 仅启动后端 |
-| `start-local.ps1` | 一键本地启动（含数据库）|
+| `start-local.ps1` | `npm run dev` 的兼容入口 |
 
 ## 📌 版本与发布
 

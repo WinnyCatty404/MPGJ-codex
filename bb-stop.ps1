@@ -4,7 +4,8 @@
 param(
   [string]$AppRoot = (Split-Path -Parent $MyInvocation.MyCommand.Definition),
   [switch]$Silent,
-  [switch]$KeepPostgres
+  [switch]$KeepPostgres,
+  [string]$PgRoot = ''
 )
 $ErrorActionPreference = 'Continue'
 . (Join-Path $AppRoot 'bb-common.ps1')
@@ -13,9 +14,10 @@ $config  = Get-BBConfig -AppRoot $AppRoot
 $apiPort = if ($config -and $config.apiPort) { [int]$config.apiPort } else { 3100 }
 $webPort = if ($config -and $config.webPort) { [int]$config.webPort } else { 5173 }
 $pgPort  = if ($config -and $config.pgPort)  { [int]$config.pgPort }  else { 54328 }
+$instanceId = Get-BBInstanceId -AppRoot $AppRoot -ConfiguredInstanceId $(if ($config -and $config.instanceId) { [string]$config.instanceId } else { '' })
 
 # 依据 pid 文件结束（精确结束本工具启动的进程）
-$pidFile = Join-Path $env:TEMP 'bb-miping.pids'
+$pidFile = Join-Path (Get-BBRuntimeDir -AppRoot $AppRoot -InstanceId $instanceId) 'processes.pids'
 if (Test-Path -LiteralPath $pidFile) {
   Get-Content -LiteralPath $pidFile | ForEach-Object {
     if ($_ -match '^(\w+)=(\d+)$') {
@@ -36,7 +38,12 @@ foreach ($port in @($apiPort, $webPort)) {
 # 恢复和一致性维护只停止 Web/API，数据库需继续提供本机恢复连接。
 if (-not $KeepPostgres) {
   $configuredPgData = if ($config -and $config.pgData) { [string]$config.pgData } else { '' }
-  $p = Resolve-BBPaths -AppRoot $AppRoot -PgPort $pgPort -ConfiguredPgData $configuredPgData
+  if ($PgRoot) {
+    if (-not $configuredPgData) { Write-Error '缺少 PostgreSQL 数据目录配置。'; exit 1 }
+    $p = [PSCustomObject]@{ PgRoot = $PgRoot; PgData = $configuredPgData; PgPort = $pgPort }
+  } else {
+    $p = Resolve-BBPaths -AppRoot $AppRoot -PgPort $pgPort -ConfiguredPgData $configuredPgData
+  }
   $pgCtl = Join-Path $p.PgRoot 'bin\pg_ctl.exe'
   if (Test-Path -LiteralPath $pgCtl) {
     & $pgCtl -D $p.PgData stop -m fast 2>$null | Out-Null
