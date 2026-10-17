@@ -29,7 +29,12 @@ Assert-True ($common -match 'function Start-BBPostgres' -and $start -match 'Star
 Assert-True ($stop -match '\[switch\]\$KeepPostgres' -and $restore -match 'KeepPostgres') '恢复流程未保留 PostgreSQL'
 Assert-True ($backup -match '\.pending-' -and $backup -match 'backup-manifest\.json') '备份未使用临时集和完成清单'
 Assert-True ($restore -match 'pgRestore -l' -and $restore -match 'bb_restore_' -and $restore -match '正在回退') '恢复缺少预检、临时库或回退流程'
+Assert-True ($restore -match 'Wait-BBPortsReleased' -and $restore -match 'ValidationOnly' -and $restore -match '/api/health') '恢复缺少端口等待或应用健康检查'
+Assert-True ($restore -match 'Get-BBDirectoryFingerprint' -and $restore -match '启用后的 storage') '恢复后未校验附件目录内容'
+Assert-True ($backup -match '正在暂停 Web/API' -and $backup -match 'formatVersion\s*=\s*2' -and $backup -match 'sha256 = \$storageStats\.Sha256') '备份未暂停写入或未生成附件指纹'
+Assert-True ($stop -match 'Test-BBAppProcess' -and $stop -match '拒绝强制结束') '停止脚本未校验进程归属'
 Assert-True ($control -match 'function Select-BBBackupSet' -and $control -match '使用所选备份') '控制台缺少备份集选择'
+Assert-True ($control -match '\$taskOk -and \(-not \$codeReadable -or \$code -eq 0\)') '控制台未强制要求当前任务成功标记'
 Assert-True ($control -notmatch '\$form\.Topmost\s*=\s*\$true' -and $control -notmatch '\$btnExit') '控制台仍然置顶或保留退出按钮'
 Assert-True ($control -match '''running''[\s\S]*Set-BBButtonEnabled \$btnStart \$false') '系统运行后启动按钮没有禁用'
 Assert-True ($control -match 'Add_FormClosing' -and $control -match '不会停止 PostgreSQL') '关闭控制台语义未明确'
@@ -46,6 +51,9 @@ try {
   Invoke-BBRobocopy -Source $source -Destination $destination -Mirror
   Assert-True (Test-Path -LiteralPath (Join-Path $destination 'current.txt')) '镜像复制未写入当前文件'
   Assert-True (-not (Test-Path -LiteralPath (Join-Path $destination 'stale.txt'))) '镜像复制未清除旧文件'
+  $fingerprint1 = Get-BBDirectoryFingerprint $source
+  $fingerprint2 = Get-BBDirectoryFingerprint $destination
+  Assert-True ($fingerprint1.Sha256 -eq $fingerprint2.Sha256 -and $fingerprint1.Count -eq 1) '目录指纹不稳定或文件数错误'
 } finally {
   if (Test-Path -LiteralPath $tempRoot) { Remove-Item -LiteralPath $tempRoot -Recurse -Force }
 }
