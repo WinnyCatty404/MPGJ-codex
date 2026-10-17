@@ -175,8 +175,14 @@ $logHost.Controls.Add($logBox)
 # 任务日志连续刷屏时上一次滚动可能还没落地，几何判定会误认为"用户已向上滚动"，
 # 于是既不滚动、还把视图拉回原处，表现为最后一行永远差一点（2026-10-17）。
 $script:logFollowTail = $true
+# 程序化滚动（Push-LogToBottom）期间置位：VScroll 事件会同步触发，
+# 若此时按几何位置更新跟随标志，会在"滚动刚发出、布局未落地"的瞬间
+# 误判为"用户已向上滚动"，把自己的跟随状态关掉——这正是日志末行
+# 一直差一截治不好的闭环（2026-10-17）。
+$script:suppressFollowUpdate = $false
 
 function Update-LogFollowTail {
+  if ($script:suppressFollowUpdate) { return }
   try {
     if ($logBox.TextLength -le 0) { $script:logFollowTail = $true; return }
     $lastPoint = $logBox.GetPositionFromCharIndex($logBox.TextLength - 1)
@@ -197,10 +203,16 @@ function Push-LogToBottom {
     [void]$logBox.GetPositionFromCharIndex([Math]::Max(0, $logBox.TextLength - 1))
     $logBox.SelectionStart = $logBox.TextLength
     $logBox.SelectionLength = 0
-    $logBox.ScrollToCaret()
-    if ('Native.Win' -as [type]) {
-      # WM_VSCROLL(0x0115) 的 SB_BOTTOM(7)：滚动到垂直滚动范围最底
-      [void][Native.Win]::SendMessage($logBox.Handle, 0x0115, [IntPtr]7, [IntPtr]::Zero)
+    # 程序化滚动会同步触发 VScroll 事件，期间屏蔽跟随标志更新（见 Update-LogFollowTail）。
+    $script:suppressFollowUpdate = $true
+    try {
+      $logBox.ScrollToCaret()
+      if ('Native.Win' -as [type]) {
+        # WM_VSCROLL(0x0115) 的 SB_BOTTOM(7)：滚动到垂直滚动范围最底
+        [void][Native.Win]::SendMessage($logBox.Handle, 0x0115, [IntPtr]7, [IntPtr]::Zero)
+      }
+    } finally {
+      $script:suppressFollowUpdate = $false
     }
   } catch { }
 }
