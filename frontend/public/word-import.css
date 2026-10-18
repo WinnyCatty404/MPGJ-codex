@@ -1,0 +1,20 @@
+.word-import-size-note {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 0 0 12px;
+  padding: 10px 14px;
+  border: 1px solid #d8e5f3;
+  border-radius: 9px;
+  background: #f5f9fe;
+  color: #52657c;
+  font-size: 13px;
+  line-height: 1.6;
+}
+.word-import-size-note b { color: #174a83; white-space: nowrap; }
+html[data-theme="dark"] .word-import-size-note {
+  border-color: #35516b;
+  background: #172b3b;
+  color: #b8c7d5;
+}
+html[data-theme="dark"] .word-import-size-note b { color: #83bdf2; }

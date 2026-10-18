@@ -363,18 +363,25 @@ async function handleProjectWordImport(event: Event) {
   if (!file || !project) return;
   const child = window.open('about:blank', '_blank');
   try {
-    notify('正在上传 Word 报告…');
-    await api(`/projects/${project.id}/report-template`, {
+    const wordImport = (window as any).bbWordImport;
+    if (!wordImport?.prepare) throw new Error('Word 导入组件未加载，请刷新页面后重试');
+    const prepared = await wordImport.prepare(file, { token: token.value, onStatus: notify });
+    notify(prepared.optimized
+      ? `图片优化完成：${wordImport.formatMiB(prepared.originalSize)} → ${wordImport.formatMiB(prepared.optimizedSize)}，正在上传…`
+      : `文件大小 ${wordImport.formatMiB(file.size)}，正在直接上传…`);
+    const staged = await api(`/projects/${project.id}/report-template-staging`, {
       method: 'POST',
-      body: JSON.stringify({ name: file.name, dataBase64: await fileAsBase64(file) }),
-    });
-    const url = `/prototype.html?project=${encodeURIComponent(project.id)}&importStored=1`;
+      body: JSON.stringify({ name: prepared.file.name, dataBase64: await fileAsBase64(prepared.file) }),
+    }) as { importToken: string };
+    const url = `/prototype.html?project=${encodeURIComponent(project.id)}&importStaged=${encodeURIComponent(staged.importToken)}`;
     if (child) child.location.href = url;
     else window.location.href = url;
     notify('上传完成，正在进入项目并解析报告');
   } catch (error) {
     if (child) child.close();
+    if ((error as any)?.cancelled) return;
     notify((error as Error).message);
+    if ((error as any)?.manualRequired) window.alert((error as Error).message);
   } finally {
     importTargetProject.value = null;
     input.value = '';
@@ -871,6 +878,7 @@ onBeforeUnmount(() => {
       <div v-else-if="page==='projects'" class="content list-page">
         <section class="page-title"><div><small>项目全生命周期管理</small><h1>项目管理</h1><p>集中管理项目档案、阶段进度、测评数据与报告成果。</p></div><button class="primary" @click="openAddProjectModal">＋ 新建项目</button></section>
         <section class="panel filter-panel"><div class="search"><span>⌕</span><input v-model="filters.search" @keyup.enter="loadProjects" placeholder="搜索项目编号、报告编号、系统或单位" /></div><select v-model="filters.year" @change="loadProjects"><option value="">全部年度</option><option>2026</option><option>2025</option></select><select v-model="filters.level" @change="loadProjects"><option value="">全部等级</option><option value="2">二级</option><option value="3">三级</option><option value="4">四级</option></select><select v-model="filters.status" @change="loadProjects"><option value="">全部状态</option><option value="draft">草稿</option><option value="in_progress">实施中</option><option value="reviewing">审核中</option><option value="completed">已完成</option></select><button class="secondary" @click="loadProjects">查询</button></section>
+        <div class="word-import-size-note"><b>Word 导入大小规则</b><span>≤55 MiB 直接导入；55–150 MiB 确认后自动优化图片；超过 150 MiB 请先在 Word/WPS 中手工压缩。</span></div>
         <section class="panel data-table project-table"><div class="table-head"><span>项目</span><span>年度</span><span>等级</span><span>项目周期</span><span>当前阶段</span><span>系统评分</span><span>进度</span><span>操作</span></div><div v-for="p in visibleProjects" :key="p.id" class="table-row project-row"><span><b>{{ p.system_name }}</b><small>{{ p.code }}<template v-if="p.report_code"> · {{ p.report_code }}</template><br>{{ p.org_name }}</small></span><span><b>{{ p.assessment_year }}</b></span><span><b>{{ p.system_level }}级</b></span><span><b v-if="p.start_date && p.end_date">{{ fmtDate(p.start_date) }}</b><small v-if="p.start_date && p.end_date">至 {{ fmtDate(p.end_date) }}</small><b v-else>待填写</b></span><span><i class="status-pill" :class="p.status">{{ statusMap[p.status] }}</i><small>{{ stageMeta[p.current_stage-1]?.short }}</small></span><span><b>{{ p.system_score ?? '—' }}</b><small>满分 100</small></span><span><div class="progress"><i :style="{width:p.progress+'%'}"></i></div><small>{{ p.progress }}%</small></span><span class="project-actions"><button @click="openProject(p)">实施</button><label class="project-action-label" for="project-word-import" @click.stop="importTargetProject=p">导入Word</label><button @click="openCopyProjectModal(p)">复制</button><button @click="openEditProjectModal(p)">编辑</button><button class="danger" @click="projectToDelete=p">删除</button></span></div></section>
       </div>
 

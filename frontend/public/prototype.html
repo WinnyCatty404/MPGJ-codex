@@ -965,7 +965,7 @@
     .overall-editor-hint { margin-top: 3px; color: #7b8798; font-size: 12px; font-weight: 400; }
     .overall-stat { flex: none; padding: 7px 11px; border-radius: 7px; background: #eef4fb; color: #31557e; font-size: 12px; line-height: 1.5; }
     .overall-editor-card .doc-editor { margin-top: 0; }
-    .overall-editor-card .doc-editor textarea { min-height: 270px; height: auto; padding: 16px 18px; border: 1px solid #b9c9db; border-radius: 8px; background: #fff; color: #28384d; font-family: inherit; font-size: 16px; line-height: 2; overflow-y: hidden; text-align: justify; resize: none; field-sizing: content; transition: border-color .15s, box-shadow .15s; }
+    .overall-editor-card .doc-editor textarea { min-height: 270px; height: auto; padding: 16px 18px; border: 1px solid #b9c9db; border-radius: 8px; background: #fff; color: #28384d; font-family: inherit; font-size: 17px; line-height: 2; overflow-y: hidden; text-align: justify; resize: none; field-sizing: content; transition: border-color .15s, box-shadow .15s; }
     .overall-editor-card .doc-editor textarea:focus { border-color: #3d73b7; outline: none; box-shadow: 0 0 0 3px rgba(36, 94, 168, .11); }
     .overall-editor-card .doc-meta { margin-top: 8px; color: #77869a; font-size: 12px; }
     .overall-conclusion { margin: 0; padding: 16px 20px; border-left: 4px solid #245ea8; background: #f5f8fc; }
@@ -984,7 +984,7 @@
     .suggestion-problem-count { flex: none; padding: 7px 11px; border-radius: 7px; background: #eef4fb; color: #31557e; font-size: 14px; }
     .suggestion-editor-card .doc-editor + .doc-editor { margin-top: 16px; }
     .suggestion-editor-card .doc-meta { font-size: 14px; line-height: 1.6; }
-    .suggestion-editor-card .doc-editor textarea { min-height: 190px; padding: 14px 16px; border-style: solid; font-size: 16px; line-height: 2; resize: none; }
+    .suggestion-editor-card .doc-editor textarea { min-height: 190px; padding: 14px 16px; border-style: solid; font-size: 17px; line-height: 2; resize: none; }
     .suggestion-empty { padding: 34px 20px; border: 1px dashed #cbd7e5; border-radius: 8px; background: #fafcff; color: #52657c; font-size: 16px; line-height: 1.8; text-align: center; }
     @media (max-width: 760px) { .overall-summary-card { padding: 12px 14px; } .overall-editor-card { width: auto; padding: 18px; } .overall-editor-head { display: block; } .overall-stat { margin-top: 8px; } }
     @media (max-width: 760px) { .suggestion-editor-card { padding: 18px; } .suggestion-editor-head { display: block; } .suggestion-problem-count { display: inline-block; margin-top: 8px; } }
@@ -2743,6 +2743,8 @@
     </div>
     <div class="modal-body">
       <div style="margin-bottom:14px; color:#646A73; line-height:1.7;">只有勾选的内容才会从 Word 导入并覆盖；<strong>未勾选的内容保留当前项目原值</strong>。</div>
+      <div style="margin-bottom:10px; padding:10px 12px; background:#F5F8FC; border:1px solid #DCE5F0; border-radius:7px; color:#52657C; font-size:12px; line-height:1.7;"><strong>文件大小规则：</strong>≤55 MiB 直接导入；55–150 MiB 经确认后自动优化 JPEG/PNG 图片；超过 150 MiB 不读取，请先使用 Word/WPS 手工压缩。</div>
+      <div id="word-import-file-status" style="margin-bottom:14px; padding:9px 11px; background:#ECF8F3; border:1px solid #BFE6D4; border-radius:6px; color:#276749; font-size:12px; line-height:1.6;"></div>
       <div style="display:grid; gap:8px; margin-bottom:14px;">
         <label style="display:flex; align-items:center; gap:8px;"><input type="checkbox" id="word-import-basic" checked /> 项目准备与系统基本信息</label>
         <label style="display:flex; align-items:center; gap:8px;"><input type="checkbox" id="word-import-planning" checked /> 测评准备与方案（含资产、测评对象、指标和方案内容）</label>
@@ -2790,6 +2792,7 @@
   <span id="toast-text" data-page-node-id="AERy16BTruRaPnPB3eKuBr">操作成功</span>
 </div>
 
+<script src="/word-import.js"></script>
 <script>
   // ===== 数据 =====
   const currentYear = new Date().getFullYear();
@@ -7189,8 +7192,8 @@
   }
 
   const APPENDIX_B_SELECTABLE_ROLES = [
-    { key: 'b7-reviewer', role: '密评报告审核人' },
-    { key: 'b7-approver', role: '密评报告批准人' }
+    { key: 'b7-reviewer', role: '密评报告审核人', defaultName: '赵一凡' },
+    { key: 'b7-approver', role: '密评报告批准人', defaultName: '朱晨鸣' }
   ];
   const APPENDIX_B_FIELD_DEFAULTS = { 'b1-type': '政府采购合同' };
 
@@ -7211,8 +7214,8 @@
       fixed: false
     }));
     APPENDIX_B_SELECTABLE_ROLES.forEach(item => {
-      const name = apbVal(item.key, '');
-      rows.push({ name: name, role: item.role, certDate: apbCertDate(name), fixed: true, selectKey: item.key, defaultName: '' });
+      const name = apbVal(item.key, item.defaultName);
+      rows.push({ name: name, role: item.role, certDate: apbCertDate(name), fixed: true, selectKey: item.key, defaultName: item.defaultName });
     });
     return rows;
   }
@@ -8329,11 +8332,29 @@
     inp.click();
   }
 
-  function handleWordImport(input) {
+  async function handleWordImport(input) {
     const file = input.files && input.files[0];
     if (!file) return;
     if (!/\.docx$/i.test(file.name)) { showToast('请选择 .docx 格式的密评报告', true); return; }
-    pendingWordImportFile = file;
+    try {
+      if (!window.bbWordImport || !window.bbWordImport.prepare) throw new Error('Word 导入组件未加载，请刷新页面后重试');
+      const prepared = await window.bbWordImport.prepare(file, {
+        token: localStorage.getItem('bb-token') || '',
+        onStatus: function(message) { showToast(message); }
+      });
+      pendingWordImportFile = prepared.file;
+      const fileStatus = document.getElementById('word-import-file-status');
+      if (fileStatus) fileStatus.textContent = prepared.optimized
+        ? '图片优化完成：' + window.bbWordImport.formatMiB(prepared.originalSize) + ' → ' + window.bbWordImport.formatMiB(prepared.optimizedSize) + '，共优化 ' + prepared.optimizedImages + ' 张图片。'
+        : '文件大小 ' + window.bbWordImport.formatMiB(prepared.originalSize) + '，无需优化，将直接导入。';
+    } catch (error) {
+      pendingWordImportFile = null;
+      input.value = '';
+      if (error && error.cancelled) return;
+      showToast('导入准备失败：' + (error && error.message ? error.message : error), true);
+      if (error && error.manualRequired) window.alert(error.message);
+      return;
+    }
     ['basic', 'planning', 'reporting'].forEach(function(id) {
       const box = document.getElementById('word-import-' + id);
       if (box) box.checked = true;
@@ -8594,9 +8615,9 @@
         normalizeParagraphTextareas(document.getElementById('page-implement'));
         syncTopologyCaption();
       showImportLog(log);
-      if (window.bbStoreImportedTemplate) await window.bbStoreImportedTemplate(file, log);
       if (typeof window.bbPersistAllStages !== 'function') throw new Error('项目保存组件尚未就绪，请刷新页面后重试');
       await window.bbPersistAllStages();
+      if (window.bbStoreImportedTemplate) await window.bbStoreImportedTemplate(file, log);
       renderProjects();
       updateProjectStats();
       try {
@@ -11113,11 +11134,11 @@
       if (saved.reportRiskStore) reportRiskStore = clone(saved.reportRiskStore);
       if (saved.reportImportedRiskRows) reportImportedRiskRows = clone(saved.reportImportedRiskRows);
       if (saved.appendixBData) appendixBData = clone(saved.appendixBData);
-      // 新版改为两个无默认值的自由选择框；清除旧版本曾强制写入的人员一次。
-      if (appendixBData['b7-personnel-selection-version'] !== '3') {
-        delete appendixBData['b7-reviewer'];
-        delete appendixBData['b7-approver'];
-        appendixBData['b7-personnel-selection-version'] = '3';
+      // 缺失时应用新默认值；已选择或主动清空的值均保留，两个下拉框仍可随时修改。
+      if (appendixBData['b7-personnel-selection-version'] !== '4') {
+        if (!Object.prototype.hasOwnProperty.call(appendixBData, 'b7-reviewer')) appendixBData['b7-reviewer'] = '赵一凡';
+        if (!Object.prototype.hasOwnProperty.call(appendixBData, 'b7-approver')) appendixBData['b7-approver'] = '朱晨鸣';
+        appendixBData['b7-personnel-selection-version'] = '4';
       }
       if (saved.appendixBImages) appendixBImages = clone(saved.appendixBImages);
       renderReport();
@@ -11658,14 +11679,18 @@
     }).catch(function () { riskTemplateLibrary = []; });
 
     const requestedStep = Number(params.get('step') || 0);
-    const isImporting = params.get('import') === '1' || params.get('importStored') === '1';
+    const stagedImportToken = params.get('importStaged');
+    const isImporting = params.get('import') === '1' || params.get('importStored') === '1' || !!stagedImportToken;
     const initialStep = isImporting ? 1 : (requestedStep ? Math.min(5, Math.max(1, requestedStep)) : Math.min(5, Math.max(1, Number(project.current_stage || 1))));
     switchStep(initialStep);
     loading.remove();
     restoreGlobalReplaceUiState();
-    if (params.get('importStored') === '1') {
+    if (stagedImportToken || params.get('importStored') === '1') {
       showToast('正在读取并解析已选择的 Word 报告…');
-      fetch('/api/projects/' + projectId + '/report-template', { headers: { Authorization: 'Bearer ' + token } })
+      const importUrl = stagedImportToken
+        ? '/api/projects/' + projectId + '/report-template-staging/' + encodeURIComponent(stagedImportToken)
+        : '/api/projects/' + projectId + '/report-template';
+      fetch(importUrl, { headers: { Authorization: 'Bearer ' + token } })
         .then(function (response) {
           if (!response.ok) return response.json().then(function (error) { throw new Error(error.message || 'Word 报告读取失败'); });
           const disposition = response.headers.get('Content-Disposition') || '';
@@ -11673,6 +11698,11 @@
           return Promise.all([response.blob(), Promise.resolve(nameM ? decodeURIComponent(nameM[1]) : 'imported-report.docx')]);
         })
         .then(function (result) {
+          if (stagedImportToken) {
+            const cleanUrl = new URL(location.href);
+            cleanUrl.searchParams.delete('importStaged');
+            history.replaceState(null, '', cleanUrl.toString());
+          }
           const file = new File([result[0]], result[1], { type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' });
           file.__bbStoredTemplate = true;
           const input = document.getElementById('word-import-file');

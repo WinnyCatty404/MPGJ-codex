@@ -21,6 +21,7 @@ import { replaceProjectTextInStageData, syncProjectDatesInStageData } from './pr
 import { calculateStageCompletion, deriveProjectProgress } from './project-progress.js';
 import { buildRiskTemplateWorkbook, parseRiskTemplateWorkbook } from './risk-template-xlsx.js';
 import { buildUserImportWorkbook, parseUserImportWorkbook } from './user-import-xlsx.js';
+import { DocxOptimizeError, optimizeDocxForWordImport, WORD_IMPORT_DIRECT_LIMIT, WORD_IMPORT_HARD_LIMIT } from './docx-image-optimizer.js';
 
 dotenv.config({ path: fileURLToPath(new URL('../../.env', import.meta.url)) });
 
@@ -816,6 +817,58 @@ app.post('/api/projects/:id/report-template', auth, asyncRoute(async (req, res) 
   res.json({ stored: true, name: input.name });
 }));
 
+app.post('/api/projects/:id/report-template-staging', auth, asyncRoute(async (req, res) => {
+  const projectId = String(req.params.id);
+  const input = z.object({ name: z.string().min(1).max(255), dataBase64: z.string().min(1) }).parse(req.body);
+  if (!input.name.toLowerCase().endsWith('.docx')) return res.status(400).json({ message: '仅支持 DOCX 报告模板' });
+  const exists = await pool.query('SELECT 1 FROM projects WHERE id=$1', [projectId]);
+  if (!exists.rows[0]) return res.status(404).json({ message: '项目不存在' });
+  const data = Buffer.from(input.dataBase64, 'base64');
+  if (!data.length || data.length > WORD_IMPORT_DIRECT_LIMIT) return res.status(413).json({ message: '待导入文件必须小于或等于 55 MiB' });
+  const importToken = randomUUID();
+  const folder = path.join(storageRoot, 'projects', projectId, 'word-import-staging');
+  await fs.mkdir(folder, { recursive: true });
+  await Promise.all([
+    fs.writeFile(path.join(folder, `${importToken}.docx`), data),
+    fs.writeFile(path.join(folder, `${importToken}.json`), JSON.stringify({ originalName: input.name, createdAt: new Date().toISOString() })),
+  ]);
+  res.json({ staged: true, importToken });
+}));
+
+app.get('/api/projects/:id/report-template-staging/:token', auth, asyncRoute(async (req, res) => {
+  const projectId = String(req.params.id);
+  const importToken = z.string().uuid().parse(req.params.token);
+  const folder = path.join(storageRoot, 'projects', projectId, 'word-import-staging');
+  const templatePath = path.join(folder, `${importToken}.docx`);
+  const metadataPath = path.join(folder, `${importToken}.json`);
+  try {
+    const [content, metadataText] = await Promise.all([fs.readFile(templatePath), fs.readFile(metadataPath, 'utf8')]);
+    const originalName = JSON.parse(metadataText).originalName || 'imported-report.docx';
+    res.type('application/vnd.openxmlformats-officedocument.wordprocessingml.document');
+    res.setHeader('Content-Disposition', `inline; filename*=UTF-8''${encodeURIComponent(originalName)}`);
+    res.send(content);
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === 'ENOENT') return res.status(404).json({ message: 'Word 临时导入文件不存在或已使用，请重新选择文件' });
+    throw error;
+  } finally {
+    await Promise.allSettled([fs.unlink(templatePath), fs.unlink(metadataPath)]);
+  }
+}));
+
+app.post('/api/word-import/optimize', auth, express.raw({
+  type: ['application/vnd.openxmlformats-officedocument.wordprocessingml.document', 'application/octet-stream'],
+  limit: WORD_IMPORT_HARD_LIMIT,
+}), asyncRoute(async (req, res) => {
+  if (!Buffer.isBuffer(req.body) || !req.body.length) return res.status(400).json({ message: '未收到 DOCX 文件内容' });
+  const result = await optimizeDocxForWordImport(req.body);
+  res.type('application/vnd.openxmlformats-officedocument.wordprocessingml.document');
+  res.setHeader('X-BMPBGS-Original-Size', String(result.originalSize));
+  res.setHeader('X-BMPBGS-Optimized-Size', String(result.optimizedSize));
+  res.setHeader('X-BMPBGS-Optimized-Images', String(result.optimizedImages));
+  res.setHeader('X-BMPBGS-Optimization-Pass', String(result.pass));
+  res.send(result.data);
+}));
+
 app.get('/api/projects/:id/report-template', auth, asyncRoute(async (req, res) => {
   const projectId = String(req.params.id);
   const templatePath = path.join(storageRoot, 'projects', projectId, 'report-template.docx');
@@ -1267,6 +1320,10 @@ app.post('/api/projects/:id/original-records', auth, asyncRoute(async (req, res)
 
 app.use((error: unknown, _req: Request, res: Response, _next: NextFunction) => {
   console.error(error);
+  if (error instanceof DocxOptimizeError) return res.status(error.status).json({ message: error.message });
+  if (typeof error === 'object' && error && 'type' in error && error.type === 'entity.too.large') {
+    return res.status(413).json({ message: 'Word 文件超过 150 MiB，系统不会读取该文件。' });
+  }
   if (error instanceof z.ZodError) return res.status(400).json({ message: '提交内容校验失败', issues: error.issues });
   if (typeof error === 'object' && error && 'code' in error && error.code === '23505') return res.status(409).json({ message: '编号或用户名已存在' });
   res.status(500).json({ message: '服务器处理失败' });
