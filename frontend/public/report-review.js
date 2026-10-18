@@ -10,68 +10,119 @@ let reportReviewState = { findings: [], accepted: [], ranAt: '', scope: null, si
     return tbody ? Array.from(tbody.rows).map(r => r.cells[1]?.querySelector('textarea,input')?.value.trim()).filter(Boolean) : [];
   }
   function snapshot() {
-    const objects = [], units = [], targets = [];
+    const objects = [], units = [], targets = [], recordExpectations = [];
     ONSITE_LAYERS.forEach((layer, t) => {
       const planned = getOnsiteObjectEntries(t);
       evaluationIndicatorLevels[t].items.forEach((unit, i) => {
         const applicable = isOnsiteUnitApplicable(t, i);
         units.push({ layer: t, name: unit.name, result: reportClassify(getRawUnitScore(t, i)) });
+        const unitObjects = [];
         getOnsiteUnitObjectEntries(t, unit.name).forEach((entry, j) => {
           const record = getOnsiteRec(t, i, j);
           const aliases = (objData[t < 4 ? t + 1 : 5] || []).find(o => o.objectId === entry.id)?.aliases || [];
-          objects.push({ key: onsiteKey(t, i, j), layer: t, item: i, index: j, name: entry.name, aliases,
+          const reviewObject = { key: onsiteKey(t, i, j), layer: t, item: i, index: j, name: entry.name, aliases,
             unit: unit.name, record: String(record.record || ''), result: getObjectCls(t, i, j),
             rawScore: getReportObjectScore(t, i, j, false), applicable,
-            isData: t === 3 && Boolean(ONSITE_UNIT_DATA_REQ[unit.name]) });
+            isData: t === 3 && Boolean(ONSITE_UNIT_DATA_REQ[unit.name]) };
+          objects.push(reviewObject);
+          unitObjects.push(reviewObject);
         });
+        if (t >= 4 && t <= 7 && applicable) {
+          const nonempty = new Map();
+          unitObjects.forEach(object => {
+            const text = String(object.record || '').trim();
+            if (!text) return;
+            if (!nonempty.has(text)) nonempty.set(text, { key: 'record|' + t + '|' + i + '|' + nonempty.size,
+              layer: t, item: i, unit: unit.name, record: text, problem: false, sources: [] });
+            const expectation = nonempty.get(text);
+            expectation.sources.push({ ...object, problem: ['部分符合', '不符合'].includes(object.result) });
+            if (['部分符合', '不符合'].includes(object.result)) expectation.problem = true;
+          });
+          if (nonempty.size) recordExpectations.push(...nonempty.values());
+          else recordExpectations.push({ key: 'record-empty|' + t + '|' + i, layer: t, item: i, unit: unit.name,
+            record: '', problem: unitObjects.some(object => ['部分符合', '不符合'].includes(object.result)), sources: unitObjects.map(object => ({ ...object,
+              problem: ['部分符合', '不符合'].includes(object.result) })) });
+        }
       });
       // 第二步存在但未绑定任何现场指标的对象也纳入覆盖检查。
       planned.forEach(entry => { if (!objects.some(o => o.layer === t && o.name === entry.name)) objects.push({ key: 'plan|' + entry.id,
         layer: t, item: -1, index: -1, name: entry.name, aliases: [], unit: '', record: '', result: '未测评', applicable: true, planOnly: true }); });
-      const problemUnits = getLayerProblemUnits(t).map(p => ({ item: p.itemIdx, name: p.name }));
+      const problemUnits = getLayerProblemUnits(t).map(p => {
+        const template = findRiskTemplate(t, p.name, p.cls);
+        const templateAdvice = fillRiskTemplateText(template?.advice, t, p.name);
+        const adviceBaseline = templateAdvice || ('建议按照 GB/T 39786—2021 相关要求' + (p.desc ? '（' + p.desc + '）' : '') +
+          '，采用符合国家密码管理要求的密码技术、密码产品与密码服务进行整改，确保相应安全需求得到有效保障。');
+        return { item: p.itemIdx, name: p.name, adviceBaseline };
+      });
       objects.push({ key: 'problem-count|' + t, layer: t, item: -1, index: -1, name: '问题项', unit: '',
         record: '问题项 ' + problemUnits.length + ' 个', result: String(problemUnits.length), summaryCount: true });
+      objects.push({ key: 'advice-count|' + t, layer: t, item: -1, index: -1, name: '改进建议', unit: '',
+        record: '问题单元 ' + problemUnits.length + ' 个', result: String(problemUnits.length), summaryCount: true });
       const definitions = [
-        [0, 'report-ua-text-' + t, buildLayerAnalysisText(t), 'all'],
-        [4, 'report-overall-' + t, buildLayerOverallText(t), 'all'],
-        [5, 'report-sug-prob-' + t, buildSugProblemText(t), 'problems']
+        [0, 'report-ua-text-' + t, getReportUnitAnalysisText(t), 'all', 'unitAnalysis'],
+        [4, 'report-overall-' + t, getReportOverallText(t), 'all', 'overall'],
+        [5, 'report-sug-prob-' + t, getReportSuggestionText(t, 'prob'), 'problems', 'problem'],
+        [5, 'report-sug-adv-' + t, getReportSuggestionText(t, 'adv'), null, 'advice']
       ];
-      definitions.forEach(([section, id, auto, coverage]) => targets.push({ id, section, layer: t, text: getReportTextVal(id, auto),
-        manual: Object.prototype.hasOwnProperty.call(reportTexts, id), coverage,
-        problemUnits: section === 5 ? problemUnits : undefined }));
+      definitions.forEach(([section, id, text, coverage, kind]) => {
+        const state = reportTextStates[id];
+        const sourceMode = state?.mode || (Object.prototype.hasOwnProperty.call(reportTexts, id) ? 'manual' : 'auto');
+        targets.push({ id, section, layer: t, text, manual: sourceMode !== 'auto', sourceMode, coverage, kind,
+          problemUnits: section === 5 ? problemUnits : undefined });
+      });
     });
     ['physical', 'network', 'device', 'application'].forEach((key, layer) => {
       const id = 'plan-crypto-' + key;
       targets.push({ id, section: 8, layer, text: document.getElementById(id)?.value || '', manual: true, coverage: 'all' });
     });
-    // 整体分析与评估结论继续保留；建议只核对问题描述中的低分对象和编号，不核对改进建议。
+    // 整体分析与评估结论继续保留；问题描述按层面规则核对，改进建议另行检查对应关系和可执行性。
     // 整体分析是结构化修正：保留人工填写理由，不将修正前后结果不同直接判错。
     Object.entries(reportFixes).forEach(([key, fix]) => {
       const loc = locateOnsiteRecordKey(key);
       if (loc) targets.push({ id: 'fix|' + key, section: 1, layer: loc.t, unit: loc.unitName, text: String(fix.reason || ''), manual: true });
     });
     targets.push({ id: 'report-conclusion-text', section: 3, layer: -1, text: getReportTextVal('report-conclusion-text', buildConclusionSentence()), manual: Object.prototype.hasOwnProperty.call(reportTexts, 'report-conclusion-text') });
-    return { objects, units, targets, serverNames: assetNames('server'), databaseNames: assetNames('db'), dataCount: assetNames('data').length };
+    return { objects, units, targets, recordExpectations,
+      serverNames: assetNames('server'), databaseNames: assetNames('db'), dataCount: assetNames('data').length };
   }
   function signature(input) { return BBReportReviewEngine.hash(JSON.stringify(input)); }
+  function findInputObject(input, key) {
+    const direct = input.objects.find(object => object.key === key);
+    if (direct) return direct;
+    const expectation = (input.recordExpectations || []).find(item => item.key === key ||
+      (item.sources || []).some(source => source.key === key));
+    if (!expectation) return null;
+    return (expectation.sources || []).find(source => source.key === key) || {
+      key: expectation.key, layer: expectation.layer, item: expectation.item, index: -1,
+      name: '结果记录', unit: expectation.unit, record: expectation.record, result: ''
+    };
+  }
   const excludedSections = new Set([2]);
-  const suggestionRules = new Set(['C31', 'C32']);
+  const suggestionRules = new Set(['C31', 'C32', 'C34', 'C35', 'C36', 'C37', 'C38', 'C39']);
+  const managementRulesReplaced = new Set(['C29', 'C31']);
+  function layerFromTargetId(id) {
+    const match = /-(\d+)$/.exec(String(id || ''));
+    return match ? Number(match[1]) : null;
+  }
   function validFinding(finding) {
-    return finding && !excludedSections.has(finding.target?.section) &&
-      (finding.target?.section !== 5 || suggestionRules.has(finding.rule));
+    if (!finding || excludedSections.has(finding.target?.section)) return false;
+    if (Number(finding.object?.layer) >= 4 && managementRulesReplaced.has(finding.rule)) return false;
+    return finding.target?.section !== 5 || suggestionRules.has(finding.rule);
   }
   function validAccepted(item) {
-    return item && !excludedSections.has(item.targetSection) &&
-      (item.targetSection !== 5 || suggestionRules.has(item.rule));
+    if (!item || excludedSections.has(item.targetSection)) return false;
+    const layer = item.objectLayer ?? layerFromTargetId(item.targetId);
+    if (Number(layer) >= 4 && managementRulesReplaced.has(item.rule)) return false;
+    return item.targetSection !== 5 || suggestionRules.has(item.rule);
   }
   function sourceFingerprint(target, object, rule) {
     const source = [target.text, object.record, object.result, object.name];
-    if (rule === 'C31') source.push(object.unit, object.rawScore);
+    if (rule === 'C31' || /^C3[4-9]$/.test(rule)) source.push(object.unit, object.rawScore, target.kind, target.sourceMode);
     return BBReportReviewEngine.hash(JSON.stringify(source));
   }
   function acceptedFromFinding(finding) {
     return { id: finding.id, rule: finding.rule, objectKey: finding.object.key, objectName: finding.object.name,
-      objectUnit: finding.object.unit, targetId: finding.target.id, targetSection: finding.target.section, title: finding.title,
+      objectUnit: finding.object.unit, objectLayer: finding.object.layer, targetId: finding.target.id, targetSection: finding.target.section, title: finding.title,
       fingerprint: finding.fingerprint, sourceFingerprint: sourceFingerprint(finding.target, finding.object, finding.rule),
       note: finding.note || '', confirmedAt: new Date().toISOString() };
   }
@@ -146,7 +197,7 @@ let reportReviewState = { findings: [], accepted: [], ranAt: '', scope: null, si
     const filtered = { ...input, targets: input.targets.filter(t => scope == null || t.section === scope) };
     reportReviewState.accepted = reportReviewState.accepted.filter(item => {
       const target = input.targets.find(t => t.id === item.targetId);
-      const object = input.objects.find(o => o.key === item.objectKey);
+      const object = findInputObject(input, item.objectKey);
       return target && object && item.sourceFingerprint === sourceFingerprint(target, object, item.rule);
     });
     const accepted = new Map(reportReviewState.accepted.map(item => [item.id, item]));
@@ -160,7 +211,7 @@ let reportReviewState = { findings: [], accepted: [], ranAt: '', scope: null, si
     reportReviewState.ranAt = new Date().toISOString(); reportReviewState.scope = scope;
     reportReviewState.findings.forEach(f => {
       const target = input.targets.find(t => t.id === f.target.id);
-      const object = input.objects.find(o => o.key === f.object.key);
+      const object = findInputObject(input, f.object.key);
       f.stale = !target || !object || target.text !== f.target.text || object.record !== f.object.record || object.result !== f.object.result;
       if (f.stale) f.status = '待确认';
     });
@@ -194,6 +245,8 @@ let reportReviewState = { findings: [], accepted: [], ranAt: '', scope: null, si
   window.locateReviewSource = function(id) {
     const f = findingMembers(id)[0]; if (!f) return;
     if (f.rule === 'C32') { switchStep(4); activeSuggestionLayer = f.target.layer; switchReportTab(5); showToast('请核对本层面的“问题项”数量及编号条目。'); return; }
+    if (f.rule === 'C37' && f.object.summaryCount) { switchStep(4); activeSuggestionLayer = f.target.layer; switchReportTab(5); showToast('请核对本层面的改进建议编号及问题单元。'); return; }
+    if (Number(f.object.item) < 0 || Number(f.object.index) < 0) { switchStep(3); switchOnsiteTab(f.object.layer); showToast('请核对本测评单元的现场结果记录。'); return; }
     switchStep(f.object.planOnly ? 2 : 3);
     if (f.object.planOnly) { showToast('请在第二步测评对象中核对：' + f.object.name); return; }
     switchOnsiteTab(f.object.layer);
@@ -246,7 +299,7 @@ let reportReviewState = { findings: [], accepted: [], ranAt: '', scope: null, si
     return out;
   }
   function rvDescribe(finding) {
-    if (finding.rule === 'C31' || finding.rule === 'C32') return '<b>审核依据：</b>' + esc(finding.reason);
+    if (finding.rule === 'C31' || finding.rule === 'C32' || /^C3[4-9]$/.test(finding.rule)) return '<b>审核依据：</b>' + esc(finding.reason);
     const left = rvBrief(finding.baseline || finding.object.name);
     const right = String(finding.target.text || '').trim();
     return '<b>A</b> 现场结果记录中写了「<em class="ok">' + esc(left) + '</em>」，<b>B</b> ' + esc(labels[finding.target.section]) +
@@ -272,11 +325,12 @@ let reportReviewState = { findings: [], accepted: [], ranAt: '', scope: null, si
       STATUSES.map((s, i) => '<button type="button" class="review-chip' + (reviewFilter === s ? ' on' : '') + (counts[i] ? '' : ' empty') + '" onclick="setReviewFilter(\'' + s + '\')">' + s + ' ' + counts[i] + '</button>').join('') + '</div>';
     const detail = f ? (function() {
       const hasObject = String(f.target.text || '').indexOf(f.object.name) >= 0;
+      const recordRule = /^C3[4-9]$/.test(f.rule) || (f.rule === 'C28' && Number(f.object.layer) >= 4);
       return '<h4>' + esc(f.title) + '</h4>' +
         '<p class="review-desc">' + rvDescribe(f) + '</p>' +
         '<div class="review-fields">' +
           (f.object.unit ? '<span>测评指标 <b>' + esc(f.object.unit) + '</b></span>' : '') +
-          '<span>测评对象 <b>' + esc(f.object.name) + '</b></span>' +
+          (recordRule ? '<span>核对项目 <b>' + esc(f.target.kind === 'advice' ? '改进建议' : '结果记录') + '</b></span>' : '<span>测评对象 <b>' + esc(f.object.name) + '</b></span>') +
           '<span>所属层面 <b>' + esc(ONSITE_LAYERS[f.object.layer].name) + '</b></span>' +
         '</div>' +
         '<div class="review-compare">' +
@@ -285,14 +339,14 @@ let reportReviewState = { findings: [], accepted: [], ranAt: '', scope: null, si
             '<button type="button" onclick="locateReviewSource(\'' + f.id + '\')">定位现场对象</button>') + '</div>' +
           '<pre>' + rvMarkText(f.baseline || f.object.name, rvPatterns(f, 'left'), 'rv-ok') + '</pre></div>' +
           '<div><div class="review-compare-head"><span>' + esc(labels[f.target.section]) + '原文</span><button type="button" onclick="locateReviewTarget(\'' + f.id + '\')">定位报告原文</button></div>' +
-          (hasObject || f.rule === 'C32' || f.type === '无法核对' ? '' : '<div class="review-missing">未找到「' + esc(f.object.name) + '」相关描述</div>') +
+          (recordRule || hasObject || f.rule === 'C32' || f.type === '无法核对' ? '' : '<div class="review-missing">未找到「' + esc(f.object.name) + '」相关描述</div>') +
           '<pre>' + rvMarkText(f.target.text || '（未填写）', rvPatterns(f, 'right'), 'rv-bad') + '</pre></div>' +
         '</div>' +
         '<label>处理状态 <select onchange="setReviewStatus(\'' + f.id + '\',this.value)">' + STATUSES.map(s => '<option' + (s === f.status ? ' selected' : '') + '>' + s + '</option>').join('') + '</select></label>' +
         '<label>处理说明<textarea class="text-area" onchange="setReviewNote(\'' + f.id + '\',this.value)">' + esc(f.note) + '</textarea></label>';
     })() : '<p>选择左侧问题查看原文对照。</p>';
-    panel.innerHTML = '<h3>报告审核</h3><p>根据第二步对象与第三步现场记录，核对密码应用概况四个层面的应用情况描述、单元测评结果分析和总体评价等目标。允许同类服务器、数据库达到3个时合并称呼；重要数据资产达到3项时可称“重要数据”。</p>' +
-      '<p class="review-hint">安全问题及改进建议仅检查各层面问题描述中的低分对象和编号末项；同指标无法定位的对象合并显示，仍可分别定位。改进建议与风险分析不参与对比；复杂语义及截图代码仍需人工复核。</p>' +
+    panel.innerHTML = '<h3>报告审核</h3><p>技术类层面依据测评对象及现场记录核对对象、参数和结论；管理类层面依据测评单元及结果记录核对单元分析、总体评价和问题描述，允许不改变核心事实与肯否方向的合理简写。</p>' +
+      '<p class="review-hint">问题描述同时检查问题项编号；改进建议检查问题单元对应关系、整改方向、可执行性以及现状与未来措施是否混淆。复杂语义及截图代码仍需人工复核，审核结果不会自动修改报告原文。</p>' +
       statusbar +
       (state.accepted.length ? '<details class="review-accepted"><summary>已确认合理差异（' + groupedAccepted(state.accepted).length + '，不计入问题数）</summary>' +
         groupedAccepted(state.accepted).map(item => '<div class="review-accepted-item"><span>' + esc(item.rule + ' · ' + item.title + ' · ' + item.objectName + ' · ' + (labels[item.targetSection] || '报告内容')) +

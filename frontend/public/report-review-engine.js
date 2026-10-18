@@ -107,6 +107,87 @@
       return qualifier >= 0 && tail.indexOf(parts[3], qualifier + (parts[2] || '').length) >= 0;
     });
   }
+  const MANAGEMENT_FACT_TERMS = [
+    '密码', '密钥', '制度', '方案', '策略', '流程', '规程', '职责', '岗位', '培训', '考核', '保密', '调离',
+    '记录', '修订', '发布', '评估', '应急', '演练', '报告', '事件', '处置', '检查', '审批', '备案', '留存',
+    '算法', '协议', '产品', '服务', '身份鉴别', '机密性', '完整性', '访问控制', '日志', '通道', '证书'
+  ];
+  const ADVICE_ACTIONS = /采用|完善|制定|修订|建立|明确|落实|开展|配置|部署|替换|更新|留存|培训|考核|演练|检查|评估|整改/;
+  const FUTURE_MARKERS = /建议|应当|应|需要|需|拟|计划|要求/;
+  const COMPLETED_MARKERS = /已完成|已经(?:完成|部署|采用|建立|制定|开展|落实|整改)|目前已|现已/;
+  function recordNorm(text, names) {
+    let value = String(text || '').normalize('NFKC');
+    (names || []).filter(Boolean).sort((a, b) => b.length - a.length).forEach(name => {
+      value = value.split(String(name).normalize('NFKC')).join('');
+    });
+    return value
+      .replace(/经(?:现场)?(?:核查|访谈|查看|检查|测评)|测评发现|现场发现|结果显示/g, '')
+      .replace(/[\s“”‘’"'`·•，,。；;：:、！？!?（）()【】\[\]《》<>_-]/g, '')
+      .toLowerCase();
+  }
+  function polarity(text) {
+    const value = String(text || '');
+    const negative = /未(?:制定|建立|开展|落实|提供|留存|修订|发布|培训|考核|演练|评估|报告|记录|采用)|没有|无(?:相关|有效|明确|完整)?|缺少|缺失|不完善|不足|不到位|不符合/.test(value);
+    const positive = /已(?:制定|建立|开展|落实|提供|留存|修订|发布|培训|考核|演练|评估|报告|记录|采用)|具备|(?<!不)符合/.test(value);
+    if (negative && positive) return 'mixed';
+    if (negative) return 'negative';
+    if (positive) return 'positive';
+    return 'neutral';
+  }
+  function bigrams(text) {
+    const out = new Set();
+    for (let i = 0; i < text.length - 1; i++) out.add(text.slice(i, i + 2));
+    return out;
+  }
+  function factTerms(text) { return MANAGEMENT_FACT_TERMS.filter(term => String(text || '').includes(term)); }
+  function recordCoverage(record, targetText, names) {
+    const source = recordNorm(record, names), target = recordNorm(targetText, names);
+    const leftPolarity = polarity(record), rightPolarity = polarity(targetText);
+    const conflict = (leftPolarity === 'positive' && rightPolarity === 'negative') ||
+      (leftPolarity === 'negative' && rightPolarity === 'positive');
+    if (!source || !target) return { status: 'missing', score: 0, source, target };
+    const shorter = Math.min(source.length, target.length);
+    if (!conflict && shorter >= 6 && (source.includes(target) || target.includes(source))) {
+      return { status: 'covered', score: 1, source, target };
+    }
+    const sourcePairs = bigrams(source), targetPairs = bigrams(target);
+    const matched = [...sourcePairs].filter(pair => targetPairs.has(pair)).length;
+    const score = sourcePairs.size ? matched / sourcePairs.size : 0;
+    const sharedTerms = factTerms(record).filter(term => targetText.includes(term));
+    if (conflict && (score >= 0.35 || sharedTerms.length)) return { status: 'conflict', score, source, target };
+    if (!conflict && score >= 0.6 && sharedTerms.length) return { status: 'covered', score, source, target };
+    if (score >= 0.35 || sharedTerms.length) return { status: 'uncertain', score, source, target };
+    return { status: 'missing', score, source, target };
+  }
+  function targetUnitText(target, unit, unitNames) {
+    if (target.kind === 'problem' || target.kind === 'advice') {
+      return numberedProblems(target.text).filter(entry => problemMentionsUnit(entry.text, unit)).map(entry => entry.text).join('；');
+    }
+    const text = String(target.text || '');
+    const names = [...new Set((unitNames || []).filter(name => name && name !== unit))];
+    const matches = [];
+    let cursor = 0;
+    while (cursor < text.length) {
+      const start = text.indexOf(unit, cursor);
+      if (start < 0) break;
+      const next = names.map(name => text.indexOf(name, start + unit.length)).filter(index => index >= 0);
+      const end = next.length ? Math.min(...next) : text.length;
+      matches.push(text.slice(start, end));
+      cursor = Math.max(end, start + unit.length);
+    }
+    return matches.join('；');
+  }
+  function sourceForExpectation(expectation, problemOnly) {
+    const sources = expectation.sources || [];
+    return (problemOnly ? sources.find(source => source.problem) : null) || sources[0] || {
+      key: expectation.key, layer: expectation.layer, item: expectation.item, index: -1,
+      name: '结果记录', unit: expectation.unit, record: expectation.record, result: ''
+    };
+  }
+  function adviceDirectionCovered(baseline, text) {
+    const expected = factTerms(baseline).filter(term => !['密码', '产品', '服务'].includes(term));
+    return expected.some(term => String(text || '').includes(term));
+  }
   function analyze(input) {
     const findings = [];
     const allNames = [...new Set(input.objects.filter(o => !o.summaryCount).map(o => o.name))];
@@ -119,23 +200,99 @@
           ? [baseline || object.record, target.text, object.result, object.name, object.unit, object.rawScore]
           : [baseline || object.record, target.text, object.result, object.name])) });
     }
-    for (const target of input.targets) {
-      if (target.section === 2) continue;
-      if (target.section === 5) {
-        const expected = target.problemUnits || [];
-        const entries = numberedProblems(target.text);
-        const summary = { key: 'problem-count|' + target.layer, layer: target.layer, item: -1,
-          name: '问题项', unit: '', record: '问题项 ' + expected.length + ' 个', result: String(expected.length), summaryCount: true };
-        if (expected.length && !entries.length) {
-          add('C32', target, summary, '问题描述无法按编号核对',
-            '本层面有 ' + expected.length + ' 个问题项，但问题描述没有可识别的独立编号；请补充编号或人工核对。', summary.record, '无法核对');
+    function analyzeProblemCount(target) {
+      const expected = target.problemUnits || [];
+      const entries = numberedProblems(target.text);
+      const summary = { key: 'problem-count|' + target.layer, layer: target.layer, item: -1, index: -1,
+        name: '问题项', unit: '', record: '问题项 ' + expected.length + ' 个', result: String(expected.length), summaryCount: true };
+      if (expected.length && !entries.length) {
+        add('C32', target, summary, '问题描述无法按编号核对',
+          '本层面有 ' + expected.length + ' 个问题项，但问题描述没有可识别的独立编号；请补充编号或人工核对。', summary.record, '无法核对');
+        return entries;
+      }
+      const lastNumber = entries.at(-1)?.number || 0;
+      if (lastNumber !== expected.length) {
+        add('C32', target, summary, '问题描述编号数量不一致',
+          '本层面有 ' + expected.length + ' 个问题项，问题描述最后一个可识别编号为 ' + lastNumber + '。', summary.record, '数量核对');
+      }
+      return entries;
+    }
+    function analyzeManagementRecords(target) {
+      const problemOnly = target.kind === 'problem';
+      const expected = (input.recordExpectations || []).filter(item => item.layer === target.layer && (!problemOnly || item.problem));
+      const unitNames = [...new Set((input.recordExpectations || []).filter(item => item.layer === target.layer).map(item => item.unit))];
+      for (const item of expected) {
+        const source = sourceForExpectation(item, problemOnly);
+        const baseline = String(item.record || '');
+        if (!baseline.trim()) {
+          // 空记录只在单元分析目标提示一次，避免在三个章节重复报告同一基础数据问题。
+          if (target.kind === 'unitAnalysis') add('C28', target, source, '现场结果记录尚未填写：' + item.unit,
+            '该测评单元的现场结果记录全部为空，无法核对后续报告描述。', '（结果记录为空）', '证据不足');
           continue;
         }
-        const lastNumber = entries.at(-1)?.number || 0;
-        if (lastNumber !== expected.length) {
-          add('C32', target, summary, '问题描述编号数量不一致',
-            '本层面有 ' + expected.length + ' 个问题项，问题描述最后一个可识别编号为 ' + lastNumber + '。', summary.record, '数量核对');
+        const unitText = targetUnitText(target, item.unit, unitNames);
+        const names = (item.sources || []).map(row => row.name);
+        const coverage = recordCoverage(baseline, unitText, names);
+        const scoreText = Math.round(coverage.score * 100) + '%';
+        if (coverage.status === 'missing') add('C34', target, source, '可能遗漏结果记录：' + item.unit,
+          '当前章节在“' + item.unit + '”对应内容中未找到该结果记录的核心事实。', baseline, '覆盖检查', { score: scoreText });
+        else if (coverage.status === 'uncertain') add('C35', target, source, '无法确认简写是否覆盖：' + item.unit,
+          '当前章节可能对结果记录进行了简写，但核心事实覆盖不足，请人工核对。', baseline, '无法核对', { score: scoreText });
+        else if (coverage.status === 'conflict') add('C36', target, source, '结果记录肯否方向可能相反：' + item.unit,
+          '现场结果记录与当前章节在肯定、否定方向上可能不一致，请核对是否改变了原意。', baseline, '一致性检查', { score: scoreText });
+      }
+    }
+    function analyzeAdvice(target) {
+      const expected = target.problemUnits || [];
+      const entries = numberedProblems(target.text);
+      const summary = { key: 'advice-count|' + target.layer, layer: target.layer, item: -1, index: -1,
+        name: '改进建议', unit: '', record: '问题单元 ' + expected.length + ' 个', result: String(expected.length), summaryCount: true };
+      if (expected.length && !entries.length) {
+        add('C37', target, summary, '改进建议无法按编号核对',
+          '本层面有 ' + expected.length + ' 个问题单元，但改进建议没有可识别的独立编号。', summary.record, '无法核对');
+        return;
+      }
+      const lastNumber = entries.at(-1)?.number || 0;
+      if (lastNumber !== expected.length) add('C37', target, summary, '改进建议编号数量不一致',
+        '本层面有 ' + expected.length + ' 个问题单元，改进建议最后一个可识别编号为 ' + lastNumber + '。', summary.record, '数量核对');
+      for (const unit of expected) {
+        const matching = entries.filter(entry => problemMentionsUnit(entry.text, unit.name));
+        const recordItem = (input.recordExpectations || []).find(item => item.layer === target.layer && item.item === unit.item && item.problem);
+        const technicalSource = input.objects.find(object => object.layer === target.layer && object.item === unit.item && object.applicable &&
+          typeof object.rawScore === 'number' && object.rawScore >= 0 && object.rawScore < 1);
+        const source = recordItem ? sourceForExpectation(recordItem, true) : (technicalSource ||
+          { ...summary, key: 'advice|' + target.layer + '|' + unit.item, unit: unit.name });
+        if (!matching.length) {
+          add('C37', target, source, '问题单元缺少对应改进建议：' + unit.name,
+            '没有找到能够对应“' + unit.name + '”问题单元的编号建议。', unit.adviceBaseline || unit.name, '覆盖检查');
+          continue;
         }
+        const text = matching.map(entry => entry.text).join('；');
+        const unitPos = text.indexOf(unit.name);
+        const adviceBody = unitPos >= 0 ? text.slice(0, unitPos) + text.slice(unitPos + unit.name.length) : text;
+        if (!ADVICE_ACTIONS.test(adviceBody) || !adviceDirectionCovered(unit.adviceBaseline || unit.name, adviceBody)) {
+          add('C38', target, source, '改进建议缺少可执行措施：' + unit.name,
+            '建议应包含明确整改动作，并与该测评单元的整改方向相关；仅写“加强管理、尽快整改”等泛化表述不足以核对。', unit.adviceBaseline || unit.name, '建议质量');
+        }
+        const confused = text.split(/[。！？；;\n]/).find(sentence => COMPLETED_MARKERS.test(sentence) && !FUTURE_MARKERS.test(sentence));
+        if (confused) add('C39', target, source, '现状与未来措施可能混淆：' + unit.name,
+          '改进建议使用了已完成或已采用的现状措辞，但没有“建议、应、需、拟”等整改限定。', confused, '一致性检查');
+      }
+    }
+    for (const target of input.targets) {
+      if (target.section === 2) continue;
+      const managementRecordTarget = target.layer >= 4 && target.layer <= 7 &&
+        ['unitAnalysis', 'overall', 'problem'].includes(target.kind);
+      if (managementRecordTarget) analyzeManagementRecords(target);
+      if (target.kind === 'advice') {
+        analyzeAdvice(target);
+        continue;
+      }
+      if (target.section === 5) {
+        const expected = target.problemUnits || [];
+        const entries = analyzeProblemCount(target);
+        if (managementRecordTarget) continue;
+        if (expected.length && !entries.length) continue;
         const objects = input.objects.filter(o => o.layer === target.layer && typeof o.rawScore === 'number' && o.rawScore >= 0 && o.rawScore < 1 && o.applicable);
         for (const o of objects) {
           const matchingEntries = entries.filter(e => problemMentionsUnit(e.text, o.unit));
@@ -156,12 +313,12 @@
         }
         continue;
       }
-      if (!target.manual) continue;
+      if (!target.manual && !managementRecordTarget) continue;
       const objects = input.objects.filter(o => !o.summaryCount && o.layer === target.layer && (!target.unit || o.unit === target.unit));
       const applicable = objects.filter(o => o.applicable);
       // 风险/问题/建议只要求覆盖问题对象；汇总结论不要求逐个列出测评对象。
       const required = target.coverage === 'problems' ? applicable.filter(o => ['不符合', '部分符合'].includes(o.result)) : applicable;
-      if (target.coverage) {
+      if (target.coverage && !managementRecordTarget) {
         const unique = [...new Map(required.map(o => [o.name, o])).values()];
         for (const o of unique) {
           if (!objectMentioned(target.text, o, allNames) && !groupMentioned(target.text, o, applicable, input)) {
@@ -187,7 +344,7 @@
       }
       // 参数比较限定到包含对象名称的句子，避免在多对象段落中交叉比较；
       // 对象名使用简称或写在相邻句时，通过简称变体与相邻句回退兜底（相邻句不得提及其它对象）。
-      for (const o of applicable.filter(o => o.record.trim())) {
+      for (const o of (managementRecordTarget ? [] : applicable.filter(o => o.record.trim()))) {
         const mention = s => objectMentioned(s, o, allNames);
         const namesOther = s => allNames.some(n => n && n !== o.name && mentioned(s, n));
         const recSents = o.record.split(/[。；\n]/);
@@ -233,7 +390,7 @@
     }
     return findings;
   }
-  const api = { analyze, norm, hash, tokens };
+  const api = { analyze, norm, hash, tokens, recordCoverage };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   else root.BBReportReviewEngine = api;
 })(typeof window !== 'undefined' ? window : globalThis);

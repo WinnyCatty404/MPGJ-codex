@@ -123,6 +123,60 @@ const cryptoInput = text => ({objects:[object('A服务器')],units:[],serverName
 assert.equal(engine.analyze(cryptoInput('未描述服务器')).filter(f=>f.rule==='C33').length,1);
 assert.equal(engine.analyze(cryptoInput('A服务器采用TLS1.2和AES128。')).filter(f=>f.rule==='C33').length,0);
 assert.equal(engine.analyze(cryptoInput('A服务器采用TLS1.3和AES256。')).filter(f=>['C06','C07'].includes(f.rule)).length,2);
+
+// 第5—8层面：按测评单元和结果记录审核，不再要求复写对象名称。
+const managementObjects = [
+  {key:'m1',name:'制度文档A',layer:4,item:0,index:0,unit:'定期修订安全管理制度',applicable:true,
+    record:'已制定密码应用安全管理制度，并按照年度计划定期修订，留存发布审批记录。',result:'符合',rawScore:1},
+  {key:'m2',name:'修订记录B',layer:4,item:0,index:1,unit:'定期修订安全管理制度',applicable:true,
+    record:'未提供最近一次制度修订记录。',result:'不符合',rawScore:0}
+];
+const managementExpectations = managementObjects.map((o,i)=>({key:'record|4|0|'+i,layer:4,item:0,unit:o.unit,
+  record:o.record,problem:o.result==='不符合',sources:[{...o,problem:o.result==='不符合'}]}));
+function managementReview(targets, expectations=managementExpectations, objects=managementObjects) {
+  return engine.analyze({objects,units:[{layer:4,name:'定期修订安全管理制度',result:'不符合'}],recordExpectations:expectations,
+    serverNames:[],databaseNames:[],dataCount:0,targets});
+}
+const managementBase = {layer:4,manual:true,sourceMode:'manual'};
+let findings = managementReview([{...managementBase,id:'report-ua-text-4',section:0,kind:'unitAnalysis',coverage:'all',
+  text:'定期修订安全管理制度测评指标中，已制定密码应用安全管理制度并定期修订，留存发布审批记录；未提供最近一次制度修订记录。故该指标不符合。'}]);
+assert.equal(findings.filter(f=>['C29','C31','C34','C35','C36'].includes(f.rule)).length,0,
+  '管理层面合理简写不应要求对象名称，也不应提示结果记录遗漏');
+findings = managementReview([{...managementBase,id:'report-overall-4',section:4,kind:'overall',coverage:'all',
+  text:'定期修订安全管理制度测评指标中，已制定密码应用安全管理制度并定期修订。'}]);
+assert(findings.some(f=>['C34','C36'].includes(f.rule)&&f.baseline.includes('未提供最近一次制度修订记录')),
+  '总体评价遗漏一条不同结果记录时应提示');
+findings = managementReview([{...managementBase,id:'report-sug-prob-4',section:5,kind:'problem',coverage:'problems',
+  problemUnits:[{item:0,name:'定期修订安全管理制度'}],text:'1）定期修订安全管理制度：未提供最近一次制度修订记录。'}]);
+assert(!findings.some(f=>['C29','C31','C34','C35','C36'].includes(f.rule)), '问题描述只需覆盖问题对象记录');
+assert.equal(engine.recordCoverage('已制定密码应用安全管理制度。','未制定密码应用安全管理制度。',[]).status,'conflict');
+assert.equal(engine.recordCoverage('已制定密码应用安全管理制度，并定期修订。','制度已制定并修订。',[]).status,'uncertain');
+assert.equal(engine.recordCoverage('未提供制度修订记录。','本项符合要求。',[]).status,'missing');
+const emptyExpectation=[{key:'record-empty|4|0',layer:4,item:0,unit:'定期修订安全管理制度',record:'',problem:true,sources:[managementObjects[1]]}];
+findings=managementReview([
+  {...managementBase,id:'report-ua-text-4',section:0,kind:'unitAnalysis',text:''},
+  {...managementBase,id:'report-overall-4',section:4,kind:'overall',text:''},
+  {...managementBase,id:'report-sug-prob-4',section:5,kind:'problem',problemUnits:[{item:0,name:'定期修订安全管理制度'}],text:'1）定期修订安全管理制度：无。'}
+],emptyExpectation,[{...managementObjects[1],record:''}]);
+assert.equal(findings.filter(f=>f.rule==='C28').length,1,'同一管理单元全部记录为空时只提示一次');
+
+const adviceTarget = text => ({...managementBase,id:'report-sug-adv-4',section:5,kind:'advice',text,
+  problemUnits:[{item:0,name:'定期修订安全管理制度',adviceBaseline:'建议完善密码应用安全管理制度，明确修订及执行记录留存要求。'}]});
+assert.equal(managementReview([adviceTarget('1）针对「定期修订安全管理制度」：建议完善密码应用安全管理制度，定期修订并留存记录。')])
+  .filter(f=>['C37','C38','C39'].includes(f.rule)).length,0,'具体且方向正确的建议应通过');
+assert(managementReview([adviceTarget('1）针对「定期修订安全管理制度」：加强管理，尽快整改。')]).some(f=>f.rule==='C38'));
+assert(managementReview([adviceTarget('1）针对「定期修订安全管理制度」：已经完成制度部署。')]).some(f=>f.rule==='C39'));
+assert(managementReview([adviceTarget('1）针对「其他测评单元」：建议完善制度。')]).some(f=>f.rule==='C37'));
+
+const crossUnitExpectations = [
+  managementExpectations[0],
+  {key:'record|4|1|0',layer:4,item:1,unit:'建立密码人员管理制度',record:'已开展密码人员年度培训。',problem:false,sources:[{...managementObjects[0],item:1,unit:'建立密码人员管理制度'}]}
+];
+findings = managementReview([{...managementBase,id:'report-overall-4',section:4,kind:'overall',coverage:'all',
+  text:'定期修订安全管理制度测评指标中，未提供修订记录。建立密码人员管理制度测评指标中，已制定密码应用安全管理制度，并按照年度计划定期修订，留存发布审批记录；已开展密码人员年度培训。'}],crossUnitExpectations);
+assert(findings.some(f=>['C34','C35','C36'].includes(f.rule)&&f.object.unit==='定期修订安全管理制度'),
+  '其他测评单元中出现的相同结果记录不得用于补齐当前单元');
+
 for(const path of ['frontend/public/prototype.html','frontend/src/report-generator.html']) {
   const html=fs.readFileSync(path,'utf8');
   for(const match of html.matchAll(/<script\b[^>]*>([\s\S]*?)<\/script>/gi)) if(match[1].trim()) new vm.Script(match[1]);
@@ -143,11 +197,16 @@ async function integration() {
     getOnsiteRec:()=>({record:'A服务器采用TLS1.2。'}),getObjectCls:()=> '部分符合',getRawUnitScore:()=>0.25,
     getReportObjectScore:()=>0.5,getLayerProblemUnits:t=>t===2?[{itemIdx:0,name:'身份鉴别'}]:[],reportClassify:()=> '部分符合',
     isOnsiteUnitApplicable:()=>true,onsiteKey:()=> 'ind|obj',ONSITE_UNIT_DATA_REQ:{},reportTexts:{'report-overall-2':'A服务器采用TLS1.3。'},
+    reportTextStates:{},findRiskTemplate:()=>({advice:'建议采用密码技术完善身份鉴别。'}),fillRiskTemplateText:value=>value,
     buildLayerAnalysisText:()=>'',buildLayerOverallText:()=>'',buildSugProblemText:t=>t===2?'1）身份鉴别：A服务器密码应用存在不足。':'无。',
-    buildSugAdviceText:()=>'',buildConclusionSentence:()=>'',
+    buildSugAdviceText:t=>t===2?'1）针对「身份鉴别」：建议采用密码技术完善身份鉴别。':'无。',buildConclusionSentence:()=>'',
     getReportTextVal:(id,auto)=>sandbox.reportTexts[id]??auto,getRiskRows:()=>[],reportRiskStore:{},reportFixes:{},
     switchReportTab:()=>sandbox.renderReportReview(),showToast(){},switchStep(){},switchPlanTab(){},switchCryptoModule(){},switchCryptoLayer(){},switchOnsiteTab(){},expandOnsiteRecord:()=>located++,
     bbPersistProjectStage:async()=>saves++};
+  sandbox.getReportUnitAnalysisText=t=>sandbox.reportTexts['report-ua-text-'+t]??sandbox.buildLayerAnalysisText(t);
+  sandbox.getReportOverallText=t=>sandbox.reportTexts['report-overall-'+t]??sandbox.buildLayerOverallText(t);
+  sandbox.getReportSuggestionText=(t,kind)=>sandbox.reportTexts['report-sug-'+kind+'-'+t]??
+    (kind==='prob'?sandbox.buildSugProblemText(t):sandbox.buildSugAdviceText(t));
   sandbox.window=sandbox;
   const ctx=vm.createContext(sandbox);
   vm.runInContext(fs.readFileSync('frontend/public/report-review-engine.js','utf8'),ctx);
@@ -258,6 +317,41 @@ async function integration() {
   await sandbox.restoreAcceptedReview(acceptedGroupId);
   assert.equal(get().accepted.length,0);
   assert.equal(get().findings.filter(x=>x.rule==='C31').length,2);
-  console.log('PASS: 风险与改进建议排除、合理差异持久化和失效、问题描述与计数审核');
+
+  // 快照集成：管理类使用最终有效文本和结构化结果记录，不再进入对象覆盖规则。
+  vm.runInContext('reportReviewState = {findings:[],accepted:[],ranAt:"",scope:null,signature:""}',ctx);
+  sandbox.evaluationIndicatorLevels[4]={items:[{name:'制定密码应用方案',desc:'建设运行管理要求'}]};
+  sandbox.getOnsiteObjectEntries=t=>t===4?[{id:'policy',name:'方案文档'}]:[];
+  sandbox.getOnsiteUnitObjectEntries=(t)=>t===4?[{id:'policy',name:'方案文档'}]:[];
+  sandbox.getOnsiteRec=(t)=>({record:t===4?'未提供有效的密码应用方案。':''});
+  sandbox.getObjectCls=t=>t===4?'不符合':'未测评';
+  sandbox.getRawUnitScore=t=>t===4?0:null;
+  sandbox.getReportObjectScore=t=>t===4?0:null;
+  sandbox.getLayerProblemUnits=t=>t===4?[{itemIdx:0,name:'制定密码应用方案',desc:'建设运行管理要求',cls:'不符合'}]:[];
+  sandbox.onsiteKey=(t,i,j)=>t+'|'+i+'|'+j;
+  sandbox.reportTexts['report-ua-text-4']='制定密码应用方案测评指标中，未提供有效的密码应用方案。故该指标不符合。';
+  sandbox.reportTexts['report-overall-4']='制定密码应用方案测评指标中，未提供有效的密码应用方案。';
+  sandbox.reportTexts['report-sug-prob-4']='1）制定密码应用方案：未提供有效的密码应用方案。';
+  sandbox.reportTexts['report-sug-adv-4']='1）针对「制定密码应用方案」：建议制定并完善密码应用方案，开展密码应用安全性评估。';
+  await sandbox.runReportReview(null);
+  assert(!get().findings.some(x=>x.object.layer===4&&['C29','C31','C34','C35','C36'].includes(x.rule)),
+    '管理类最终文本已覆盖结果记录时不应出现对象或记录遗漏');
+  sandbox.reportTexts['report-overall-4']='制定密码应用方案测评指标中，本项符合要求。';
+  await sandbox.runReportReview(null);
+  const managementFinding=get().findings.find(x=>x.target.id==='report-overall-4'&&['C34','C35','C36'].includes(x.rule));
+  assert(managementFinding,
+    '管理类总体评价遗漏或改变结果记录时应提示');
+  await sandbox.setReviewStatus(managementFinding.id,'合理差异');
+  await sandbox.runReportReview(null);
+  assert(!get().findings.some(x=>x.id===managementFinding.id),'管理类记录差异确认后原文不变时不应重复提示');
+  sandbox.reportTexts['report-overall-4']='制定密码应用方案测评指标中，未提供有效的密码应用方案。';
+  await sandbox.runReportReview(null);
+  assert(!get().accepted.some(x=>x.id===managementFinding.id),'管理类报告原文变化后应使旧合理差异失效');
+  const oldManagement={id:'old-management-object',rule:'C31',objectKey:'4|0|0',objectName:'方案文档',objectUnit:'制定密码应用方案',
+    objectLayer:4,targetId:'report-sug-prob-4',targetSection:5,title:'旧版对象遗漏',fingerprint:'old',sourceFingerprint:'old'};
+  vm.runInContext('reportReviewState.accepted.push('+JSON.stringify(oldManagement)+')',ctx);
+  sandbox.bbNormalizeReportReviewState();
+  assert(!get().accepted.some(x=>x.id===oldManagement.id),'第5—8层面旧C29/C31合理差异记录应清理');
+  console.log('PASS: 技术层规则回归、管理类记录审核、建议审核、合理差异持久化与失效');
 }
 integration().catch(error=>{console.error(error);process.exitCode=1;});
