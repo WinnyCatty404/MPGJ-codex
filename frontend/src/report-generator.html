@@ -5962,7 +5962,8 @@
     if (uaLayer !== null) {
       reportTextStates[id] = {
         mode: 'manual',
-        sourceSignature: reportAnalysisSourceSignature(buildLayerAnalysisText(uaLayer))
+        sourceSignature: reportAnalysisSourceSignature(buildLayerAnalysisText(uaLayer)),
+        userEdited: true
       };
       refreshReportAnalysisStateUi(id);
     }
@@ -5970,7 +5971,8 @@
     if (overallLayer !== null) {
       reportTextStates[id] = {
         mode: 'manual',
-        sourceSignature: reportAnalysisSourceSignature(buildLayerOverallText(overallLayer))
+        sourceSignature: reportAnalysisSourceSignature(buildLayerOverallText(overallLayer)),
+        userEdited: true
       };
     }
   }
@@ -6365,6 +6367,16 @@
     return (String(value || '').match(/（未填写结果记录，请补充）/g) || []).length;
   }
 
+  function reportAnalysisNoObjectCount(value) {
+    return (String(value || '').match(/暂无测评对象/g) || []).length;
+  }
+
+  function reportGeneratedTextComparable(value) {
+    return String(value || '').replace(/\r/g, '').split('\n')
+      .map(function(line) { return line.replace(/^[\s\u3000]+|[\s\u3000]+$/g, ''); })
+      .filter(Boolean).join('\n');
+  }
+
   function resolveReportAnalysisText(id, autoText) {
     const automatic = String(autoText || '');
     const signature = reportAnalysisSourceSignature(automatic);
@@ -6373,15 +6385,16 @@
     if (!hasSavedText) {
       reportTexts[id] = automatic;
       state = { mode: 'auto', sourceSignature: signature };
-    } else if (!state || (state.mode !== 'auto' && state.mode !== 'manual')) {
+    } else if (!state || !['auto', 'manual', 'imported'].includes(state.mode) || (state.mode === 'manual' && state.userEdited !== true)) {
       const saved = String(reportTexts[id] || '');
       const legacyMissingWasFilled = reportAnalysisMissingCount(saved) > reportAnalysisMissingCount(automatic);
-      if (saved === automatic || legacyMissingWasFilled) {
+      const legacyObjectWasAdded = reportAnalysisNoObjectCount(saved) > reportAnalysisNoObjectCount(automatic);
+      if (reportGeneratedTextComparable(saved) === reportGeneratedTextComparable(automatic) || legacyMissingWasFilled || legacyObjectWasAdded) {
         reportTexts[id] = automatic;
         state = { mode: 'auto', sourceSignature: signature };
       } else {
         // 无状态的历史文本默认视为人工内容，避免升级时误覆盖。
-        state = { mode: 'manual', sourceSignature: signature };
+        state = Object.assign({}, state, { mode: 'manual', sourceSignature: signature, userEdited: false });
       }
     } else if (state.mode === 'auto') {
       reportTexts[id] = automatic;
@@ -6397,6 +6410,7 @@
 
   function reportAnalysisStateText(resolved) {
     if (resolved.mode === 'auto') return '自动同步：内容来自第三步现场测评记录';
+    if (resolved.mode === 'imported') return '内容来自Word导入；编辑后将按人工内容保留';
     return resolved.sourceChanged
       ? '现场测评记录已变化，当前保留人工编辑内容'
       : '已人工编辑；后续现场记录变化时不会自动覆盖';
@@ -7101,6 +7115,18 @@
     return segs.join('；') + '。';
   }
 
+  function isLegacyGeneratedOverallText(t, value) {
+    const text = reportGeneratedTextComparable(value).replace(/。$/, '');
+    if (!text) return false;
+    const unitNames = evaluationIndicatorLevels[t].items.map(function(item) { return item.name; });
+    return text.split('；').every(function(segment) {
+      const unitName = unitNames.find(function(name) { return segment.indexOf(name) === 0; });
+      if (!unitName) return false;
+      const suffix = segment.slice(unitName.length);
+      return suffix === '测评指标不适用' || suffix === '方面密码应用符合要求' || /^方面存在不足（.*）$/.test(suffix);
+    });
+  }
+
   // 未导入、未人工编辑时，总体评价直接同步对应层面的单元测评结果分析。
   function buildLayerOverallText(t) {
     return getReportUnitAnalysisText(t);
@@ -7122,14 +7148,16 @@
     if (!hasSavedText) {
       reportTexts[id] = automatic;
       state = { mode: 'auto', sourceSignature: signature };
-    } else if (!state || !['auto', 'manual', 'imported'].includes(state.mode)) {
+    } else if (!state || !['auto', 'manual', 'imported'].includes(state.mode) || (state.mode === 'manual' && state.userEdited !== true)) {
       const saved = String(reportTexts[id] || '');
-      if (saved === automatic || saved === buildLegacyLayerOverallText(t)) {
+      if (reportGeneratedTextComparable(saved) === reportGeneratedTextComparable(automatic) ||
+          reportGeneratedTextComparable(saved) === reportGeneratedTextComparable(buildLegacyLayerOverallText(t)) ||
+          isLegacyGeneratedOverallText(t, saved)) {
         reportTexts[id] = automatic;
         state = { mode: 'auto', sourceSignature: signature };
       } else {
         // 无来源状态的历史内容可能来自Word或人工编辑，默认保留。
-        state = { mode: 'manual', sourceSignature: signature };
+        state = Object.assign({}, state, { mode: 'manual', sourceSignature: signature, userEdited: false });
       }
     } else if (state.mode === 'auto') {
       reportTexts[id] = automatic;
@@ -9784,7 +9812,12 @@
       let cnt = 0;
       ONSITE_LAYERS.forEach(function (cfg, t) {
         const v = uaTexts[cfg.name];
-        if (v) { reportTexts['report-ua-text-' + t] = v; cnt++; }
+        if (v) {
+          const id = 'report-ua-text-' + t;
+          reportTexts[id] = v;
+          reportTextStates[id] = { mode: 'imported', sourceSignature: reportAnalysisSourceSignature(buildLayerAnalysisText(t)) };
+          cnt++;
+        }
       });
       add(s4, '单元测评结果分析：导入 ' + cnt + ' 个层面的结果分析文本');
     })();
