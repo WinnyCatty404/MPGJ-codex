@@ -231,6 +231,58 @@ function Test-BBPortBindable {
   }
 }
 
+# Windows PowerShell 5.1 的 Start-Process 在进程环境块同时包含大小写不同的同名
+# 代理变量（例如 HTTPS_PROXY / https_proxy）时可能直接抛出“已添加了具有相同键的项”。
+# 仅规范化本进程中的常见代理变量，不记录值，也不修改用户或系统级环境变量。
+function Repair-BBProxyEnvironment {
+  $proxyNames = @('HTTP_PROXY', 'HTTPS_PROXY', 'NO_PROXY', 'ALL_PROXY')
+  $entries = @(Get-ChildItem Env: -ErrorAction SilentlyContinue)
+  foreach ($canonicalName in $proxyNames) {
+    $matches = @($entries | Where-Object { ([string]$_.Name).ToUpperInvariant() -eq $canonicalName })
+    if ($matches.Count -le 1) { continue }
+    $preferred = $matches | Where-Object { ([string]$_.Name) -ceq $canonicalName } | Select-Object -First 1
+    if (-not $preferred) { $preferred = $matches | Select-Object -First 1 }
+    $value = [string]$preferred.Value
+    foreach ($entry in $matches) {
+      [Environment]::SetEnvironmentVariable([string]$entry.Name, $null, 'Process')
+    }
+    [Environment]::SetEnvironmentVariable($canonicalName, $value, 'Process')
+    Write-Host "检测到重复环境变量 $canonicalName，已为本次启动规范化。"
+  }
+}
+
+# 将任务脚本的显式结果标记与退出码统一成稳定结果。退出码在少数 Windows
+# PowerShell 环境中可能为空，因此业务标记优先；同时只接受与当前任务同名的
+# BB_TASK_OK，避免把嵌套停止脚本的成功标记误认为恢复成功。
+function Resolve-BBTaskOutcome {
+  param(
+    [string]$Kind,
+    [string[]]$Output = @(),
+    $ExitCode = $null,
+    [bool]$ExitCodeReadable = $false
+  )
+  $taskOk = [bool]($Output | Where-Object { $_ -match "^BB_TASK_OK=$([regex]::Escape($Kind))\s*$" })
+  $remoteFailed = [bool]($Output | Where-Object { $_ -match '^BB_REMOTE_BACKUP_FAILED=' })
+  $restartFailed = [bool]($Output | Where-Object { $_ -match '^BB_BACKUP_RESTART_FAILED' })
+  $outcome = if ($remoteFailed -and $Kind -in @('backingup', 'remoteupload')) {
+    'remote-failed'
+  } elseif ($restartFailed -and $Kind -eq 'backingup') {
+    'restart-failed'
+  } elseif ($taskOk -and (-not $ExitCodeReadable -or [int]$ExitCode -eq 0)) {
+    'success'
+  } elseif (-not $ExitCodeReadable) {
+    'unknown'
+  } else {
+    'failed'
+  }
+  return [PSCustomObject]@{
+    Outcome = $outcome
+    TaskOk = $taskOk
+    RemoteFailed = $remoteFailed
+    RestartFailed = $restartFailed
+  }
+}
+
 function Wait-BBPortsReleased {
   param([int[]]$Ports, [int]$TimeoutSeconds = 5)
   $deadline = (Get-Date).AddSeconds($TimeoutSeconds)
@@ -355,6 +407,12 @@ function Get-BBBackupSetInfo {
       $manifest = Get-Content -LiteralPath $manifestPath -Raw -Encoding UTF8 | ConvertFrom-Json
       if ($manifest.createdAt) { $result.CreatedAt = [datetime]$manifest.createdAt }
       if (-not $manifest.database.dumpFile) { throw '备份清单缺少 dump 文件名' }
+      $formatVersion = if ($manifest.formatVersion) { [int]$manifest.formatVersion } else { 1 }
+      if ($formatVersion -ge 2) {
+        if (-not $manifest.database.sha256) { throw '第 2 版备份清单缺少 dump 校验值' }
+        if (-not $manifest.storage -or -not $manifest.storage.sha256) { throw '第 2 版备份清单缺少 storage 校验信息' }
+        if (-not $manifest.uploads -or -not $manifest.uploads.sha256) { throw '第 2 版备份清单缺少 uploads 校验信息' }
+      }
       $dumpPath = Join-Path $Path ([string]$manifest.database.dumpFile)
     } else {
       $result.Legacy = $true
@@ -410,7 +468,10 @@ function Copy-BBBackupSetAtomic {
   $finalPath = Join-Path $DestinationRoot $setName
   if (Test-Path -LiteralPath $finalPath) {
     $existingInfo = Get-BBBackupSetInfo -Path $finalPath -Deep
-    if ($existingInfo.Valid -and $existingInfo.DumpBytes -eq $sourceInfo.DumpBytes -and $existingInfo.DumpSha256 -eq $sourceInfo.DumpSha256) {
+    if ($existingInfo.Valid -and
+        $existingInfo.DumpBytes -eq $sourceInfo.DumpBytes -and $existingInfo.DumpSha256 -eq $sourceInfo.DumpSha256 -and
+        $existingInfo.StorageFiles -eq $sourceInfo.StorageFiles -and $existingInfo.StorageBytes -eq $sourceInfo.StorageBytes -and $existingInfo.StorageSha256 -eq $sourceInfo.StorageSha256 -and
+        $existingInfo.UploadFiles -eq $sourceInfo.UploadFiles -and $existingInfo.UploadBytes -eq $sourceInfo.UploadBytes -and $existingInfo.UploadSha256 -eq $sourceInfo.UploadSha256) {
       return [PSCustomObject]@{ Path = $finalPath; AlreadyExists = $true }
     }
     throw "远程目录已存在同名但内容不一致的备份集：$finalPath"
@@ -420,7 +481,11 @@ function Copy-BBBackupSetAtomic {
     Invoke-BBRobocopy -Source $Source -Destination $pending -Mirror
     $remoteInfo = Get-BBBackupSetInfo -Path $pending -Deep
     if (-not $remoteInfo.Valid) { throw "远程备份集校验失败：$($remoteInfo.Error)" }
-    if ($remoteInfo.DumpBytes -ne $sourceInfo.DumpBytes -or $remoteInfo.DumpSha256 -ne $sourceInfo.DumpSha256) { throw '远程 dump 与本地备份不一致' }
+    if ($remoteInfo.DumpBytes -ne $sourceInfo.DumpBytes -or $remoteInfo.DumpSha256 -ne $sourceInfo.DumpSha256 -or
+        $remoteInfo.StorageFiles -ne $sourceInfo.StorageFiles -or $remoteInfo.StorageBytes -ne $sourceInfo.StorageBytes -or $remoteInfo.StorageSha256 -ne $sourceInfo.StorageSha256 -or
+        $remoteInfo.UploadFiles -ne $sourceInfo.UploadFiles -or $remoteInfo.UploadBytes -ne $sourceInfo.UploadBytes -or $remoteInfo.UploadSha256 -ne $sourceInfo.UploadSha256) {
+      throw '远程备份集与本地备份不一致（数据库或附件校验失败）'
+    }
     [IO.Directory]::Move($pending, $finalPath)
     return [PSCustomObject]@{ Path = $finalPath; AlreadyExists = $false }
   } catch {

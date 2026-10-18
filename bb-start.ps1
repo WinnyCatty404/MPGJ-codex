@@ -11,6 +11,7 @@ param(
 )
 $ErrorActionPreference = 'Continue'
 . (Join-Path $AppRoot 'bb-common.ps1')
+Repair-BBProxyEnvironment
 
 # ---- 日志：同时输出到屏幕与日志文件，方便远程排查 ----
 $initialConfig = Get-BBConfig -AppRoot $AppRoot

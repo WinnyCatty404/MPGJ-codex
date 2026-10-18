@@ -66,12 +66,26 @@ $form.BackColor = $C_BG
 $form.Font = New-Object Drawing.Font('微软雅黑', 9)
 try { $form.Icon = New-Object Drawing.Icon((Join-Path $AppRoot 'bmpbgs.ico')) } catch {}
 
+# 用单一表格布局明确分隔品牌区、状态区、日志区和按钮区，避免 Dock 顺序、
+# DPI 缩放或最大化时日志的最后一行被底部按钮遮住。
+$rootLayout = New-Object Windows.Forms.TableLayoutPanel
+$rootLayout.Dock = 'Fill'
+$rootLayout.ColumnCount = 1
+$rootLayout.RowCount = 4
+$rootLayout.Margin = New-Object Windows.Forms.Padding(0)
+$rootLayout.Padding = New-Object Windows.Forms.Padding(0)
+$rootLayout.ColumnStyles.Add((New-Object Windows.Forms.ColumnStyle([Windows.Forms.SizeType]::Percent, 100)))
+$rootLayout.RowStyles.Add((New-Object Windows.Forms.RowStyle([Windows.Forms.SizeType]::Absolute, 78)))
+$rootLayout.RowStyles.Add((New-Object Windows.Forms.RowStyle([Windows.Forms.SizeType]::Absolute, 42)))
+$rootLayout.RowStyles.Add((New-Object Windows.Forms.RowStyle([Windows.Forms.SizeType]::Percent, 100)))
+$rootLayout.RowStyles.Add((New-Object Windows.Forms.RowStyle([Windows.Forms.SizeType]::Absolute, 82)))
+$form.Controls.Add($rootLayout)
+
 # ---- 顶部品牌区 ----
 $header = New-Object Windows.Forms.Panel
-$header.Dock = 'Top'
-$header.Height = 78
+$header.Dock = 'Fill'
 $header.BackColor = $C_CARD
-$form.Controls.Add($header)
+$rootLayout.Controls.Add($header, 0, 0)
 
 $logoBox = New-Object Windows.Forms.PictureBox
 $logoBox.Size = New-Object Drawing.Size(46, 46)
@@ -98,12 +112,10 @@ $header.Controls.Add($lblSub)
 
 # ---- 状态条 ----
 $statusBar = New-Object Windows.Forms.Panel
-$statusBar.Dock = 'Top'
-$statusBar.Height = 42
+$statusBar.Dock = 'Fill'
 $statusBar.BackColor = $C_BG
 $statusBar.Padding = New-Object Windows.Forms.Padding(22, 0, 22, 0)
-$form.Controls.Add($statusBar)
-$statusBar.BringToFront()
+$rootLayout.Controls.Add($statusBar, 0, 1)
 
 $statusPill = New-Object Windows.Forms.Label
 $statusPill.Dock = 'Fill'
@@ -156,80 +168,115 @@ $logHost = New-Object Windows.Forms.Panel
 $logHost.Dock = 'Fill'
 $logHost.BackColor = $C_BG
 $logHost.Padding = New-Object Windows.Forms.Padding(22, 6, 22, 6)
-$form.Controls.Add($logHost)
-$logHost.BringToFront()
+$rootLayout.Controls.Add($logHost, 0, 2)
 
-$logBox = New-Object Windows.Forms.RichTextBox
-$logBox.Dock = 'Fill'
-$logBox.ReadOnly = $true
-$logBox.BackColor = $C_LOGBG
-$logBox.BorderStyle = 'None'
-$logBox.Font = New-Object Drawing.Font('Consolas', 9.75)
-# 日志查看器最稳的配置：开启自动换行 + 仅垂直滚动条。
-# 原 WordWrap=False + ScrollBars=Both 会触发 RichTextBox 已知缺陷——出现水平滚动条时，
-# 垂直滚动范围的最大值算漏最后一行，导致"差一行、手动拖到最底也看不到末行"（2026-10-17 真机实测）。
-$logBox.WordWrap = $true
-$logBox.ScrollBars = 'Vertical'
-$logBox.DetectUrls = $false
-$logHost.Controls.Add($logBox)
+$logLayout = New-Object Windows.Forms.TableLayoutPanel
+$logLayout.Dock = 'Fill'
+$logLayout.ColumnCount = 1
+$logLayout.RowCount = 2
+$logLayout.Margin = New-Object Windows.Forms.Padding(0)
+$logLayout.Padding = New-Object Windows.Forms.Padding(0)
+$logLayout.ColumnStyles.Add((New-Object Windows.Forms.ColumnStyle([Windows.Forms.SizeType]::Percent, 100)))
+$logLayout.RowStyles.Add((New-Object Windows.Forms.RowStyle([Windows.Forms.SizeType]::Absolute, 24)))
+$logLayout.RowStyles.Add((New-Object Windows.Forms.RowStyle([Windows.Forms.SizeType]::Percent, 100)))
+$logHost.Controls.Add($logLayout)
 
-# 自动滚动到底部开关（默认开）。取消勾选可在日志刷屏时向上翻阅历史。
+# 每条日志独立成行，避免 RichTextBox 在换行、DPI 缩放和追加文本时反复出现
+# “滚动条已到底但末行仍被裁掉”的原生控件问题。
+$logGrid = New-Object Windows.Forms.DataGridView
+$logGrid.Dock = 'Fill'
+$logGrid.ReadOnly = $true
+$logGrid.AllowUserToAddRows = $false
+$logGrid.AllowUserToDeleteRows = $false
+$logGrid.AllowUserToResizeRows = $false
+$logGrid.RowHeadersVisible = $false
+$logGrid.ColumnHeadersVisible = $false
+$logGrid.BackgroundColor = $C_LOGBG
+$logGrid.BorderStyle = 'None'
+$logGrid.GridColor = $C_LOGBG
+$logGrid.CellBorderStyle = 'None'
+$logGrid.ScrollBars = 'Vertical'
+$logGrid.AutoSizeRowsMode = 'AllCellsExceptHeaders'
+$logGrid.SelectionMode = 'FullRowSelect'
+$logGrid.MultiSelect = $false
+$logGrid.ClipboardCopyMode = 'EnableWithoutHeaderText'
+$logGrid.DefaultCellStyle.BackColor = $C_LOGBG
+$logGrid.DefaultCellStyle.SelectionBackColor = [Drawing.Color]::FromArgb(229, 238, 250)
+$logGrid.DefaultCellStyle.SelectionForeColor = $C_TEXT
+$logGrid.DefaultCellStyle.WrapMode = 'True'
+$logGrid.DefaultCellStyle.Padding = New-Object Windows.Forms.Padding(2, 3, 2, 3)
+$logGrid.DefaultCellStyle.Font = New-Object Drawing.Font('微软雅黑', 9.5)
+$timeColumn = New-Object Windows.Forms.DataGridViewTextBoxColumn
+$timeColumn.Width = 82
+$timeColumn.AutoSizeMode = 'None'
+$messageColumn = New-Object Windows.Forms.DataGridViewTextBoxColumn
+$messageColumn.AutoSizeMode = 'Fill'
+[void]$logGrid.Columns.Add($timeColumn)
+[void]$logGrid.Columns.Add($messageColumn)
+$logLayout.Controls.Add($logGrid, 0, 1)
+
 $script:autoScroll = $true
+$script:programmaticLogScroll = $false
+$script:syncingAutoCheck = $false
 
-# 把日志视图推到真正的最底部。
-# 前几版用 ScrollToCaret / BeginInvoke / 跟随标志 / WM_VSCROLL 兜底，在"末行刚追加、
-# RichEdit 惰性排版尚未落地"时都会少滚约一行，表现为最后一行永远差一截。
-# 这里改用 Win32 EM_SETSCROLLPOS 直接把垂直滚动位置压到最大值（RichEdit 会夹紧到
-# 真实底部），完全绕开 ScrollToCaret 的排版时序依赖，从根本上保证最后一行完整可见；
-# 同时把水平滚动复位到最左，确保长行首部也能看到。ScrollToCaret + WM_VSCROLL 仅作兜底。
-function Push-LogToBottom {
+function Test-LogAtBottom {
+  if ($logGrid.Rows.Count -eq 0) { return $true }
   try {
-    if (-not $logBox -or -not $logBox.IsHandleCreated) { return }
-    $logBox.SelectionStart = $logBox.TextLength
-    $logBox.SelectionLength = 0
-    # EM_SETSCROLLPOS(0x04DE)：lParam 指向 POINT(x,y)；y 取最大即滚到最底，x=0 复位到最左
-    $ptr = [System.Runtime.InteropServices.Marshal]::AllocHGlobal(8)
-    try {
-      [System.Runtime.InteropServices.Marshal]::WriteInt32($ptr, 0)             # POINT.x = 0（水平复位到最左）
-      [System.Runtime.InteropServices.Marshal]::WriteInt32($ptr, 4, 0x7FFFFFFF) # POINT.y = 最大（垂直滚到最底）
-      [void][Native.Win]::SendMessage($logBox.Handle, 0x04DE, [IntPtr]::Zero, $ptr)
-    } finally {
-      [System.Runtime.InteropServices.Marshal]::FreeHGlobal($ptr)
-    }
-    $logBox.ScrollToCaret()
-    if ('Native.Win' -as [type]) {
-      # WM_VSCROLL(0x0115) 的 SB_BOTTOM(7)：滚动到垂直滚动范围最底
-      [void][Native.Win]::SendMessage($logBox.Handle, 0x0115, [IntPtr]7, [IntPtr]::Zero)
-    }
-  } catch { }
+    $first = [Math]::Max(0, $logGrid.FirstDisplayedScrollingRowIndex)
+    $visible = [Math]::Max(1, $logGrid.DisplayedRowCount($false))
+    return (($first + $visible) -ge $logGrid.Rows.Count)
+  } catch { return $true }
 }
 
-# 自动滚动复选框（位于日志区顶部，默认勾选）
+function Push-LogToBottom {
+  try {
+    if (-not $logGrid -or -not $logGrid.IsHandleCreated -or $logGrid.Rows.Count -eq 0) { return }
+    $script:programmaticLogScroll = $true
+    $last = $logGrid.Rows.Count - 1
+    $logGrid.AutoResizeRow($last, [Windows.Forms.DataGridViewAutoSizeRowMode]::AllCellsExceptHeader)
+    $visible = [Math]::Max(1, $logGrid.DisplayedRowCount($false))
+    $logGrid.FirstDisplayedScrollingRowIndex = [Math]::Max(0, $logGrid.Rows.Count - $visible)
+    # 极长的换行日志可能占满视口；若按常规可见行数回退后末行仍不完整，
+    # 将末行置于视口顶部，优先保证它可以完整阅读。
+    if (-not (Test-LogAtBottom)) { $logGrid.FirstDisplayedScrollingRowIndex = $last }
+  } catch { } finally { $script:programmaticLogScroll = $false }
+}
+
+# 自动滚动复选框（用户直接向上滚动时自动取消；回到底部时自动恢复）。
 $chkAuto = New-Object Windows.Forms.CheckBox
-$chkAuto.Dock = 'Top'
-$chkAuto.Height = 22
+$chkAuto.Dock = 'Fill'
 $chkAuto.Text = '自动滚动到底部'
 $chkAuto.Checked = $true
 $chkAuto.Font = New-Object Drawing.Font('微软雅黑', 9)
 $chkAuto.ForeColor = $C_SUBTEXT
 $chkAuto.BackColor = $C_BG
 $chkAuto.Margin = New-Object Windows.Forms.Padding(0)
-$chkAuto.Add_CheckedChanged({ $script:autoScroll = $chkAuto.Checked; if ($chkAuto.Checked) { Push-LogToBottom } })
-$logHost.Controls.Add($chkAuto)
+$chkAuto.Add_CheckedChanged({
+  if ($script:syncingAutoCheck) { return }
+  $script:autoScroll = $chkAuto.Checked
+  if ($chkAuto.Checked) { Push-LogToBottom }
+})
+$logLayout.Controls.Add($chkAuto, 0, 0)
+$logGrid.Add_Scroll({
+  if ($script:programmaticLogScroll) { return }
+  $atBottom = Test-LogAtBottom
+  $script:autoScroll = $atBottom
+  $script:syncingAutoCheck = $true
+  $chkAuto.Checked = $atBottom
+  $script:syncingAutoCheck = $false
+})
 
 function Write-Log([string]$msg, [System.Drawing.Color]$color) {
-  $logBox.SelectionStart = $logBox.TextLength
-  $logBox.SelectionLength = 0
-  $logBox.SelectionColor = $C_SUBTEXT
-  $logBox.AppendText('[' + (Get-Date -Format 'HH:mm:ss') + ']  ')
-  $logBox.SelectionColor = $color
-  $logBox.AppendText($msg + "`r`n")
-  $logBox.SelectionColor = $logBox.ForeColor
+  $rowIndex = $logGrid.Rows.Add(('[' + (Get-Date -Format 'HH:mm:ss') + ']'), $msg)
+  $logGrid.Rows[$rowIndex].Cells[0].Style.ForeColor = $C_SUBTEXT
+  $logGrid.Rows[$rowIndex].Cells[1].Style.ForeColor = $color
+  # 控制长期运行时的内存占用；完整历史仍持续写入本地日志文件。
+  if ($logGrid.Rows.Count -gt 2000) {
+    for ($i = 0; $i -lt 200; $i++) { $logGrid.Rows.RemoveAt(0) }
+  }
   if ($script:autoScroll) {
-    # 同步滚一次（立即生效）+ 投递到下一个消息周期再滚一次：追加文本后 RichEdit
-    # 的排版/滚动条状态可能刚变化，二次 EM_SETSCROLLPOS 用于兜底，确保末行完整贴底。
     Push-LogToBottom
-    if ($logBox.IsHandleCreated) { [void]$logBox.BeginInvoke([Action]{ Push-LogToBottom }) }
+    if ($logGrid.IsHandleCreated) { [void]$logGrid.BeginInvoke([Action]{ Push-LogToBottom }) }
   }
   if ($script:controlLogPath) {
     try { Add-Content -LiteralPath $script:controlLogPath -Value ('[' + (Get-Date -Format 'yyyy-MM-dd HH:mm:ss') + '] ' + $msg) -Encoding UTF8 } catch { }
@@ -238,11 +285,9 @@ function Write-Log([string]$msg, [System.Drawing.Color]$color) {
 
 # ---- 底部按钮区 ----
 $panel = New-Object Windows.Forms.Panel
-$panel.Dock = 'Bottom'
-$panel.Height = 82
+$panel.Dock = 'Fill'
 $panel.BackColor = $C_CARD
-$form.Controls.Add($panel)
-$panel.BringToFront()
+$rootLayout.Controls.Add($panel, 0, 3)
 
 $buttonLayout = New-Object Windows.Forms.TableLayoutPanel
 $buttonLayout.Dock = 'Fill'
@@ -577,20 +622,34 @@ function Update-ControlTask {
   # 只认与本任务种类一致的标记：嵌套脚本（如恢复流程内停 Web/API 的 bb-stop）也会
   # 输出自己的 BB_TASK_OK=<kind>，不限定种类会把失败任务误判成成功（2026-10-17 实测：
   # 恢复在角色检查失败回退退出，控制台却因嵌套的 BB_TASK_OK=stopping 显示"恢复成功完成"）。
-  $taskOk = [bool]($taskOutput | Where-Object { $_ -match "^BB_TASK_OK=$kind\s*$" })
   $codeReadable = ($null -ne $code -and "$code".Trim() -ne '')
   # 备份数据已落盘（本地与 NAS 均已完成），只是备份后没能把 Web/API 自动拉起：
   # 这不是失败，不能红字报"任务执行失败"，也不能显示成"备份成功完成"让用户察觉不到系统已停。
-  $restartFailed = [bool]($taskOutput | Where-Object { $_ -match '^BB_BACKUP_RESTART_FAILED' })
-  # NAS 上传失败更严重（可重试上传），优先走退出码 2 的分支，不在此处吞掉
-  $remoteFailed = [bool]($taskOutput | Where-Object { $_ -match '^BB_REMOTE_BACKUP_FAILED=' })
+  $taskResult = Resolve-BBTaskOutcome -Kind $kind -Output $taskOutput -ExitCode $code -ExitCodeReadable $codeReadable
+  $restartFailed = $taskResult.RestartFailed
+  # NAS 上传失败更严重（可重试上传），优先处理；不能依赖部分环境中不可读的退出码。
   $script:activeTask = $null
-  if ($restartFailed -and -not $remoteFailed -and $kind -eq 'backingup') {
+  if ($taskResult.Outcome -eq 'remote-failed') {
+    $message = if ($kind -eq 'remoteupload') { 'NAS 备份重试失败。' } else { '本地备份已成功，但 NAS 备份失败。' }
+    Write-Log ($message + " 详细日志：$controlLogDir") $C_RED
+    if ($restartFailed) {
+      Write-Log '同时，Web/API 未能自动启动，请点击“启动系统”手动恢复。' ([System.Drawing.Color]::FromArgb(240, 150, 30))
+      Set-ControlState 'stopped'
+    } else {
+      Set-ControlState $(if (Test-BBWebReady) { 'running' } else { 'stopped' })
+    }
+    if ($kind -eq 'backingup' -and $localSet) {
+      $retry = [Windows.Forms.MessageBox]::Show('本地备份已保留，NAS 上传失败。是否现在重试远程上传？', '远程备份失败', 'YesNo', 'Warning')
+      if ($retry -eq [Windows.Forms.DialogResult]::Yes) { Start-ControlTask 'remoteupload' 'bb-backup.ps1' @('-RemoteOnly', '-BackupSet', $localSet, '-Silent') }
+    }
+    return $false
+  }
+  if ($taskResult.Outcome -eq 'restart-failed') {
     Write-Log '备份已完成，但 Web/API 未能自动启动。请点击“启动系统”手动恢复。' ([System.Drawing.Color]::FromArgb(240, 150, 30))
     Set-ControlState 'stopped'
     return $false
   }
-  if ($taskOk -and (-not $codeReadable -or $code -eq 0)) {
+  if ($taskResult.Outcome -eq 'success') {
     switch ($kind) {
       'starting' { $script:launchStartedAt = Get-Date; Write-Log '启动脚本执行完成，正在确认服务健康状态。' $C_GREEN }
       'stopping' { $script:restoreAwaitingStart = $false; Write-Log '系统已停止。' $C_GREEN; Set-ControlState 'stopped' }
@@ -605,14 +664,7 @@ function Update-ControlTask {
       'remoteupload' { Write-Log 'NAS 备份重试成功。' $C_GREEN }
       'restoring' { $script:restoreAwaitingStart = $true; Write-Log '恢复成功完成；请点击“启动系统”。' $C_GREEN; Set-ControlState 'restore-ready' }
     }
-  } elseif ($codeReadable -and $code -eq 2 -and $kind -eq 'backingup') {
-    Write-Log ("本地备份已成功，但 NAS 备份失败。详细日志：$controlLogDir") $C_RED
-    Set-ControlState 'running'
-    if ($localSet) {
-      $retry = [Windows.Forms.MessageBox]::Show('本地备份已保留，NAS 上传失败。是否现在重试远程上传？', '远程备份失败', 'YesNo', 'Warning')
-      if ($retry -eq [Windows.Forms.DialogResult]::Yes) { Start-ControlTask 'remoteupload' 'bb-backup.ps1' @('-RemoteOnly', '-BackupSet', $localSet, '-Silent') }
-    }
-  } elseif (-not $codeReadable) {
+  } elseif ($taskResult.Outcome -eq 'unknown') {
     Write-Log ("任务已结束，但无法确认执行结果（退出码不可用）。请依据以上日志判断，必要时重试。日志：$controlLogDir") $C_PRIMARY
     $script:launchFailed = ($kind -eq 'starting')
     Set-ControlState 'partial'
@@ -624,9 +676,14 @@ function Update-ControlTask {
   return $false
 }
 
-$btnLogBottom.Add_Click({ $chkAuto.Checked = $true; Push-LogToBottom; $logBox.Focus() })
+$btnLogBottom.Add_Click({ $chkAuto.Checked = $true; Push-LogToBottom; $logGrid.Focus() })
 $btnOpenLog.Add_Click({ if (-not (Test-Path -LiteralPath $controlLogDir)) { New-Item -ItemType Directory -Path $controlLogDir -Force | Out-Null }; Start-Process explorer.exe -ArgumentList ('"' + $controlLogDir + '"') })
 $btnSettings.Add_Click({ if (-not $script:activeTask) { Show-BBRemoteBackupSettings } })
+$form.Add_Resize({
+  if ($script:autoScroll -and $logGrid.IsHandleCreated) {
+    [void]$logGrid.BeginInvoke([Action]{ Push-LogToBottom })
+  }
+})
 
 $btnStart.Add_Click({
   $script:restoreAwaitingStart = $false

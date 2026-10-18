@@ -34,10 +34,12 @@ Assert-True ($restore -match 'Get-BBDirectoryFingerprint' -and $restore -match '
 Assert-True ($backup -match '正在暂停 Web/API' -and $backup -match 'formatVersion\s*=\s*2' -and $backup -match 'sha256 = \$storageStats\.Sha256') '备份未暂停写入或未生成附件指纹'
 Assert-True ($stop -match 'Test-BBAppProcess' -and $stop -match '拒绝强制结束') '停止脚本未校验进程归属'
 Assert-True ($control -match 'function Select-BBBackupSet' -and $control -match '使用所选备份') '控制台缺少备份集选择'
-Assert-True ($control -match '\$taskOk -and \(-not \$codeReadable -or \$code -eq 0\)') '控制台未强制要求当前任务成功标记'
+Assert-True ($control -match 'Resolve-BBTaskOutcome' -and $common -match 'function Resolve-BBTaskOutcome') '控制台未使用统一任务结果判定'
 Assert-True ($backup -match 'BB_BACKUP_RESTART_FAILED' -and $backup -notmatch '\$restartError\]\s*\{\s*Write-Error') '备份未标记"服务未自动恢复"，或仍在成功落盘前提前退出'
-Assert-True ($control -match 'BB_BACKUP_RESTART_FAILED' -and $control -match 'Web/API 未能自动启动') '控制台未区分"备份成功但服务未自动启动"'
+Assert-True ($common -match 'BB_BACKUP_RESTART_FAILED' -and $control -match 'Web/API 未能自动启动') '控制台未区分"备份成功但服务未自动启动"'
+Assert-True ($backup -match '\$taskKind\s*=\s*if\s*\(\$RemoteOnly\)[\s\S]*remoteupload[\s\S]*backingup') '远程重试未输出与任务种类一致的成功标记'
 Assert-True ($control -notmatch '\$form\.Topmost\s*=\s*\$true' -and $control -notmatch '\$btnExit') '控制台仍然置顶或保留退出按钮'
+Assert-True ($control -match 'DataGridView' -and $control -notmatch 'New-Object Windows\.Forms\.RichTextBox' -and $control -match '\$rootLayout') '日志区未使用独立行布局，末行仍可能被裁切'
 Assert-True ($control -match '''running''[\s\S]*Set-BBButtonEnabled \$btnStart \$false') '系统运行后启动按钮没有禁用'
 Assert-True ($control -match 'Add_FormClosing' -and $control -match '不会停止 PostgreSQL') '关闭控制台语义未明确'
 
@@ -50,6 +52,14 @@ try {
   [IO.File]::WriteAllText((Join-Path $source 'current.txt'), 'current')
   [IO.File]::WriteAllText((Join-Path $destination 'stale.txt'), 'stale')
   . (Join-Path $project 'bb-common.ps1')
+  $success = Resolve-BBTaskOutcome -Kind 'remoteupload' -Output @('BB_TASK_OK=remoteupload') -ExitCode $null -ExitCodeReadable $false
+  Assert-True ($success.Outcome -eq 'success') '退出码不可读时未按 remoteupload 成功标记判定成功'
+  $wrongMarker = Resolve-BBTaskOutcome -Kind 'restoring' -Output @('BB_TASK_OK=stopping') -ExitCode $null -ExitCodeReadable $false
+  Assert-True ($wrongMarker.Outcome -eq 'unknown') '嵌套停止脚本标记被误认为恢复成功'
+  $partial = Resolve-BBTaskOutcome -Kind 'backingup' -Output @('BB_LOCAL_BACKUP_SET=X', 'BB_REMOTE_BACKUP_FAILED=offline', 'BB_BACKUP_RESTART_FAILED') -ExitCode $null -ExitCodeReadable $false
+  Assert-True ($partial.Outcome -eq 'remote-failed' -and $partial.RestartFailed) 'NAS 与服务重启同时失败时结果优先级错误'
+  $restartOnly = Resolve-BBTaskOutcome -Kind 'backingup' -Output @('BB_BACKUP_RESTART_FAILED') -ExitCode 3 -ExitCodeReadable $true
+  Assert-True ($restartOnly.Outcome -eq 'restart-failed') '备份成功但服务重启失败未被单独识别'
   Invoke-BBRobocopy -Source $source -Destination $destination -Mirror
   Assert-True (Test-Path -LiteralPath (Join-Path $destination 'current.txt')) '镜像复制未写入当前文件'
   Assert-True (-not (Test-Path -LiteralPath (Join-Path $destination 'stale.txt'))) '镜像复制未清除旧文件'

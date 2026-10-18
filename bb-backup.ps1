@@ -76,7 +76,9 @@ if ($RemoteOnly) {
   $ts = Get-Date -Format 'yyyyMMdd-HHmmss'
   $setDir = Join-Path $BackupRoot $ts
   $pendingDir = Join-Path $BackupRoot ('.pending-' + $ts + '-' + [guid]::NewGuid().ToString('N'))
-  $portsWereListening = (Test-BBPortListening -Port $apiPort) -or (Test-BBPortListening -Port $webPort)
+  # 以能否独占绑定端口判断服务是否可能运行，避免 Get-NetTCPConnection 中 PID 0
+  # 的过期监听项让备份误以为服务仍在运行。
+  $portsWereListening = (-not (Test-BBPortBindable -Port $apiPort)) -or (-not (Test-BBPortBindable -Port $webPort))
   $resumeServices = $false
   $restartError = ''
   if (Test-Path -LiteralPath $setDir) { throw "备份集已存在，请稍后重试：$setDir" }
@@ -180,7 +182,8 @@ if ($restartError) {
   exit 3
 }
 # 控制台据此判定任务成功（进程退出码在某些环境下读不到，不能单独依赖）
-Write-Host 'BB_TASK_OK=backingup'
+$taskKind = if ($RemoteOnly) { 'remoteupload' } else { 'backingup' }
+Write-Host "BB_TASK_OK=$taskKind"
 if (-not $Silent) { Read-Host '按回车退出' }
 # 显式以 0 退出：robocopy 用位图作退出码（1=复制了文件），会泄漏成进程退出码，
 # 导致控制台把成功的备份误判为失败。

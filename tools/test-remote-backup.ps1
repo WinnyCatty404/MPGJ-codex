@@ -62,6 +62,26 @@ try {
   Assert-True (-not (Get-ChildItem -LiteralPath $remoteRoot -Directory | Where-Object { $_.Name.StartsWith('.pending-') })) '远程复制后残留 pending 目录'
   $retry = Copy-BBBackupSetAtomic -Source $sourceSet -DestinationRoot $remoteRoot
   Assert-True $retry.AlreadyExists '内容一致的远程备份未安全识别为已存在'
+
+  # 同名远程备份的 dump 未变但附件被篡改时，必须拒绝当作“已存在且一致”。
+  [IO.File]::WriteAllText((Join-Path $retry.Path 'uploads\evidence.txt'), 'changed evidence')
+  $mismatchRejected = $false
+  try { [void](Copy-BBBackupSetAtomic -Source $sourceSet -DestinationRoot $remoteRoot) }
+  catch { $mismatchRejected = ($_.Exception.Message -match '同名但内容不一致') }
+  Assert-True $mismatchRejected '远程附件内容变化后仍被误判为相同备份集'
+
+  # 第 2 版清单必须具备数据库、storage、uploads 三类校验值。
+  $invalidV2 = Join-Path $tempRoot 'invalid-v2'
+  New-Item -ItemType Directory -Path (Join-Path $invalidV2 'storage'), (Join-Path $invalidV2 'uploads') -Force | Out-Null
+  [IO.File]::WriteAllText((Join-Path $invalidV2 'bb_miping-invalid.dump'), 'dump')
+  [PSCustomObject]@{
+    formatVersion = 2; createdAt = (Get-Date).ToString('o')
+    database = [PSCustomObject]@{ dumpFile = 'bb_miping-invalid.dump'; bytes = 4 }
+    storage = [PSCustomObject]@{ files = 0; bytes = 0 }
+    uploads = [PSCustomObject]@{ files = 0; bytes = 0 }
+  } | ConvertTo-Json -Depth 5 | Set-Content -LiteralPath (Join-Path $invalidV2 'backup-manifest.json') -Encoding UTF8
+  $invalidInfo = Get-BBBackupSetInfo -Path $invalidV2 -Deep
+  Assert-True (-not $invalidInfo.Valid -and $invalidInfo.Error -match '校验') '缺少指纹的第 2 版清单未被拒绝'
 } finally {
   if (Test-Path -LiteralPath $tempRoot) { Remove-Item -LiteralPath $tempRoot -Recurse -Force }
 }
