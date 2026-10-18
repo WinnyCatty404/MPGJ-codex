@@ -5966,6 +5966,13 @@
       };
       refreshReportAnalysisStateUi(id);
     }
+    const overallLayer = reportOverallLayerFromTextId(id);
+    if (overallLayer !== null) {
+      reportTextStates[id] = {
+        mode: 'manual',
+        sourceSignature: reportAnalysisSourceSignature(buildLayerOverallText(overallLayer))
+      };
+    }
   }
 
   function protectConclusionScoreEdit(event, el) {
@@ -7079,8 +7086,8 @@
     return cnt;
   }
 
-  // 层面描述自动草稿：由各测评单元结果拼接
-  function buildLayerOverallText(t) {
+  // 旧版总体评价自动草稿，仅用于识别并迁移未经过人工编辑的历史项目。
+  function buildLegacyLayerOverallText(t) {
     const level = evaluationIndicatorLevels[t];
     const segs = [];
     level.items.forEach((item, itemIdx) => {
@@ -7092,6 +7099,48 @@
       segs.push(item.name + (ok ? '方面密码应用符合要求' : '方面存在不足（' + issues.map(i => i.name).join('、') + '）'));
     });
     return segs.join('；') + '。';
+  }
+
+  // 未导入、未人工编辑时，总体评价直接同步对应层面的单元测评结果分析。
+  function buildLayerOverallText(t) {
+    return getReportUnitAnalysisText(t);
+  }
+
+  function reportOverallLayerFromTextId(id) {
+    const match = /^report-overall-(\d+)$/.exec(String(id || ''));
+    if (!match) return null;
+    const layer = Number(match[1]);
+    return Number.isInteger(layer) && layer >= 0 && layer < ONSITE_LAYERS.length ? layer : null;
+  }
+
+  function resolveReportOverallText(t) {
+    const id = 'report-overall-' + t;
+    const automatic = buildLayerOverallText(t);
+    const signature = reportAnalysisSourceSignature(automatic);
+    const hasSavedText = Object.prototype.hasOwnProperty.call(reportTexts, id);
+    let state = reportTextStates[id];
+    if (!hasSavedText) {
+      reportTexts[id] = automatic;
+      state = { mode: 'auto', sourceSignature: signature };
+    } else if (!state || !['auto', 'manual', 'imported'].includes(state.mode)) {
+      const saved = String(reportTexts[id] || '');
+      if (saved === automatic || saved === buildLegacyLayerOverallText(t)) {
+        reportTexts[id] = automatic;
+        state = { mode: 'auto', sourceSignature: signature };
+      } else {
+        // 无来源状态的历史内容可能来自Word或人工编辑，默认保留。
+        state = { mode: 'manual', sourceSignature: signature };
+      }
+    } else if (state.mode === 'auto') {
+      reportTexts[id] = automatic;
+      state.sourceSignature = signature;
+    }
+    reportTextStates[id] = state;
+    return { value: String(reportTexts[id] || ''), mode: state.mode };
+  }
+
+  function getReportOverallText(t) {
+    return resolveReportOverallText(t).value;
   }
 
   // 评估结论句（与评估结论Tab一致）
@@ -7153,14 +7202,15 @@
     const cfg = ONSITE_LAYERS[activeOverallLayer];
     const lc = getLayerStatCounts(activeOverallLayer);
     const taId = 'report-overall-' + activeOverallLayer;
+    const overallText = resolveReportOverallText(activeOverallLayer);
     html += '<div class="doc-card overall-editor-card" role="tabpanel">';
     html += '<div class="overall-editor-head"><div><div class="overall-editor-title">' + onsiteEsc(cfg.name) + '</div>' +
       '<div class="overall-editor-hint">当前仅展示本层面，切换 Tab 时编辑内容会自动保留</div></div>' +
       '<div class="overall-stat">符合 ' + lc['符合'] + ' 项　部分符合 ' + lc['部分符合'] + ' 项　不符合 ' + lc['不符合'] + ' 项　不适用 ' + lc['不适用'] + ' 项</div></div>';
     html += '<div class="doc-editor"><textarea oninput="saveReportText(\'' + taId + '\',this.value);autoResizeOverallTextarea(this)" ' +
       'aria-label="' + onsiteEsc(cfg.name) + '总体评价" placeholder="在' + onsiteEsc(cfg.name) + '方面，……（自动生成，可编辑）">' +
-      onsiteEsc(getReportTextVal(taId, buildLayerOverallText(activeOverallLayer))) + '</textarea>' +
-      '<div class="doc-meta">系统已生成初稿，可直接修改；编辑框高度会随内容自动调整。</div></div>';
+      onsiteEsc(overallText.value) + '</textarea>' +
+      '<div class="doc-meta">' + (overallText.mode === 'auto' ? '已同步对应层面的单元测评结果分析，可直接修改。' : (overallText.mode === 'imported' ? '内容来自Word导入，可直接修改。' : '已保留人工编辑内容。')) + ' 编辑框高度会随内容自动调整。</div></div>';
     html += '</div>';
     html += '<div class="overall-conclusion"><div class="doc-h">评估结论</div>';
     html += '<p class="doc-p">' + onsiteEsc(buildConclusionSentence()) + '</p></div>';
@@ -9767,7 +9817,12 @@
       let cnt = 0;
       ONSITE_LAYERS.forEach(function (cfg, t) {
         const v = ovTexts[cfg.name];
-        if (v) { reportTexts['report-overall-' + t] = v; cnt++; }
+        if (v) {
+          const id = 'report-overall-' + t;
+          reportTexts[id] = v;
+          reportTextStates[id] = { mode: 'imported', sourceSignature: reportAnalysisSourceSignature(buildLayerOverallText(t)) };
+          cnt++;
+        }
       });
       add(s4, '总体评价：导入 ' + cnt + ' 个层面的评价文本（总述与结论句由系统自动生成）');
     })();
@@ -10918,7 +10973,7 @@
       const name = layer.name;
       const layerCounts = getLayerStatCounts(index);
       put('单元测评结果分析_' + name + '·结果分析', getReportUnitAnalysisText(index));
-      put('总体评价_' + name + '_描述', getReportTextVal('report-overall-' + index, buildLayerOverallText(index)));
+      put('总体评价_' + name + '_描述', getReportOverallText(index));
       put('总体评价_' + name + '_测评结果', '符合项' + layerCounts['符合'] + '项，部分符合项' + layerCounts['部分符合'] + '项，不符合项' + layerCounts['不符合'] + '项，不适用项' + layerCounts['不适用'] + '项。');
       put('安全问题及改进建议_' + name + '_问题描述', getReportTextVal('report-sug-prob-' + index, buildSugProblemText(index)));
       put('安全问题及改进建议_' + name + '_改进建议', getReportTextVal('report-sug-adv-' + index, buildSugAdviceText(index)));
