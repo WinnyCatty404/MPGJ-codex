@@ -5975,6 +5975,14 @@
         userEdited: true
       };
     }
+    const suggestion = reportSuggestionFromTextId(id);
+    if (suggestion) {
+      reportTextStates[id] = {
+        mode: 'manual',
+        sourceSignature: reportAnalysisSourceSignature(buildReportSuggestionText(suggestion.layer, suggestion.kind)),
+        userEdited: true
+      };
+    }
   }
 
   function protectConclusionScoreEdit(event, el) {
@@ -6389,7 +6397,11 @@
       const saved = String(reportTexts[id] || '');
       const legacyMissingWasFilled = reportAnalysisMissingCount(saved) > reportAnalysisMissingCount(automatic);
       const legacyObjectWasAdded = reportAnalysisNoObjectCount(saved) > reportAnalysisNoObjectCount(automatic);
-      if (reportGeneratedTextComparable(saved) === reportGeneratedTextComparable(automatic) || legacyMissingWasFilled || legacyObjectWasAdded) {
+      const layer = reportUaLayerFromTextId(id);
+      const matchesLegacyManagementDraft = layer !== null && layer >= 4 &&
+        reportGeneratedTextComparable(saved) === reportGeneratedTextComparable(buildLegacyLayerAnalysisText(layer));
+      if (reportGeneratedTextComparable(saved) === reportGeneratedTextComparable(automatic) ||
+          matchesLegacyManagementDraft || legacyMissingWasFilled || legacyObjectWasAdded) {
         reportTexts[id] = automatic;
         state = { mode: 'auto', sourceSignature: signature };
       } else {
@@ -6467,9 +6479,31 @@
     return { '符合': '#1e8e3e', '部分符合': '#e65100', '不符合': '#c62828', '不适用': '#78909c', '未测评': '#999' }[cls] || '#333';
   }
 
-  // 结果分析自动草稿：每个测评单元一段，逐个测评对象写入现场测评的实际情况（结果记录），
-  // 全部由「现场测评·结果记录」+ 模板拼接生成，无需大模型，人工仅需润色
-  function buildLayerAnalysisText(t) {
+  const REPORT_MISSING_RECORD_TEXT = '（未填写结果记录，请补充）';
+
+  // 管理类层面按对象原顺序汇总结果记录：忽略空值，对完全相同的记录去重。
+  // problemOnly=true 时只读取部分符合或不符合对象，供安全问题描述使用。
+  function getManagementUnitRecordSummary(t, itemIdx, problemOnly) {
+    const level = evaluationIndicatorLevels[t];
+    const item = level && level.items[itemIdx];
+    if (!item) return REPORT_MISSING_RECORD_TEXT;
+    const records = [];
+    const seen = new Set();
+    getOnsiteUnitObjects(t, item.name).forEach(function(_objName, objIdx) {
+      if (problemOnly) {
+        const cls = getObjectCls(t, itemIdx, objIdx);
+        if (cls !== '部分符合' && cls !== '不符合') return;
+      }
+      const record = String(getOnsiteRec(t, itemIdx, objIdx).record || '').trim();
+      if (!record || seen.has(record)) return;
+      seen.add(record);
+      records.push(record);
+    });
+    return records.length ? records.join('；') : REPORT_MISSING_RECORD_TEXT;
+  }
+
+  // 升级前的自动稿，仅用于安全识别并迁移历史自动内容。
+  function buildLegacyLayerAnalysisText(t) {
     const level = evaluationIndicatorLevels[t];
     const parts = [];
     level.items.forEach((item, itemIdx) => {
@@ -6487,6 +6521,23 @@
         return objName + '：' + detail + '（测评结果：' + cls + '）';
       });
       parts.push(item.name + '测评指标中，' + (segs.length ? segs.join('；') : '暂无测评对象') + '。故该指标' + (unitCls === '未测评' ? '尚未完成测评' : unitCls) + '。');
+    });
+    return parts.join('\n');
+  }
+
+  // 结果分析自动草稿：前四个技术层面保持原规则；第5—8层面只汇总结果记录，
+  // 不再复写测评对象名称及每个对象的单独结论。
+  function buildLayerAnalysisText(t) {
+    if (t < 4) return buildLegacyLayerAnalysisText(t);
+    const level = evaluationIndicatorLevels[t];
+    const parts = [];
+    level.items.forEach(function(item, itemIdx) {
+      if (!isOnsiteUnitApplicable(t, itemIdx)) {
+        parts.push(item.name + '测评指标中，根据被测系统密码应用方案及实际密码应用需求，本条款不纳入测评范围。故该指标不适用。');
+        return;
+      }
+      const unitCls = reportClassify(getRawUnitScore(t, itemIdx));
+      parts.push(item.name + '测评指标中，' + getManagementUnitRecordSummary(t, itemIdx, false) + '。故该指标' + unitCls + '。');
     });
     return parts.join('\n');
   }
@@ -7127,9 +7178,21 @@
     });
   }
 
-  // 未导入、未人工编辑时，总体评价直接同步对应层面的单元测评结果分析。
+  function buildManagementLayerOverallText(t) {
+    const parts = [];
+    evaluationIndicatorLevels[t].items.forEach(function(item, itemIdx) {
+      if (!isOnsiteUnitApplicable(t, itemIdx)) {
+        parts.push(item.name + '测评指标中，根据被测系统密码应用方案及实际密码应用需求，本条款不纳入测评范围。');
+        return;
+      }
+      parts.push(item.name + '测评指标中，' + getManagementUnitRecordSummary(t, itemIdx, false) + '。');
+    });
+    return parts.join('\n');
+  }
+
+  // 前四个技术层面继续同步单元分析；第5—8层面只保留指标名称和结果记录。
   function buildLayerOverallText(t) {
-    return getReportUnitAnalysisText(t);
+    return t < 4 ? getReportUnitAnalysisText(t) : buildManagementLayerOverallText(t);
   }
 
   function reportOverallLayerFromTextId(id) {
@@ -7151,6 +7214,7 @@
     } else if (!state || !['auto', 'manual', 'imported'].includes(state.mode) || (state.mode === 'manual' && state.userEdited !== true)) {
       const saved = String(reportTexts[id] || '');
       if (reportGeneratedTextComparable(saved) === reportGeneratedTextComparable(automatic) ||
+          (t >= 4 && reportGeneratedTextComparable(saved) === reportGeneratedTextComparable(buildLegacyLayerAnalysisText(t))) ||
           reportGeneratedTextComparable(saved) === reportGeneratedTextComparable(buildLegacyLayerOverallText(t)) ||
           isLegacyGeneratedOverallText(t, saved)) {
         reportTexts[id] = automatic;
@@ -7238,7 +7302,7 @@
     html += '<div class="doc-editor"><textarea oninput="saveReportText(\'' + taId + '\',this.value);autoResizeOverallTextarea(this)" ' +
       'aria-label="' + onsiteEsc(cfg.name) + '总体评价" placeholder="在' + onsiteEsc(cfg.name) + '方面，……（自动生成，可编辑）">' +
       onsiteEsc(overallText.value) + '</textarea>' +
-      '<div class="doc-meta">' + (overallText.mode === 'auto' ? '已同步对应层面的单元测评结果分析，可直接修改。' : (overallText.mode === 'imported' ? '内容来自Word导入，可直接修改。' : '已保留人工编辑内容。')) + ' 编辑框高度会随内容自动调整。</div></div>';
+      '<div class="doc-meta">' + (overallText.mode === 'auto' ? (activeOverallLayer < 4 ? '已同步对应层面的单元测评结果分析，可直接修改。' : '已根据现场测评结果记录自动生成，可直接修改。') : (overallText.mode === 'imported' ? '内容来自Word导入，可直接修改。' : '已保留人工编辑内容。')) + ' 编辑框高度会随内容自动调整。</div></div>';
     html += '</div>';
     html += '<div class="overall-conclusion"><div class="doc-h">评估结论</div>';
     html += '<p class="doc-p">' + onsiteEsc(buildConclusionSentence()) + '</p></div>';
@@ -7262,8 +7326,8 @@
     return out;
   }
 
-  // 问题描述自动草稿（编号列表，可结合风险分析中的威胁描述）
-  function buildSugProblemText(t) {
+  // 升级前的问题描述自动稿，仅用于识别并迁移历史自动内容。
+  function buildLegacySugProblemText(t) {
     const probs = getLayerProblemUnits(t);
     if (!probs.length) return '无。';
     return probs.map((p, i) => {
@@ -7282,6 +7346,16 @@
     }).join('\n');
   }
 
+  // 前四个技术层面保持原规则；第5—8层面只汇总问题对象的结果记录。
+  function buildSugProblemText(t) {
+    if (t < 4) return buildLegacySugProblemText(t);
+    const probs = getLayerProblemUnits(t);
+    if (!probs.length) return '无。';
+    return probs.map(function(p, i) {
+      return (i + 1) + '）' + p.name + '：' + getManagementUnitRecordSummary(t, p.itemIdx, true) + '。';
+    }).join('\n');
+  }
+
   // 改进建议自动草稿（引用 GB/T 39786 对应条款）
   function buildSugAdviceText(t) {
     const probs = getLayerProblemUnits(t);
@@ -7293,6 +7367,50 @@
         ('建议按照 GB/T 39786—2021 相关要求' + (p.desc ? '（' + p.desc + '）' : '') +
         '，采用符合国家密码管理要求的密码技术、密码产品与密码服务进行整改，确保相应安全需求得到有效保障。'));
     }).join('\n');
+  }
+
+  function reportSuggestionFromTextId(id) {
+    const match = /^report-sug-(prob|adv)-(\d+)$/.exec(String(id || ''));
+    if (!match) return null;
+    const layer = Number(match[2]);
+    if (!Number.isInteger(layer) || layer < 0 || layer >= ONSITE_LAYERS.length) return null;
+    return { kind: match[1], layer: layer };
+  }
+
+  function buildReportSuggestionText(t, kind) {
+    return kind === 'prob' ? buildSugProblemText(t) : buildSugAdviceText(t);
+  }
+
+  function resolveReportSuggestionText(t, kind) {
+    const id = 'report-sug-' + kind + '-' + t;
+    const automatic = buildReportSuggestionText(t, kind);
+    const signature = reportAnalysisSourceSignature(automatic);
+    const hasSavedText = Object.prototype.hasOwnProperty.call(reportTexts, id);
+    let state = reportTextStates[id];
+    if (!hasSavedText) {
+      reportTexts[id] = automatic;
+      state = { mode: 'auto', sourceSignature: signature };
+    } else if (!state || !['auto', 'manual', 'imported'].includes(state.mode) || (state.mode === 'manual' && state.userEdited !== true)) {
+      const saved = String(reportTexts[id] || '');
+      const matchesCurrent = reportGeneratedTextComparable(saved) === reportGeneratedTextComparable(automatic);
+      const matchesLegacy = kind === 'prob' && reportGeneratedTextComparable(saved) === reportGeneratedTextComparable(buildLegacySugProblemText(t));
+      if (matchesCurrent || matchesLegacy) {
+        reportTexts[id] = automatic;
+        state = { mode: 'auto', sourceSignature: signature };
+      } else {
+        // 无来源状态的历史内容默认保留，避免覆盖人工或旧版Word导入文本。
+        state = Object.assign({}, state, { mode: 'manual', sourceSignature: signature, userEdited: false });
+      }
+    } else if (state.mode === 'auto') {
+      reportTexts[id] = automatic;
+      state.sourceSignature = signature;
+    }
+    reportTextStates[id] = state;
+    return { value: String(reportTexts[id] || ''), mode: state.mode };
+  }
+
+  function getReportSuggestionText(t, kind) {
+    return resolveReportSuggestionText(t, kind).value;
   }
 
   let activeSuggestionLayer = 0;
@@ -7326,12 +7444,14 @@
     if (!probs.length) {
       html += '<div class="suggestion-empty"><strong>问题描述：</strong>无。　<strong>改进建议：</strong>无。</div>';
     } else {
-      html += '<div class="doc-editor"><div class="doc-meta" style="margin:0 0 5px;">问题描述（自动生成，可编辑）</div>' +
+      const probText = resolveReportSuggestionText(activeSuggestionLayer, 'prob');
+      const advText = resolveReportSuggestionText(activeSuggestionLayer, 'adv');
+      html += '<div class="doc-editor"><div class="doc-meta" style="margin:0 0 5px;">问题描述（' + (probText.mode === 'auto' ? '自动同步' : (probText.mode === 'imported' ? 'Word导入' : '人工内容')) + '，可编辑）</div>' +
         '<textarea aria-label="' + onsiteEsc(cfg.name) + '问题描述" oninput="saveReportText(\'' + probId + '\',this.value)">' +
-        onsiteEsc(getReportTextVal(probId, buildSugProblemText(activeSuggestionLayer))) + '</textarea></div>';
-      html += '<div class="doc-editor"><div class="doc-meta" style="margin:0 0 5px;">改进建议（自动生成，可编辑）</div>' +
+        onsiteEsc(probText.value) + '</textarea></div>';
+      html += '<div class="doc-editor"><div class="doc-meta" style="margin:0 0 5px;">改进建议（' + (advText.mode === 'auto' ? '自动同步' : (advText.mode === 'imported' ? 'Word导入' : '人工内容')) + '，可编辑）</div>' +
         '<textarea aria-label="' + onsiteEsc(cfg.name) + '改进建议" oninput="saveReportText(\'' + advId + '\',this.value)">' +
-        onsiteEsc(getReportTextVal(advId, buildSugAdviceText(activeSuggestionLayer))) + '</textarea></div>';
+        onsiteEsc(advText.value) + '</textarea></div>';
     }
     html += '</div></div>';
     panel.innerHTML = html;
@@ -9879,8 +9999,13 @@
       });
       let cnt = 0;
       Object.keys(sugTexts).forEach(function (t) {
-        reportTexts['report-sug-prob-' + t] = sugTexts[t].prob || '无。';
-        reportTexts['report-sug-adv-' + t] = sugTexts[t].adv || '无。';
+        const layer = Number(t);
+        const probId = 'report-sug-prob-' + t;
+        const advId = 'report-sug-adv-' + t;
+        reportTexts[probId] = sugTexts[t].prob || '无。';
+        reportTexts[advId] = sugTexts[t].adv || '无。';
+        reportTextStates[probId] = { mode: 'imported', sourceSignature: reportAnalysisSourceSignature(buildSugProblemText(layer)) };
+        reportTextStates[advId] = { mode: 'imported', sourceSignature: reportAnalysisSourceSignature(buildSugAdviceText(layer)) };
         if (sugTexts[t].prob && sugTexts[t].prob !== '无。') cnt++;
       });
       add(s4, '安全问题及改进建议：导入 ' + Object.keys(sugTexts).length + ' 个层面（其中 ' + cnt + ' 个层面存在问题）');
@@ -11008,8 +11133,8 @@
       put('单元测评结果分析_' + name + '·结果分析', getReportUnitAnalysisText(index));
       put('总体评价_' + name + '_描述', getReportOverallText(index));
       put('总体评价_' + name + '_测评结果', '符合项' + layerCounts['符合'] + '项，部分符合项' + layerCounts['部分符合'] + '项，不符合项' + layerCounts['不符合'] + '项，不适用项' + layerCounts['不适用'] + '项。');
-      put('安全问题及改进建议_' + name + '_问题描述', getReportTextVal('report-sug-prob-' + index, buildSugProblemText(index)));
-      put('安全问题及改进建议_' + name + '_改进建议', getReportTextVal('report-sug-adv-' + index, buildSugAdviceText(index)));
+      put('安全问题及改进建议_' + name + '_问题描述', getReportSuggestionText(index, 'prob'));
+      put('安全问题及改进建议_' + name + '_改进建议', getReportSuggestionText(index, 'adv'));
     });
     [['委托证明文件_文件类型','b1-type'], ['委托证明文件_签订时间','b1-date'],
       ['委托证明文件_委托金额','b1-amount'], ['委托证明文件_系统密评单价','b1-price'],
