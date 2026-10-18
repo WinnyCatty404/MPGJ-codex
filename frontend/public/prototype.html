@@ -903,6 +903,11 @@
     }
     .report-analysis-card:focus-within { border-color: #2456a6; box-shadow: 0 0 0 3px rgba(36,86,166,.08); }
     .report-analysis-card .report-textarea:focus { outline: none; box-shadow: none; }
+    .report-analysis-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 8px; }
+    .report-analysis-state { color: #58708e; font-size: 12px; line-height: 1.6; }
+    .report-analysis-state.is-warning { color: #b45309; font-weight: 600; }
+    .report-analysis-regenerate { flex: none; padding: 5px 11px; border: 1px solid #8aa8ce; border-radius: 5px; background: #f7fbff; color: #2456a6; font-size: 12px; cursor: pointer; }
+    .report-analysis-regenerate:hover { border-color: #2456a6; background: #edf5ff; }
     .risk-high { color: #c62828; font-weight: 700; }
     .risk-mid { color: #e65100; font-weight: 600; }
     .risk-low { color: #2e7d32; font-weight: 600; }
@@ -5885,6 +5890,8 @@
   let reportFixes = {};
   // 报告正文缓存（自动生成、可编辑）
   let reportTexts = {};
+  // 单元测评结果分析的来源状态：自动文本随现场记录更新，人工文本保留并提示来源变化。
+  let reportTextStates = {};
 
   function reportKey(t, itemIdx, objIdx) { return onsiteKey(t, itemIdx, objIdx); }
 
@@ -5913,6 +5920,14 @@
       }
     }
     reportTexts[id] = value;
+    const uaLayer = reportUaLayerFromTextId(id);
+    if (uaLayer !== null) {
+      reportTextStates[id] = {
+        mode: 'manual',
+        sourceSignature: reportAnalysisSourceSignature(buildLayerAnalysisText(uaLayer))
+      };
+      refreshReportAnalysisStateUi(id);
+    }
   }
 
   function protectConclusionScoreEdit(event, el) {
@@ -6277,17 +6292,101 @@
     return '<textarea id="' + id + '" class="report-textarea" style="min-height:' + (minHeight || 200) + 'px;"' + scoreLock + ' oninput="saveReportText(\'' + id + '\',this.value,this)">' + onsiteEsc(v) + '</textarea>';
   }
 
-  // 结果分析始终可编辑，高度随内容自动增长；导出仍直接读取 reportTexts原文。
+  // 结果分析始终可编辑，高度随内容自动增长；自动稿随第三步更新，人工稿保留。
   function autoResizeReportAnalysis(textarea) {
     if (!textarea) return;
     textarea.style.height = 'auto';
     textarea.style.height = Math.max(240, textarea.scrollHeight + 2) + 'px';
   }
 
-  function reportAnalysisEditor(id, autoText) {
-    const value = reportTexts.hasOwnProperty(id) ? reportTexts[id] : autoText;
+  function reportUaLayerFromTextId(id) {
+    const match = /^report-ua-text-(\d+)$/.exec(String(id || ''));
+    if (!match) return null;
+    const layer = Number(match[1]);
+    return Number.isInteger(layer) && layer >= 0 && layer < ONSITE_LAYERS.length ? layer : null;
+  }
+
+  function reportAnalysisSourceSignature(value) {
+    const text = String(value || '');
+    let hash = 2166136261;
+    for (let i = 0; i < text.length; i++) {
+      hash ^= text.charCodeAt(i);
+      hash = Math.imul(hash, 16777619);
+    }
+    return (hash >>> 0).toString(16) + ':' + text.length;
+  }
+
+  function reportAnalysisMissingCount(value) {
+    return (String(value || '').match(/（未填写结果记录，请补充）/g) || []).length;
+  }
+
+  function resolveReportAnalysisText(id, autoText) {
+    const automatic = String(autoText || '');
+    const signature = reportAnalysisSourceSignature(automatic);
+    const hasSavedText = Object.prototype.hasOwnProperty.call(reportTexts, id);
+    let state = reportTextStates[id];
+    if (!hasSavedText) {
+      reportTexts[id] = automatic;
+      state = { mode: 'auto', sourceSignature: signature };
+    } else if (!state || (state.mode !== 'auto' && state.mode !== 'manual')) {
+      const saved = String(reportTexts[id] || '');
+      const legacyMissingWasFilled = reportAnalysisMissingCount(saved) > reportAnalysisMissingCount(automatic);
+      if (saved === automatic || legacyMissingWasFilled) {
+        reportTexts[id] = automatic;
+        state = { mode: 'auto', sourceSignature: signature };
+      } else {
+        // 无状态的历史文本默认视为人工内容，避免升级时误覆盖。
+        state = { mode: 'manual', sourceSignature: signature };
+      }
+    } else if (state.mode === 'auto') {
+      reportTexts[id] = automatic;
+      state.sourceSignature = signature;
+    }
+    reportTextStates[id] = state;
+    return {
+      value: String(reportTexts[id] || ''),
+      mode: state.mode,
+      sourceChanged: state.mode === 'manual' && state.sourceSignature !== signature
+    };
+  }
+
+  function reportAnalysisStateText(resolved) {
+    if (resolved.mode === 'auto') return '自动同步：内容来自第三步现场测评记录';
+    return resolved.sourceChanged
+      ? '现场测评记录已变化，当前保留人工编辑内容'
+      : '已人工编辑；后续现场记录变化时不会自动覆盖';
+  }
+
+  function refreshReportAnalysisStateUi(id) {
+    const stateEl = document.getElementById(id + '-state');
+    const button = document.getElementById(id + '-regenerate');
+    if (stateEl) {
+      stateEl.textContent = '已人工编辑；后续现场记录变化时不会自动覆盖';
+      stateEl.className = 'report-analysis-state';
+    }
+    if (button) button.hidden = false;
+  }
+
+  function regenerateReportAnalysis(id, layer) {
+    if (!window.confirm('将根据最新现场测评记录重新生成，并覆盖当前人工编辑内容，是否继续？')) return;
+    const automatic = buildLayerAnalysisText(layer);
+    reportTexts[id] = automatic;
+    reportTextStates[id] = { mode: 'auto', sourceSignature: reportAnalysisSourceSignature(automatic) };
+    renderReportUnitAnalysis();
+  }
+
+  function getReportUnitAnalysisText(layer) {
+    const id = 'report-ua-text-' + layer;
+    return resolveReportAnalysisText(id, buildLayerAnalysisText(layer)).value;
+  }
+
+  function reportAnalysisEditor(id, layer, autoText) {
+    const resolved = resolveReportAnalysisText(id, autoText);
+    const warningClass = resolved.sourceChanged ? ' is-warning' : '';
     return '<div class="report-analysis-card">' +
-      '<textarea id="' + id + '" class="report-textarea" oninput="saveReportText(\'' + id + '\',this.value,this);autoResizeReportAnalysis(this)">' + onsiteEsc(value) + '</textarea>' +
+      '<div class="report-analysis-toolbar"><span id="' + id + '-state" class="report-analysis-state' + warningClass + '">' + onsiteEsc(reportAnalysisStateText(resolved)) + '</span>' +
+      '<button id="' + id + '-regenerate" type="button" class="report-analysis-regenerate"' + (resolved.mode === 'manual' ? '' : ' hidden') + ' onclick="regenerateReportAnalysis(\'' + id + '\',' + layer + ')">根据最新记录重新生成</button></div>' +
+      '<textarea id="' + id + '" class="report-textarea" oninput="saveReportText(\'' + id + '\',this.value,this);autoResizeReportAnalysis(this)">' + onsiteEsc(resolved.value) + '</textarea>' +
     '</div>';
   }
 
@@ -6651,7 +6750,7 @@
     // 结果分析（可编辑，自动草稿）
     html += '<div class="report-section-title" style="margin-top:14px;">' + onsiteEsc(cfg.name) + ' · 结果分析（自动生成自现场测评记录，可编辑）</div>';
     const analysisId = 'report-ua-text-' + t;
-    html += reportAnalysisEditor(analysisId, buildLayerAnalysisText(t));
+    html += reportAnalysisEditor(analysisId, t, buildLayerAnalysisText(t));
     panel.innerHTML = html;
     requestAnimationFrame(() => autoResizeReportAnalysis(document.getElementById(analysisId)));
   }
@@ -9466,6 +9565,7 @@
     reportRiskStore = {};
     reportImportedRiskRows = [];
     reportTexts = {};
+    reportTextStates = {};
     // 测评结果修正（编号无关）
     const fixT = findTN('测评结果修正');
     if (fixT) {
@@ -10620,6 +10720,7 @@
       data.templateValues = collectReportTemplateValues();
       data.reportFixes = clone(reportFixes);
       data.reportTexts = clone(reportTexts);
+      data.reportTextStates = clone(reportTextStates);
       data.reportReview = clone(reportReviewState);
       data.reportRiskStore = clone(reportRiskStore);
       data.reportImportedRiskRows = clone(reportImportedRiskRows);
@@ -10763,7 +10864,7 @@
     ONSITE_LAYERS.forEach((layer, index) => {
       const name = layer.name;
       const layerCounts = getLayerStatCounts(index);
-      put('单元测评结果分析_' + name + '·结果分析', getReportTextVal('report-ua-text-' + index, buildLayerAnalysisText(index)));
+      put('单元测评结果分析_' + name + '·结果分析', getReportUnitAnalysisText(index));
       put('总体评价_' + name + '_描述', getReportTextVal('report-overall-' + index, buildLayerOverallText(index)));
       put('总体评价_' + name + '_测评结果', '符合项' + layerCounts['符合'] + '项，部分符合项' + layerCounts['部分符合'] + '项，不符合项' + layerCounts['不符合'] + '项，不适用项' + layerCounts['不适用'] + '项。');
       put('安全问题及改进建议_' + name + '_问题描述', getReportTextVal('report-sug-prob-' + index, buildSugProblemText(index)));
@@ -11128,7 +11229,8 @@
     }
     if (step === 4) {
       if (saved.reportFixes) reportFixes = migrateLegacyStableKeyMap(saved.reportFixes, onsiteImportedObjects, onsiteObjectBindings, true);
-      if (saved.reportTexts) reportTexts = clone(saved.reportTexts);
+      reportTexts = clone(saved.reportTexts || {});
+      reportTextStates = clone(saved.reportTextStates || {});
       reportReviewState = clone(saved.reportReview || { findings: [], accepted: [], ranAt: '', scope: null, signature: '' });
       if (window.bbNormalizeReportReviewState) window.bbNormalizeReportReviewState();
       if (saved.reportRiskStore) reportRiskStore = clone(saved.reportRiskStore);
