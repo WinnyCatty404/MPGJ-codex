@@ -45,7 +45,11 @@ const headerRun = fixtureRuns.find(run => run.includes('表头'));
 const bodyRun = fixtureRuns.find(run => run.includes('正文'));
 assert.ok(headerRun?.includes('<w:b/>') && headerRun.includes('<w:sz w:val="21"/>'), '表头应保留加粗并使用五号字');
 assert.ok(bodyRun?.includes('<w:b w:val="0"/>') && bodyRun.includes('<w:sz w:val="21"/>'), '正文应取消加粗并使用五号字');
-assert.equal((formattedFixture.match(/<w:sz w:val="21"\/>/g) || []).length, 2, '表头和正文都应使用五号字');
+const fixtureTable = /<w:tbl\b[^>]*>[\s\S]*?<\/w:tbl>/.exec(formattedFixture)?.[0] || '';
+const tableParagraphMarks = [...fixtureTable.matchAll(/<w:pPr\b[^>]*>[\s\S]*?<\/w:pPr>/g)].map(match => match[0]);
+assert.equal(tableParagraphMarks.length, 2, '测试表格应包含表头和正文两个段落标记');
+assert.ok(tableParagraphMarks.every(mark => /<w:rPr\b[^>]*>[\s\S]*?<w:sz w:val="21"\/>/.test(mark)),
+  '表头和正文的段落标记也应使用五号字，避免空段落或后续输入继承错误字号');
 const normalizedBasicInfo = normalizeBasicInfoTemplateValues({
   '等保已定级备案情况': '☑已定级备案\n  \n备案证明编号：123\r\n\r\n☑是',
   '系统使用的密码算法情况': '分组算法：☑SM4\n\n非对称算法：☑SM2',
@@ -90,7 +94,7 @@ const smallPhoto = await sharp({ create: { width: 100, height: 50, channels: 3, 
 xml = await writeAppendixBImages(xml, zip, { 'b1-file': [largePhoto, smallPhoto].map(photo => `data:image/jpeg;base64,${photo.toString('base64')}`) });
 const compressed = await zip.file('word/media/bb-appendix-b1-file-1.jpg').async('nodebuffer');
 const dimensions = await sharp(compressed).metadata();
-assert.ok(Math.max(dimensions.width, dimensions.height) <= 1400);
+assert.ok(Math.max(dimensions.width, dimensions.height) <= 2400, '超大附录图片应按当前高清策略限制为 2400 像素');
 assert.ok(xml.includes('wp:extent') && xml.includes('委托证明文件照片列表'));
 const imageExtent = index => {
   const match = new RegExp(`<wp:extent cx="(\\d+)" cy="(\\d+)"/><wp:docPr[^>]*name="委托证明文件照片列表 ${index}"`).exec(xml);
@@ -100,7 +104,8 @@ const imageExtent = index => {
 const largeExtent = imageExtent(1);
 assert.ok(largeExtent.width <= 3 * 914400 && largeExtent.height <= 3 * 914400, '导出照片最长边不得超过3英寸');
 assert.ok(Math.abs(largeExtent.width / largeExtent.height - 3) < 0.01, '图片应等比例缩放');
-assert.deepEqual(imageExtent(2), { width: 100 * 9525, height: 50 * 9525 }, '小图不应放大');
+assert.deepEqual(imageExtent(2), { width: 5 * 360000, height: 2.5 * 360000 },
+  '附录B.1照片应按当前5厘米栏宽等比例显示');
 const remaining = unresolvedReportSlots(xml);
 for (const slot of ['被测系统情况_拓扑图', '工具接入示意图', '证据截图列表',
   '委托证明文件照片列表', '现场授权测评书照片列表', '密评报告评审记录照片列表',
