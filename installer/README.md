@@ -17,6 +17,14 @@
 powershell -NoProfile -ExecutionPolicy Bypass -File installer\build-windows.ps1
 ```
 
+只需要完整版安装包时使用：
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File installer\build-windows.ps1 -FullOnly
+```
+
+该模式不会创建精简版，并会清理输出目录中可能残留的旧精简版安装程序。
+
 脚本会重新构建前后端，按白名单创建干净的 Windows 发布目录，编译无控制台的 `BMPBGS.exe` 启动器，然后生成：
 
 - `installer\out\BMPBGS-Windows-x64-Setup.exe`

@@ -1,5 +1,6 @@
 ﻿param(
-  [string]$Configuration = 'Release'
+  [string]$Configuration = 'Release',
+  [switch]$FullOnly
 )
 
 $ErrorActionPreference = 'Stop'
@@ -154,7 +155,7 @@ New-Item -ItemType Directory -Path $buildRoot -Force | Out-Null
 & $csc /nologo /target:winexe /optimize+ "/win32icon:$iconPath" "/out:$launcherExe" $launcherSource
 if ($LASTEXITCODE -ne 0) { throw 'BMPBGS.exe 启动器编译失败' }
 
-Write-Host '[3/6] 创建完整版与精简版 Windows 发布目录...'
+Write-Host $(if ($FullOnly) { '[3/6] 创建完整版 Windows 发布目录...' } else { '[3/6] 创建完整版与精简版 Windows 发布目录...' })
 $resolvedBuild = [System.IO.Path]::GetFullPath($buildRoot)
 $resolvedInstaller = [System.IO.Path]::GetFullPath($installerRoot)
 if (-not $resolvedBuild.StartsWith($resolvedInstaller + [IO.Path]::DirectorySeparatorChar, [StringComparison]::OrdinalIgnoreCase)) {
@@ -173,24 +174,33 @@ foreach ($destination in @($stageRoot, $liteStageRoot)) {
   if (Test-Path -LiteralPath $destination) { Remove-Item -LiteralPath $destination -Recurse -Force }
 }
 Copy-ApplicationFiles -Destination $stageRoot
-Copy-ApplicationFiles -Destination $liteStageRoot -Lite
+if (-not $FullOnly) { Copy-ApplicationFiles -Destination $liteStageRoot -Lite }
 
-Write-Host '[4/6] 验证精简版生产运行依赖...'
-Assert-LiteRuntime $liteStageRoot
+if ($FullOnly) {
+  Write-Host '[4/6] 已选择仅完整版，跳过精简版运行依赖检查。'
+} else {
+  Write-Host '[4/6] 验证精简版生产运行依赖...'
+  Assert-LiteRuntime $liteStageRoot
+}
 
-Write-Host '[5/6] 编译完整版与精简版 Windows 安装包...'
+Write-Host $(if ($FullOnly) { '[5/6] 编译完整版 Windows 安装包...' } else { '[5/6] 编译完整版与精简版 Windows 安装包...' })
 $iscc = Resolve-Iscc
 if (-not $iscc) { throw '未找到 Inno Setup 6（ISCC.exe）' }
 & $iscc '/Qp' (Join-Path $installerRoot 'BBMiPing-Setup.iss')
 if ($LASTEXITCODE -ne 0) { throw 'Inno Setup 编译失败' }
-& $iscc '/Qp' '/DLiteBuild' (Join-Path $installerRoot 'BBMiPing-Setup.iss')
-if ($LASTEXITCODE -ne 0) { throw 'Inno Setup 精简版编译失败' }
+if ($FullOnly) {
+  $staleLiteSetup = Join-Path $installerRoot 'out\BMPBGS-Windows-x64-Setup-Lite.exe'
+  if (Test-Path -LiteralPath $staleLiteSetup) { Remove-Item -LiteralPath $staleLiteSetup -Force }
+} else {
+  & $iscc '/Qp' '/DLiteBuild' (Join-Path $installerRoot 'BBMiPing-Setup.iss')
+  if ($LASTEXITCODE -ne 0) { throw 'Inno Setup 精简版编译失败' }
+}
 
-Write-Host '[6/6] 生成两个安装包的校验文件...'
-$setups = @(
-  (Get-Item -LiteralPath (Join-Path $installerRoot 'out\BMPBGS-Windows-x64-Setup.exe'))
-  (Get-Item -LiteralPath (Join-Path $installerRoot 'out\BMPBGS-Windows-x64-Setup-Lite.exe'))
-)
+Write-Host $(if ($FullOnly) { '[6/6] 生成完整版安装包校验文件...' } else { '[6/6] 生成两个安装包的校验文件...' })
+$setups = @((Get-Item -LiteralPath (Join-Path $installerRoot 'out\BMPBGS-Windows-x64-Setup.exe')))
+if (-not $FullOnly) {
+  $setups += Get-Item -LiteralPath (Join-Path $installerRoot 'out\BMPBGS-Windows-x64-Setup-Lite.exe')
+}
 $hashLines = foreach ($setup in $setups) {
   $hash = Get-FileHash -LiteralPath $setup.FullName -Algorithm SHA256
   Write-Host "完成：$($setup.FullName)"
