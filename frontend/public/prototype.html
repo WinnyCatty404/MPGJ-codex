@@ -461,6 +461,19 @@
       margin-left: 5px; color: #8b95a5; cursor: pointer; font-style: normal; font-size: 12px;
     }
     .req-chip .req-chip-x:hover { color: #d93025; font-weight: 700; }
+    .req-add-menu { display: inline-block; position: relative; margin: 2px 4px 2px 0; font-size: 12px; }
+    .req-add-menu summary {
+      display: inline-block; padding: 2px 6px; border: 1px solid #a8c5f5;
+      border-radius: 5px; background: #fff; color: #1a73e8; cursor: pointer;
+    }
+    .req-add-menu summary::-webkit-details-marker { display: none; }
+    .req-add-options {
+      position: absolute; z-index: 20; min-width: 112px; padding: 4px;
+      border: 1px solid #c6dafc; border-radius: 5px; background: #fff;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, .12);
+    }
+    .req-add-options button { display: block; width: 100%; padding: 5px; border: 0; background: #fff; color: #1a73e8; text-align: left; cursor: pointer; }
+    .req-add-options button:hover, .req-add-options button:focus { background: #e8f0fe; }
 
     /* ===== 系统资产子 Tab ===== */
     .asset-sub-tabs {
@@ -4099,15 +4112,26 @@
     });
   }
 
-  // 重要数据·安全需求标签：默认 传输机密性/存储机密性/传输完整性/存储完整性，支持单独删除
+  // 重要数据·安全需求标签：按行增删，添加入口仅列出尚未选择的四项标准需求。
   const DATA_REQ_DEFAULTS = ['传输机密性', '存储机密性', '传输完整性', '存储完整性'];
+
+  function getMissingDataReqs(requirements) {
+    const selected = new Set(requirements);
+    return DATA_REQ_DEFAULTS.filter(req => !selected.has(req));
+  }
 
   function getDataReqChips(requirements) {
     const reqs = Array.isArray(requirements) ? requirements : DATA_REQ_DEFAULTS;
-    return reqs.map(r =>
+    const chips = reqs.map(r =>
       '<span class="req-chip" data-req="' + onsiteEsc(r) + '">' + onsiteEsc(r) +
       '<i class="req-chip-x" title="删除该安全需求" onclick="removeDataReq(this)">×</i></span>'
     ).join('');
+    const missing = getMissingDataReqs(reqs);
+    return chips + (missing.length
+      ? '<details class="req-add-menu"><summary>＋ 添加安全需求</summary><div class="req-add-options">' +
+        missing.map(req => '<button type="button" data-req="' + onsiteEsc(req) +
+          '" onclick="addDataReq(this)">' + onsiteEsc(req) + '</button>').join('') + '</div></details>'
+      : '');
   }
 
   // Word 单元格中的安全需求按实际内容导入；概括性的“机密性、完整（性）”展开为传输/存储四项。
@@ -4137,7 +4161,23 @@
   }
 
   function removeDataReq(el) {
-    el.parentNode.remove();
+    const chip = el.closest('.req-chip');
+    const cell = chip?.closest('.req-cell');
+    if (!cell) return;
+    const remaining = Array.from(cell.querySelectorAll('.req-chip'))
+      .filter(item => item !== chip).map(item => item.getAttribute('data-req'));
+    cell.innerHTML = getDataReqChips(remaining);
+    window.bbMarkProjectDirty?.(2, true, 350);
+  }
+
+  function addDataReq(button) {
+    const cell = button.closest('.req-cell');
+    if (!cell) return;
+    const req = button.getAttribute('data-req');
+    const selected = Array.from(cell.querySelectorAll('.req-chip')).map(chip => chip.getAttribute('data-req'));
+    if (!DATA_REQ_DEFAULTS.includes(req) || selected.includes(req)) return;
+    cell.innerHTML = getDataReqChips(selected.concat(req));
+    window.bbMarkProjectDirty?.(2, true, 350);
   }
 
   function updateCryptoLayerUi() {
@@ -4276,7 +4316,7 @@
       case 'app':
         return `${tr}<td>${idx}</td><td>${empty}</td><td>${empty}</td><td>${empty}</td><td>${empty}</td>${check}</tr>`;
       case 'data':
-        return `${tr}<td>${idx}</td><td>${empty}</td><td>${empty}</td><td>${empty}</td><td>${empty}</td><td class="req-cell">${useDataDefaults === false ? '' : getDataReqChips()}</td></tr>`;
+        return `${tr}<td>${idx}</td><td>${empty}</td><td>${empty}</td><td>${empty}</td><td>${empty}</td><td class="req-cell">${getDataReqChips(useDataDefaults === false ? [] : undefined)}</td></tr>`;
       case 'doc':
         return `${tr}<td>${idx}</td><td>${empty}</td><td>${empty}</td></tr>`;
       case 'person': {
