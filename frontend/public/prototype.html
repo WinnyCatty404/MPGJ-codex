@@ -5780,7 +5780,7 @@
                 (u.applicable ? '' : '<br/><span class="unit-na-badge">不适用</span>') +
                 (expanded ? '<span class="onsite-record-editing-tag">编辑中</span>' : '') + '</td>';
             }
-            html += '<td class="obj-cell">' + onsiteEsc(objName) + '</td>' +
+            html += '<td class="obj-cell">' + onsiteEsc(getOnsiteObjectDisplayName(t, u.name, objIdx, objName)) + '</td>' +
               '<td class="rec-cell">' + onsiteRecordCellHtml(t, u.itemIdx, objIdx, recordVal) + '</td>' +
               '<td class="dak-cell">' + dakCell('D') + '</td>' +
               '<td class="dak-cell">' + dakCell('A') + '</td>' +
@@ -6546,6 +6546,14 @@
       const app = row.cells[2]?.querySelector('input, textarea, select')?.value.trim() || '';
       return { name, label: app && !name.endsWith('-' + app) ? name + '-' + app : name };
     }).filter(user => user.name).map(user => user.label);
+  }
+
+  // 表A-4的对象名称与现场页面使用同一展示口径；记录仍按原对象索引关联。
+  function getOnsiteObjectDisplayName(t, unitName, objectIndex, objectName) {
+    if (t === 3 && unitName === '身份鉴别') {
+      return getAppUserDisplayNames()[objectIndex] || objectName;
+    }
+    return objectName;
   }
 
   function renderUaIdentityTable(t) {
@@ -9026,6 +9034,23 @@
     syncProjectBoundaryText(oldStart, phases[0].start, oldEnd, phases[3].end);
   }
 
+  function _impParseAccessPoints(blocks) {
+    const points = [];
+    blocks.forEach(function (block) {
+      if (block.type !== 'p') return;
+      const text = block.text.trim();
+      const markers = Array.from(text.matchAll(/接入点J?([A-Z])(?:\s*和\s*接入点J?([A-Z]))?[：:]\s*/g))
+        .filter(function (match) { return match.index === 0 || /[。；;，,、\s]/.test(text[match.index - 1]); });
+      markers.forEach(function (match, index) {
+        const description = text.slice(match.index + match[0].length, markers[index + 1]?.index ?? text.length).trim();
+        if (!description) return;
+        points.push({ letter: match[1], desc: description });
+        if (match[2]) points.push({ letter: match[2], desc: description });
+      });
+    });
+    return points;
+  }
+
   function applyWordImport(blocks, fileName, evidenceImport, importOptions) {
     const sections = [];
     const includePlanning = !importOptions || importOptions.planning !== false;
@@ -9611,16 +9636,8 @@
           add(s2, '测评工具：导入 ' + arr.length + ' 行');
         } else add(s2, '测评工具：表格无有效数据行，保持默认', true);
       } else add(s2, '测评工具：未找到对应表格，保持默认', true);
-      // 接入点："接入点A：……" / "接入点JA：……" / "接入点C和接入点D：……"
-      const aps = [];
-      blocks.forEach(function (b) {
-        if (b.type !== 'p') return;
-        const tx = b.text.trim();
-        const m = /^接入点J?([A-Z])(?:\s*和\s*接入点J?([A-Z]))?[：:]\s*(.+)$/.exec(tx);
-        if (!m) return;
-        aps.push({ letter: m[1], desc: m[3].trim() });
-        if (m[2]) aps.push({ letter: m[2], desc: m[3].trim() });
-      });
+      // 一个 Word 段落中可能连续包含 JA、JB 等多个接入点说明。
+      const aps = _impParseAccessPoints(blocks);
       if (aps.length) {
         accessPoints = aps.map(function (a) { return { code: 'J' + a.letter, desc: a.desc }; });
         renderAccessPoints();
@@ -11294,7 +11311,7 @@
               : (t < 4 ? calcOnsiteRowScore(rec, applicable) : calcOnsiteMgmtRowScore(rec, applicable)))
             : null;
           return t < 4
-            ? [item.name, object, record, applicable ? (rec.D || '--') : '/', applicable ? (rec.A || '--') : '/', applicable ? (rec.K || '--') : '/', fmt(score), fmt(unitScore)]
+            ? [item.name, getOnsiteObjectDisplayName(t, item.name, objIdx, object), record, applicable ? (rec.D || '--') : '/', applicable ? (rec.A || '--') : '/', applicable ? (rec.K || '--') : '/', fmt(score), fmt(unitScore)]
             : [item.name, object, record, applicable ? (rec.result || '--') : '不适用', fmt(unitScore)];
         });
         groups.push({ unit: item.name, rows: rows });

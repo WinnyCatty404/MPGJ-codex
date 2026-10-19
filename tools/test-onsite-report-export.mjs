@@ -150,7 +150,10 @@ assert.ok(Math.abs(Number(tallExtent[1]) / Number(tallExtent[2]) - 500 / 1800) <
   '超高证据截图必须保持原始宽高比');
 assert.equal((xml.match(/<w:sectPr\b/g) || []).length, (await zip.file('word/document.xml').async('string')).match(/<w:sectPr\b/g).length);
 assert.ok(zip.file('word/media/bb-evidence-1-1-1.png'));
-assert.deepEqual(await zip.file('word/media/bb-evidence-2-1-1.png').async('nodebuffer'), hdPngBytes);
+const exportedHdPng = await zip.file('word/media/bb-evidence-2-1-1.png').async('nodebuffer');
+const exportedHdPixels = await sharp(exportedHdPng).ensureAlpha().raw().toBuffer();
+const originalHdPixels = await sharp(hdPngBytes).ensureAlpha().raw().toBuffer();
+assert.ok(exportedHdPixels.equals(originalHdPixels), '无损 PNG 优化不得改变截图像素');
 assert.ok(zip.file('word/media/bb-evidence-8-1-1.png'));
 const rels = await zip.file('word/_rels/document.xml.rels').async('string');
 assert.ok(rels.includes('bb-evidence-1-1-1.png'));
