@@ -236,6 +236,52 @@ html[data-theme="dark"] .risk-template-modal-grid input,
 html[data-theme="dark"] .risk-template-modal-grid select { background: var(--dark-surface-raised); color: var(--dark-text); border-color: var(--dark-border); }
 html[data-theme="dark"] .toast { background: #29473e; color: #edf5f1; }
 
+/* 管理端模板设置与风险分析：内层浅色卡片和浅色主题文字必须同时切换。 */
+html[data-theme="dark"] .settings-page .template-card small,
+html[data-theme="dark"] .risk-analysis-page .risk-template-head small { color: #a8d4ff; }
+html[data-theme="dark"] .settings-page .template-card p,
+html[data-theme="dark"] .risk-analysis-page .risk-template-head p { color: #cbd8d0; }
+html[data-theme="dark"] .settings-page .template-meta {
+  background: #2b3a33; border: 1px solid #506158; color: #f2f6f3;
+}
+html[data-theme="dark"] .settings-page .template-meta b { color: #f2f6f3; }
+html[data-theme="dark"] .settings-page .template-meta span { color: #cbd8d0; }
+html[data-theme="dark"] .settings-page .template-tip {
+  background: #263930; border-color: #4c6b5d; color: #dce8e0;
+}
+html[data-theme="dark"] .settings-page .template-tip strong { background: #3f806e; color: #fff; }
+
+html[data-theme="dark"] .risk-analysis-page .risk-template-summary > div {
+  background: #293a33; border-color: #50665a;
+}
+html[data-theme="dark"] .risk-analysis-page .risk-template-summary strong { color: #a8d4ff; }
+html[data-theme="dark"] .risk-analysis-page .risk-template-summary span { color: #dce8e0; }
+html[data-theme="dark"] .risk-analysis-page .risk-layer-tabs { background: #293630; }
+html[data-theme="dark"] .risk-analysis-page .risk-layer-tabs button { color: #dce8e0; }
+html[data-theme="dark"] .risk-analysis-page .risk-layer-tabs button:hover { background: #34483e; color: #fff; }
+html[data-theme="dark"] .risk-analysis-page .risk-layer-tabs button.active {
+  background: #3a6959; border-color: #72af97; color: #fff; box-shadow: none;
+}
+html[data-theme="dark"] .risk-analysis-page .risk-layer-tabs em { background: #35483f; color: #dce8e0; }
+html[data-theme="dark"] .risk-analysis-page .risk-layer-tabs button.active em { background: #214637; color: #e2f6ec; }
+html[data-theme="dark"] .risk-analysis-page .risk-template-table { border-color: #516159; }
+html[data-theme="dark"] .risk-analysis-page .risk-template-list-head { background: #31443a; color: #eff6f1; }
+html[data-theme="dark"] .risk-analysis-page .risk-template-list-row {
+  background: #24332c; border-color: #4d6155; color: #e8f0ea;
+}
+html[data-theme="dark"] .risk-analysis-page .risk-template-list-row strong { color: #f2f6f3; }
+html[data-theme="dark"] .risk-analysis-page .risk-template-list-row p { color: #d0ddd4; }
+html[data-theme="dark"] .risk-analysis-page .risk-template-list-row code { background: #344b3e; color: #a8d4ff; }
+html[data-theme="dark"] .risk-analysis-page .risk-level-badge.level-高 { background: #54363b; color: #ffb2ba; }
+html[data-theme="dark"] .risk-analysis-page .risk-level-badge.level-中,
+html[data-theme="dark"] .risk-analysis-page .risk-status.pending { background: #4e402b; color: #f3ce87; }
+html[data-theme="dark"] .risk-analysis-page .risk-level-badge.level-低,
+html[data-theme="dark"] .risk-analysis-page .risk-status.complete { background: #2b493a; color: #a8e3bd; }
+html[data-theme="dark"] .risk-analysis-page .risk-row-actions .danger {
+  background: #3d2b30; border-color: #80545b; color: #ffb2ba;
+}
+html[data-theme="dark"] .risk-analysis-page .risk-template-modal-grid label { color: #dce8e0; }
+
 html[data-theme="dark"] .login-shell,
 html[data-theme="dark"] .login-panel { background: var(--dark-page); }
 html[data-theme="dark"] .login-brand { background: #173a32; }
