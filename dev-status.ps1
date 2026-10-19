@@ -8,6 +8,9 @@ $paths = [PSCustomObject]@{ PgRoot = 'D:\BBMipingDB\PostgreSQL'; PgData = [strin
 $psql = Join-Path $paths.PgRoot 'bin\psql.exe'
 $env:PGPASSWORD = 'BbMiping-Local-2026!'
 try { $actualDir = Get-BBTargetInstanceDataDir -Psql $psql -PgPort ([int]$config.pgPort) } finally { Remove-Item Env:\PGPASSWORD -ErrorAction SilentlyContinue }
+if (-not $actualDir) {
+  $actualDir = Get-BBLocalInstanceDataDir -PgCtl (Join-Path $paths.PgRoot 'bin\pg_ctl.exe') -PgData $paths.PgData -PgPort $paths.PgPort
+}
 function Test-DevPort([int]$Port) {
   $client = New-Object Net.Sockets.TcpClient
   try { $wait = $client.BeginConnect('127.0.0.1', $Port, $null, $null); return ($wait.AsyncWaitHandle.WaitOne(400) -and $client.Connected) } catch { return $false } finally { $client.Close() }

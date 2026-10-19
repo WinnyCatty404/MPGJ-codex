@@ -42,6 +42,9 @@ if (-not (Test-Path -LiteralPath $pgCtl) -or -not (Test-Path -LiteralPath $psql)
 if ($LASTEXITCODE -eq 0) {
   $env:PGPASSWORD = 'BbMiping-Local-2026!'
   try { $runningDir = Get-BBTargetInstanceDataDir -Psql $psql -PgPort $pgPort } finally { Remove-Item Env:\PGPASSWORD -ErrorAction SilentlyContinue }
+  if (-not $runningDir) {
+    $runningDir = Get-BBLocalInstanceDataDir -PgCtl $pgCtl -PgData $pgData -PgPort $pgPort
+  }
   if (-not $runningDir -or -not (Test-BBSamePath $runningDir $pgData)) {
     $pidLines = @(Get-Content -LiteralPath (Join-Path $pgData 'postmaster.pid') -ErrorAction SilentlyContinue)
     $runningPort = if ($pidLines.Count -ge 4) { $pidLines[3] } else { '未知' }

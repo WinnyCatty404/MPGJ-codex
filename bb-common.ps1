@@ -142,6 +142,33 @@ function Test-BBSamePath {
   return ((& $norm $A) -eq (& $norm $B))
 }
 
+# 从本机目标数据目录校验正在运行的 PostgreSQL，不依赖数据库口令。
+# pg_ctl status 先确认 postmaster.pid 指向存活的该集群进程；再核对 pid 文件中的
+# 数据目录、端口和就绪状态。这个通道只能证明本机指定集群的身份，不替代业务连接认证。
+function Get-BBLocalInstanceDataDir {
+  param(
+    [string]$PgCtl,
+    [string]$PgData,
+    [int]$PgPort
+  )
+  if (-not $PgCtl -or -not (Test-Path -LiteralPath $PgCtl)) { return $null }
+  if (-not $PgData -or -not (Test-Path -LiteralPath $PgData)) { return $null }
+
+  try {
+    & $PgCtl -D $PgData status 2>&1 | Out-Null
+    if ($LASTEXITCODE -ne 0) { return $null }
+    $pidLines = @(Get-Content -LiteralPath (Join-Path $PgData 'postmaster.pid') -ErrorAction Stop)
+  } catch { return $null }
+
+  if ($pidLines.Count -lt 8) { return $null }
+  $actualData = ([string]$pidLines[1]).Trim()
+  $actualPort = 0
+  if (-not [int]::TryParse(([string]$pidLines[3]).Trim(), [ref]$actualPort)) { return $null }
+  $status = ([string]$pidLines[7]).Trim()
+  if (-not (Test-BBSamePath $actualData $PgData) -or $actualPort -ne $PgPort -or $status -ne 'ready') { return $null }
+  return $actualData
+}
+
 # 返回 bb-config.json 的绝对路径（端口与密钥的持久化文件，位于安装目录根）。
 function Get-BBConfigPath {
   param([string]$AppRoot)
@@ -576,36 +603,39 @@ function Start-BBPostgres {
       throw "端口 $($Paths.PgPort) 已被其他 PostgreSQL 实例占用。期望：$($Paths.PgData)；实际：$existing"
     }
     if (-not $existing) {
-      & $pgCtl -D $Paths.PgData status 2>&1 | Out-Null
-      if ($LASTEXITCODE -ne 0) {
-        # 命令行端口优先于历史 postgresql.conf，使同机的开发版和安装版可固定使用不同端口。
-        # 启动日志放在数据目录外，避免异常关机恢复时 fsync 与日志写入互相占用。
-        $pgLogDir = Get-BBRuntimeDir -AppRoot $Paths.AppRoot
-        New-Item -ItemType Directory -Path $pgLogDir -Force | Out-Null
-        $pgLog = Join-Path $pgLogDir 'postgresql.log'
-        # pg_ctl 启动的 postgres 会长期持有继承的标准句柄；直接用调用运算符时，
-        # PowerShell 在某些宿主中会一直等待该句柄关闭。单独等待 pg_ctl 进程可避免启动器假死。
-        $pgStartInfo = [Diagnostics.ProcessStartInfo]::new()
-        $pgStartInfo.FileName = $pgCtl
-        $pgStartInfo.Arguments = ('-D "{0}" -l "{1}" -o "-p {2}" -w -t 120 start' -f $Paths.PgData, $pgLog, $Paths.PgPort)
-        $pgStartInfo.UseShellExecute = $false
-        $pgStartInfo.CreateNoWindow = $true
-        $pgStart = [Diagnostics.Process]::new()
-        $pgStart.StartInfo = $pgStartInfo
-        if (-not $pgStart.Start()) { throw "无法启动 pg_ctl：$pgCtl" }
-        if (-not $pgStart.WaitForExit(120000)) {
-          try { $pgStart.Kill() } catch { }
-          throw "启动 PostgreSQL 超时，请查看：$pgLog"
-        }
-        $pgExitCode = $pgStart.ExitCode
-        $pgStart.Dispose()
-        if ($pgExitCode -ne 0) {
-          throw "启动 PostgreSQL 失败（退出码 $pgExitCode），请查看：$pgLog"
-        }
+      $existing = Get-BBLocalInstanceDataDir -PgCtl $pgCtl -PgData $Paths.PgData -PgPort $Paths.PgPort
+    }
+    if (-not $existing) {
+      # 命令行端口优先于历史 postgresql.conf，使同机的开发版和安装版可固定使用不同端口。
+      # 启动日志放在数据目录外，避免异常关机恢复时 fsync 与日志写入互相占用。
+      $pgLogDir = Get-BBRuntimeDir -AppRoot $Paths.AppRoot
+      New-Item -ItemType Directory -Path $pgLogDir -Force | Out-Null
+      $pgLog = Join-Path $pgLogDir 'postgresql.log'
+      # pg_ctl 启动的 postgres 会长期持有继承的标准句柄；直接用调用运算符时，
+      # PowerShell 在某些宿主中会一直等待该句柄关闭。单独等待 pg_ctl 进程可避免启动器假死。
+      $pgStartInfo = [Diagnostics.ProcessStartInfo]::new()
+      $pgStartInfo.FileName = $pgCtl
+      $pgStartInfo.Arguments = ('-D "{0}" -l "{1}" -o "-p {2}" -w -t 120 start' -f $Paths.PgData, $pgLog, $Paths.PgPort)
+      $pgStartInfo.UseShellExecute = $false
+      $pgStartInfo.CreateNoWindow = $true
+      $pgStart = [Diagnostics.Process]::new()
+      $pgStart.StartInfo = $pgStartInfo
+      if (-not $pgStart.Start()) { throw "无法启动 pg_ctl：$pgCtl" }
+      if (-not $pgStart.WaitForExit(120000)) {
+        try { $pgStart.Kill() } catch { }
+        throw "启动 PostgreSQL 超时，请查看：$pgLog"
+      }
+      $pgExitCode = $pgStart.ExitCode
+      $pgStart.Dispose()
+      if ($pgExitCode -ne 0) {
+        throw "启动 PostgreSQL 失败（退出码 $pgExitCode），请查看：$pgLog"
       }
     }
     for ($i = 0; $i -lt 30; $i++) {
       $actual = Get-BBTargetInstanceDataDir -Psql $psql -PgPort $Paths.PgPort -DbUser $SuperUser
+      if (-not $actual) {
+        $actual = Get-BBLocalInstanceDataDir -PgCtl $pgCtl -PgData $Paths.PgData -PgPort $Paths.PgPort
+      }
       if ($actual) {
         if (-not (Test-BBSamePath $actual $Paths.PgData)) {
           throw "端口 $($Paths.PgPort) 上的 PostgreSQL 实例身份不符。期望：$($Paths.PgData)；实际：$actual"

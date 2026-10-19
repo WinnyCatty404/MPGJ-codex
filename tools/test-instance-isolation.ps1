@@ -33,6 +33,7 @@ $vite = Get-Content -LiteralPath (Join-Path $project 'frontend\vite.config.ts') 
 Assert-True ($devStart.Contains("`$pgData = 'D:\BBMipingDB\data'") -and $devStart -match '\$pgPort\s*=\s*54329') '开发库目录或 PostgreSQL 端口不固定'
 Assert-True ($devStart -match '\$apiPort\s*=\s*3101' -and $devStart -match '\$webPort\s*=\s*5174') '开发 API/Web 端口不固定'
 Assert-True ($devStart -notmatch 'AllowInitialize') '开发启动器不得初始化数据库'
+Assert-True ($devStart -match 'Get-BBLocalInstanceDataDir') '开发启动器未使用本地 PostgreSQL 实例身份校验'
 Assert-True ($devStop.Contains("-PgRoot 'D:\BBMipingDB\PostgreSQL'")) '开发停止器未固定 PostgreSQL 运行时'
 Assert-True ($server -match 'const databaseUrl = process\.env\.DATABASE_URL' -and $server -match 'if \(!databaseUrl\)' -and $server -notmatch "process\.env\.DATABASE_URL\s*\|\|") '后端仍可能猜测默认数据库'
 Assert-True ($server -match 'instanceId' -and $server -match 'databasePort') '健康接口缺少实例身份字段'
@@ -43,5 +44,9 @@ $sourceId = Get-BBInstanceId -AppRoot $project
 $installedId = Get-BBInstanceId -AppRoot 'D:\BMPBGS'
 Assert-True ($sourceId -ne $installedId) '源码版与安装版实例标识发生冲突'
 Assert-True ((Get-BBRuntimeDir -AppRoot $project) -ne (Get-BBRuntimeDir -AppRoot 'D:\BMPBGS')) '源码版与安装版运行目录发生冲突'
+
+$common = Get-Content -LiteralPath (Join-Path $project 'bb-common.ps1') -Raw
+Assert-True ($common -match 'function Get-BBLocalInstanceDataDir' -and $common -match 'postmaster\.pid' -and $common -match "status -ne 'ready'") 'PostgreSQL 本地实例身份校验不完整'
+Assert-True ($common -match 'Get-BBLocalInstanceDataDir -PgCtl \$pgCtl -PgData \$Paths\.PgData -PgPort \$Paths\.PgPort') 'PostgreSQL 启动未使用无口令本地身份校验'
 
 Write-Host 'PASS: 开发固定端口、数据库保护、实例身份、运行目录及启动入口检查通过。'
