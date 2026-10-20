@@ -500,7 +500,10 @@ app.get('/api/projects', auth, asyncRoute(async (req, res) => {
   const result = await pool.query(
     `SELECT p.*, u.display_name AS owner_name,
       (SELECT count(*)::int FROM risks r WHERE r.project_id = p.id AND r.risk_level = 'high' AND r.status <> 'closed') AS high_risk_count,
-      NULLIF((SELECT ps.data->>'systemScore' FROM project_stage_records ps WHERE ps.project_id=p.id AND ps.stage_key='reporting'),'')::numeric AS system_score
+      COALESCE(
+        NULLIF((SELECT ps.data->>'systemScore' FROM project_stage_records ps WHERE ps.project_id=p.id AND ps.stage_key='onsite'), '')::numeric,
+        NULLIF((SELECT ps.data->>'systemScore' FROM project_stage_records ps WHERE ps.project_id=p.id AND ps.stage_key='reporting'), '')::numeric
+      ) AS system_score
      FROM projects p LEFT JOIN users u ON u.id = p.owner_id
      WHERE ($1 = '' OR p.code ILIKE '%' || $1 || '%' OR COALESCE(p.report_code, '') ILIKE '%' || $1 || '%'
        OR p.system_name ILIKE '%' || $1 || '%' OR p.org_name ILIKE '%' || $1 || '%')

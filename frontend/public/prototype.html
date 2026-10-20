@@ -9224,9 +9224,52 @@
           }
           fillLineFirst(/备案证明编号/, (/备案证明编号：\s*([^\s\n，。]+)/.exec(biAll) || [])[1]);
         }
-        fillLineFirst(/测评机构名称/, (/测评机构名称：([^\n\s，]+)/.exec(biAll) || [])[1]);
-        fillLineFirst(/测评时间/, (/测评时间：([^\n\s，]+)/.exec(biAll) || [])[1]);
-        fillLineFirst(/测评结论/, (/测评结论：([^\n\s，。]+)/.exec(biAll) || [])[1]);
+        // 测评状态三列的标签相同，不能用页面中第一个“测评机构名称”回填。
+        // 先清空旧导入值，再按 Word 实际勾选的状态写入对应列。
+        const assessmentRow = biT.rows.find(function (r) {
+          return r.some(function (c) { return String(c || '').indexOf('网络安全等级测评情况') >= 0; });
+        });
+        if (assessmentRow) {
+          const assessmentText = assessmentRow.join('\n').replace(/\r/g, '');
+          const assessmentCompact = assessmentText.replace(/[\s\u3000]/g, '');
+          const assessmentGroups = [
+            { key: '已测评', selector: '.eval-done' },
+            { key: '正在测评', selector: '.eval-doing' },
+            { key: '未测评', selector: '.eval-none' }
+          ];
+          assessmentGroups.forEach(function (group) {
+            const box = miTable.querySelector(group.selector);
+            if (!box) return;
+            box.querySelectorAll('input[type="checkbox"]').forEach(function (input) { input.checked = false; });
+            box.querySelectorAll('input[type="text"]').forEach(function (input) { input.value = ''; });
+          });
+          const selectedAssessment = assessmentGroups.find(function (group) {
+            return _impCheckboxState(assessmentCompact, group.key) === true;
+          });
+          if (selectedAssessment) {
+            const box = miTable.querySelector(selectedAssessment.selector);
+            const check = box && box.querySelector('input[type="checkbox"]');
+            if (check) check.checked = true;
+            const selectedMark = new RegExp('[□☐☑✓✔]\\s*' + selectedAssessment.key).exec(assessmentText);
+            const afterSelected = selectedMark ? assessmentText.slice(selectedMark.index + selectedMark[0].length) : assessmentText;
+            const nextStatus = /[□☐☑✓✔]\s*(?:已测评|正在测评|未测评)/.exec(afterSelected);
+            const selectedText = nextStatus ? afterSelected.slice(0, nextStatus.index) : afterSelected;
+            const capture = function (label, nextLabels) {
+              const escaped = label.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+              const next = nextLabels.map(function (item) { return item.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'); }).join('|');
+              const match = new RegExp(escaped + '[：:]\\s*([\\s\\S]*?)(?=\\s*(?:' + next + ')[：:]|$)').exec(selectedText);
+              return match ? match[1].trim() : '';
+            };
+            const org = capture('测评机构名称', ['测评时间', '测评结论']);
+            const date = capture('测评时间', ['测评结论']);
+            const conclusion = capture('测评结论', []);
+            const inputs = box ? box.querySelectorAll('input[type="text"]') : [];
+            if (inputs[0]) inputs[0].value = org;
+            if (inputs[1]) inputs[1].value = date;
+            if (inputs[2]) inputs[2].value = conclusion;
+          }
+          add(s1, '网络安全等级测评情况：已按 Word 勾选状态定向回填，并清除其他状态的旧值');
+        }
         fillLineFirst(/通过密评，通过时间/, (/通过密评，通过时间：([^\n\s，]+)/.exec(biAll) || [])[1]);
         fillLineFirst(/投入运行时间/, (/投入运行时间[：:]\s*([^☑□\n]+)/.exec(biAll) || [])[1]);
         const trUser = trs.find(function (t) { return t.textContent.indexOf('系统服务用户数量') >= 0 && t.querySelector('input[type="text"]'); });
@@ -9269,15 +9312,23 @@
           const isYes = _impCheckboxState(cloudCompact, '是');
           const isNo = _impCheckboxState(cloudCompact, '否');
           const setCb = function (id, val) { const el = document.getElementById(id); if (el && val !== null) el.checked = !!val; };
+          const clearVal = function (id) { const el = document.getElementById(id); if (el) el.value = ''; };
+          const cloudValue = function (label, nextLabels) {
+            const escaped = label.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+            const next = nextLabels.map(function (item) { return item.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'); }).join('|');
+            const match = new RegExp(escaped + '[：:]\\s*([\\s\\S]*?)(?=\\s*(?:' + next + ')[：:]|$)').exec(cloudText);
+            return match ? match[1].trim() : '';
+          };
           setCb('mi-cloud-yes', isYes);
           setCb('mi-cloud-no', isNo);
           setCb('mi-cloud-assessed', _impCheckboxState(cloudCompact, '云平台已评估'));
           setCb('mi-cloud-assessing', _impCheckboxState(cloudCompact, '云平台正在评估'));
           setCb('mi-cloud-unassessed', _impCheckboxState(cloudCompact, '云平台未评估'));
-          setVal(document.getElementById('mi-cloud-name'), (/云平台名称[：:]\s*([^\n]+)/.exec(cloudText) || [])[1]);
-          setVal(document.getElementById('mi-cloud-org'), (/密评机构名称[：:]\s*([^\n]+)/.exec(cloudText) || [])[1]);
-          setVal(document.getElementById('mi-cloud-date'), (/评估时间[：:]\s*(.*?)\s*(?:评估结论|评估结论[：:]|$)/.exec(cloudText) || [])[1]);
-          setVal(document.getElementById('mi-cloud-conclusion'), (/评估结论[：:]\s*([^\n]+)/.exec(cloudText) || [])[1]);
+          ['mi-cloud-name', 'mi-cloud-org', 'mi-cloud-date', 'mi-cloud-conclusion'].forEach(clearVal);
+          setVal(document.getElementById('mi-cloud-name'), cloudValue('云平台名称', ['密评机构名称', '评估时间', '评估结论']));
+          setVal(document.getElementById('mi-cloud-org'), cloudValue('密评机构名称', ['评估时间', '评估结论']));
+          setVal(document.getElementById('mi-cloud-date'), cloudValue('评估时间', ['评估结论']));
+          setVal(document.getElementById('mi-cloud-conclusion'), cloudValue('评估结论', []));
           add(s1, '云平台信息：已按合并单元格定向回填名称、状态、机构、时间和结论');
         }
         add(s1, '基本信息表数值字段（等保级别/S-A-G、备案编号、测评情况、用户数量、密码产品数量等）已定向回填');
@@ -10985,6 +11036,11 @@
       data.onsiteImportedObjects = clone(onsiteImportedObjects);
       data.onsiteObjectBindings = clone(onsiteObjectBindings);
       data.onsiteUnmatchedObjects = clone(onsiteUnmatchedObjects);
+      // 项目列表在现场记录自动保存后即可显示最新系统评分，无须等用户进入第四步。
+      try {
+        const totals = getReportTotalScore();
+        data.systemScore = totals && totals.total != null ? totals.total : null;
+      } catch (error) { data.systemScore = null; }
     }
     if (step === 4) {
       data.exportContent = collectReportExportContent();
