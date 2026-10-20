@@ -93,6 +93,10 @@ for (const relative of ['frontend/src/report-generator.html', 'frontend/public/p
   assert.match(html, /cloudValue\('云平台名称'\)/, `${relative} 云平台名称未按新签名取值`);
   assert.match(html, /cloudValue\('评估结论'\)/, `${relative} 云平台结论未按新签名取值（不得再跨行抓取）`);
   assert.match(html, /data\.systemScore = totals && totals\.total != null \? totals\.total : null;/, `${relative} 未在现场阶段保存实时评分`);
+  // 重要数据表顺序可上下调整（现场测评对象与表4-6 按同一 tbody 行序自动同步）
+  assert.match(html, /function moveAssetRow\(type, dir\)/, `${relative} 未提供 moveAssetRow 行序调整函数`);
+  assert.match(html, /onclick="moveAssetRow\('data', -1\)"/, `${relative} 重要数据表未添加上移按钮`);
+  assert.match(html, /onclick="moveAssetRow\('data', 1\)"/, `${relative} 重要数据表未添加下移按钮`);
 }
 
 const server = await fs.readFile('backend/src/server.ts', 'utf8');

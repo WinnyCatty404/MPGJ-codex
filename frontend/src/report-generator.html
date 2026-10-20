@@ -502,6 +502,8 @@
     .btn-add-row:hover { background: #c8e6c9; }
     .btn-del-row { background: #ffebee; color: #c62828; border: 1px solid #ef9a9a; }
     .btn-del-row:hover { background: #ffcdd2; }
+    .btn-move-row { background: #e8f0fe; color: #1a56db; border: 1px solid #aecbfa; }
+    .btn-move-row:hover { background: #d2e3fc; }
     tbody[data-selectable-delete="1"] > tr { cursor: pointer; transition: background-color .15s, box-shadow .15s; }
     tbody[data-selectable-delete="1"] > tr.bb-row-selected > td {
       background: #e8f2ff !important;
@@ -2249,6 +2251,8 @@
                 <div class="asset-table-actions" data-page-node-id="UbjtB1jWDILAvYku35qGom">
                   <button class="btn-add-row" onclick="addAssetRow('data')" data-page-node-id="zcOYyDED4H0CZCfKWmQI0N">增加</button>
                   <button class="btn-del-row" onclick="deleteAssetRow('data')" data-page-node-id="xVToI4YqiysV6NpN8AQGxU">删除</button>
+                  <button class="btn-move-row" onclick="moveAssetRow('data', -1)" title="上移当前选中行；现场测评对象与表4-6 的顺序会同步调整">上移</button>
+                  <button class="btn-move-row" onclick="moveAssetRow('data', 1)" title="下移当前选中行；现场测评对象与表4-6 的顺序会同步调整">下移</button>
                 </div>
                 <table class="mi-table asset-table" data-page-node-id="fTNNfWSAFwi0XdjSqnFDuw">
                   <thead data-page-node-id="t9dWpRiEvovR7vY62ahrqK">
@@ -4440,6 +4444,24 @@
       return;
     }
     selected.remove();
+    renumberAssetRows(type);
+  }
+
+  // 上移/下移选中行：只调整 DOM 行序。重要数据的顺序被三处实时读取，均无需额外同步——
+  // ① 第三步现场测评·应用和数据安全四个重要数据单元的对象（getOnsiteUnitObjects 按 tbody 行序）；
+  // ② 报告编制·表4-6（renderUaImpDataTable 的 rows 并集按同一行序）；
+  // ③ 报告导出 dataRequirements（快照/导出均按 tbody 行序序列化）。
+  function moveAssetRow(type, dir) {
+    const tbody = document.getElementById('asset-tbody-' + type);
+    if (!tbody || tbody.children.length === 0) return;
+    const selected = tbody.querySelector(':scope > tr.bb-row-selected');
+    if (!selected) { showToast('请先选中要移动的行', true); return; }
+    const rows = Array.from(tbody.children);
+    const idx = rows.indexOf(selected);
+    const target = idx + dir;
+    if (target < 0) { showToast('已是第一行', true); return; }
+    if (target >= rows.length) { showToast('已是最后一行', true); return; }
+    tbody.insertBefore(selected, dir < 0 ? rows[target] : rows[target].nextSibling);
     renumberAssetRows(type);
   }
 
