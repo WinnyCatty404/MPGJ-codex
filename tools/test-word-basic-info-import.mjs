@@ -21,11 +21,17 @@ assert.equal(captureLabeledValue(selectedText, '测评机构名称', ['测评时
 function cellAtPos(rows, label) {
   const want = String(label == null ? '' : label).trim();
   if (!want) return '';
+  const fieldLabels = ['单位名称', '单位地址', '邮政编码', '所属省部密码管理部门', '系统名称',
+    '姓名', '职务/职称', '所属部门', '办公电话', '移动电话', '电子邮件'];
   for (const row of rows) {
     const cells = row.map(c => String(c == null ? '' : c).trim());
     for (let ci = 0; ci < cells.length; ci++) {
       if (cells[ci] !== want) continue;
-      for (let vi = ci + 1; vi < cells.length; vi++) { if (cells[vi] !== '') return cells[vi]; }
+      for (let vi = ci + 1; vi < cells.length; vi++) {
+        if (cells[vi] === '' || cells[vi] === want) continue;
+        if (fieldLabels.indexOf(cells[vi]) >= 0) break;
+        return cells[vi];
+      }
     }
   }
   return '';
@@ -38,6 +44,15 @@ const biRows = [
 assert.equal(cellAtPos(biRows, '姓名'), '张三');
 assert.equal(cellAtPos(biRows, '办公电话'), '/');
 assert.equal(cellAtPos(biRows, '电子邮件'), '/', '重复值 / 必须按行列位置如实回填，不能错取到下一节标题');
+// 合并单元格展开后标签格重复（用户实测：输入框被写入“电子邮件”本身）
+const biRowsDoubled = [
+  ['联系人', '姓名', '李少辉', '职务/职称', '工作人员'],
+  ['联系人', '所属部门', '数据资源科', '办公电话', '/'],
+  ['联系人', '移动电话', '13123937800', '电子邮件', '电子邮件', '/']
+];
+assert.equal(cellAtPos(biRowsDoubled, '电子邮件'), '/', '标签格重复时应跳过同标签格取到真实值');
+// 值缺失：撞到下一个字段标签应止住，不把字段名写进输入框
+assert.equal(cellAtPos([['电子邮件', '电子邮件', '移动电话', '13123937800']], '电子邮件'), '');
 
 // 云平台：逐格定位标签，只取标签后、复选框符号/其他字段标签之前的内容
 const CLOUD_LABELS = ['云平台名称', '密评机构名称', '评估时间', '评估结论', '云平台已评估', '云平台正在评估', '云平台未评估'];

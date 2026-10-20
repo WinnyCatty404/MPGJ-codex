@@ -9128,15 +9128,23 @@
     // 按 Word 原始行列位置读取“标签后一格”：整表先去重再取下一格，会把重复值
     // （如“办公电话”和“电子邮件”都为 /）丢弃，导致电子邮件错取到下一节标题。
     // 逐行扫描、在同一行内取标签后的下一个非空单元格，/ 会如实回填。
+    // 注意：合并单元格展开后标签格可能重复（如 [电子邮件][电子邮件][/]），
+    // 取值时跳过与本标签相同的格；撞到其他字段标签说明本字段无值，止住不误写。
     function cellAtPos(label) {
       if (!biT) return '';
       const want = String(label == null ? '' : label).replace(/^[\s\u3000]+|[\s\u3000]+$/g, '');
       if (!want) return '';
+      const fieldLabels = ['单位名称', '单位地址', '邮政编码', '所属省部密码管理部门', '系统名称',
+        '姓名', '职务/职称', '所属部门', '办公电话', '移动电话', '电子邮件'];
       for (let ri = 0; ri < biT.rows.length; ri++) {
         const row = biT.rows[ri].map(function (c) { return String(c == null ? '' : c).replace(/^[\s\u3000]+|[\s\u3000]+$/g, ''); });
         for (let ci = 0; ci < row.length; ci++) {
           if (row[ci] !== want) continue;
-          for (let vi = ci + 1; vi < row.length; vi++) { if (row[vi] !== '') return row[vi]; }
+          for (let vi = ci + 1; vi < row.length; vi++) {
+            if (row[vi] === '' || row[vi] === want) continue;
+            if (fieldLabels.indexOf(row[vi]) >= 0) break;
+            return row[vi];
+          }
         }
       }
       return '';
