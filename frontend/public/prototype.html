@@ -9125,12 +9125,28 @@
       biT.rows.forEach(function (r) { r.forEach(function (c) { const t = String(c || '').trim(); if (t && biCells.indexOf(t) < 0) biCells.push(t); }); });
     }
     function cellAfter(label) { const i = biCells.indexOf(label); return i >= 0 ? String(biCells[i + 1] || '').trim() : ''; }
+    // 按 Word 原始行列位置读取“标签后一格”：整表先去重再取下一格，会把重复值
+    // （如“办公电话”和“电子邮件”都为 /）丢弃，导致电子邮件错取到下一节标题。
+    // 逐行扫描、在同一行内取标签后的下一个非空单元格，/ 会如实回填。
+    function cellAtPos(label) {
+      if (!biT) return '';
+      const want = String(label == null ? '' : label).replace(/^[\s\u3000]+|[\s\u3000]+$/g, '');
+      if (!want) return '';
+      for (let ri = 0; ri < biT.rows.length; ri++) {
+        const row = biT.rows[ri].map(function (c) { return String(c == null ? '' : c).replace(/^[\s\u3000]+|[\s\u3000]+$/g, ''); });
+        for (let ci = 0; ci < row.length; ci++) {
+          if (row[ci] !== want) continue;
+          for (let vi = ci + 1; vi < row.length; vi++) { if (row[vi] !== '') return row[vi]; }
+        }
+      }
+      return '';
+    }
     const fillMap = {
       'prep-org-name': cellAfter('单位名称'), 'prep-address': cellAfter('单位地址'),
       'prep-zipcode': cellAfter('邮政编码'), 'prep-crypto-gov': cellAfter('所属省部密码管理部门'),
       'prep-contact-name': cellAfter('姓名'), 'prep-contact-title': cellAfter('职务/职称'),
       'prep-contact-dept': cellAfter('所属部门'), 'prep-contact-tel': cellAfter('办公电话'),
-      'prep-contact-mobile': cellAfter('移动电话'), 'prep-contact-email': cellAfter('电子邮件')
+      'prep-contact-mobile': cellAfter('移动电话'), 'prep-contact-email': cellAtPos('电子邮件')
     };
     let filled = 0;
     Object.keys(fillMap).forEach(function (id) {
@@ -9313,11 +9329,26 @@
           const isNo = _impCheckboxState(cloudCompact, '否');
           const setCb = function (id, val) { const el = document.getElementById(id); if (el && val !== null) el.checked = !!val; };
           const clearVal = function (id) { const el = document.getElementById(id); if (el) el.value = ''; };
-          const cloudValue = function (label, nextLabels) {
-            const escaped = label.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-            const next = nextLabels.map(function (item) { return item.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'); }).join('|');
-            const match = new RegExp(escaped + '[：:]\\s*([\\s\\S]*?)(?=\\s*(?:' + next + ')[：:]|$)').exec(cloudText);
-            return match ? match[1].trim() : '';
+          const cloudCells = cloudRow.map(function (c) { return String(c == null ? '' : c).replace(/\r/g, ''); });
+          // 逐格定位标签，只取标签后、复选框符号/其他字段标签之前的内容；标签单独成格时
+          // 取同一行下一个非空格。避免把状态复选框（☑云平台已评估□…）和后续标签混进输入框。
+          const cloudLabels = ['云平台名称', '密评机构名称', '评估时间', '评估结论', '云平台已评估', '云平台正在评估', '云平台未评估'];
+          const cloudNoise = new RegExp('[☑□☐]|' + cloudLabels.map(function (s) { return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'); }).join('|'));
+          const cloudValue = function (label) {
+            let ci = -1;
+            for (let k = 0; k < cloudCells.length; k++) {
+              if (cloudCells[k].indexOf(label) >= 0) { ci = k; break; }
+            }
+            if (ci < 0) return '';
+            let v = cloudCells[ci].slice(cloudCells[ci].indexOf(label) + label.length).replace(/^[\s\u3000：:]+/, '');
+            if (!v) {
+              for (let j = ci + 1; j < cloudCells.length; j++) {
+                if (cloudCells[j].trim()) { v = cloudCells[j]; break; }
+              }
+            }
+            const m = cloudNoise.exec(v);
+            if (m) v = v.slice(0, m.index);
+            return v.replace(/^[\s\u3000：:]+|[\s\u3000：:]+$/g, '').trim();
           };
           setCb('mi-cloud-yes', isYes);
           setCb('mi-cloud-no', isNo);
@@ -9325,10 +9356,10 @@
           setCb('mi-cloud-assessing', _impCheckboxState(cloudCompact, '云平台正在评估'));
           setCb('mi-cloud-unassessed', _impCheckboxState(cloudCompact, '云平台未评估'));
           ['mi-cloud-name', 'mi-cloud-org', 'mi-cloud-date', 'mi-cloud-conclusion'].forEach(clearVal);
-          setVal(document.getElementById('mi-cloud-name'), cloudValue('云平台名称', ['密评机构名称', '评估时间', '评估结论']));
-          setVal(document.getElementById('mi-cloud-org'), cloudValue('密评机构名称', ['评估时间', '评估结论']));
-          setVal(document.getElementById('mi-cloud-date'), cloudValue('评估时间', ['评估结论']));
-          setVal(document.getElementById('mi-cloud-conclusion'), cloudValue('评估结论', []));
+          setVal(document.getElementById('mi-cloud-name'), cloudValue('云平台名称'));
+          setVal(document.getElementById('mi-cloud-org'), cloudValue('密评机构名称'));
+          setVal(document.getElementById('mi-cloud-date'), cloudValue('评估时间'));
+          setVal(document.getElementById('mi-cloud-conclusion'), cloudValue('评估结论'));
           add(s1, '云平台信息：已按合并单元格定向回填名称、状态、机构、时间和结论');
         }
         add(s1, '基本信息表数值字段（等保级别/S-A-G、备案编号、测评情况、用户数量、密码产品数量等）已定向回填');
