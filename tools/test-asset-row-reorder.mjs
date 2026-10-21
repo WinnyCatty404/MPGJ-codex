@@ -11,6 +11,9 @@ assert.match(html, /return \{ id: asset\.id, name: asset\.app \? asset\.name \+ 
   '重要数据对象条目未携带行级稳定 ID');
 assert.match(html, /if \(!row\.dataset\.assetId\) row\.dataset\.assetId = newAssetRowId\('asset'\);/,
   '重要数据行未绑定行级稳定 assetId');
+// 移动后必须触发自动保存，否则刷新/重开项目后顺序会被旧快照还原
+assert.match(html, /\/保存\|恢复默认\|新增\|添加\|删除\|上移\|下移\|同步系统资产\|清除图片\//,
+  '自动保存的按钮点击正则未包含「上移|下移」，移动结果不会落库');
 
 // ---------- 2. 抽出 moveAssetRow / renumberAssetRows 做行序单测 ----------
 function extractFn(name) {

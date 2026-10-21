@@ -12020,7 +12020,7 @@
     const button = event.target.closest('button');
     if (!button) return;
     const label = (button.textContent || '').trim();
-    if (/保存|恢复默认|新增|添加|删除|同步系统资产|清除图片/.test(label)) {
+    if (/保存|恢复默认|新增|添加|删除|上移|下移|同步系统资产|清除图片/.test(label)) {
       schedulePersist(bbCurrentStep, true, 350);
     }
   }, true);
