@@ -15,6 +15,49 @@ assert.match(html, /if \(!row\.dataset\.assetId\) row\.dataset\.assetId = newAss
 assert.match(html, /\/保存\|恢复默认\|新增\|添加\|删除\|上移\|下移\|同步系统资产\|清除图片\//,
   '自动保存的按钮点击正则未包含「上移|下移」，移动结果不会落库');
 
+// ---------- 3. 表4-6 行序必须严格等于重要数据表的行序 ----------
+// 旧实现「四个单元依次遍历取并集」会把只勾存储类需求的行排到只勾传输类的行之后：DOM 为 [A,B,C] 时得到 [A,C,B]。
+for (const relative of ['frontend/src/report-generator.html', 'frontend/public/prototype.html']) {
+  const src = await fs.readFile(relative, 'utf8');
+  assert.doesNotMatch(src, /unitNames\.forEach\(n => getOnsiteUnitObjects\(t, n\)\.forEach/,
+    `${relative} 表4-6 仍在按测评单元遍历取并集，行序会脱离重要数据表`);
+  assert.doesNotMatch(src, /dataUnits\.forEach\(name => getOnsiteUnitObjects\(3, name\)\.forEach/,
+    `${relative} 报告导出侧表4-6 仍在按测评单元遍历取并集`);
+  assert.match(src, /const dataReqValues = unitNames\.map\(n => ONSITE_UNIT_DATA_REQ\[n\]\);/,
+    `${relative} 页面表4-6 未按重要数据表行序构建`);
+  assert.match(src, /const dataReqKeys = dataUnits\.map\(name => ONSITE_UNIT_DATA_REQ\[name\]\);/,
+    `${relative} 导出侧表4-6 未按重要数据表行序构建`);
+
+  const start = src.indexOf('    // 行 = 勾选了四项安全需求之一的重要数据');
+  const end = src.indexOf('let html = \'<div class="ua-caption">表4-6', start);
+  assert.ok(start > 0 && end > start, `${relative} 未找到表4-6 行序构建片段`);
+  const buildRows = new Function('getImportantDataAssets', 'ONSITE_UNIT_DATA_REQ', 'unitNames',
+    src.slice(start, end) + '\n    return rows;');
+
+  const ONSITE_UNIT_DATA_REQ = {
+    '重要数据传输机密性': '传输机密性',
+    '重要数据存储机密性': '存储机密性',
+    '重要数据传输完整性': '传输完整性',
+    '重要数据存储完整性': '存储完整性'
+  };
+  const unitNames = Object.keys(ONSITE_UNIT_DATA_REQ);
+  // DOM 行序：A 只勾传输机密性，B 只勾存储完整性，C 四项全勾；D 未勾任何需求（不进表）
+  const assets = [
+    { name: 'A', app: '应用1', reqs: ['传输机密性'] },
+    { name: 'B', app: '应用1', reqs: ['存储完整性'] },
+    { name: 'C', app: '应用2', reqs: ['传输机密性', '存储完整性'] },
+    { name: 'D', app: '应用2', reqs: [] }
+  ];
+  const rows = buildRows(() => assets, ONSITE_UNIT_DATA_REQ, unitNames);
+  assert.deepEqual(rows, ['A-应用1', 'B-应用1', 'C-应用2'],
+    `${relative} 表4-6 行序未与重要数据表行序一致（实际：${JSON.stringify(rows)}）`);
+  // 移动 B 到首位后，表4-6 行序必须跟着变
+  assets.unshift(assets.splice(1, 1)[0]);
+  const moved = buildRows(() => assets, ONSITE_UNIT_DATA_REQ, unitNames);
+  assert.deepEqual(moved, ['B-应用1', 'A-应用1', 'C-应用2'],
+    `${relative} 上移重要数据行后表4-6 行序未同步`);
+}
+
 // ---------- 2. 抽出 moveAssetRow / renumberAssetRows 做行序单测 ----------
 function extractFn(name) {
   const start = html.indexOf('  function ' + name + '(');

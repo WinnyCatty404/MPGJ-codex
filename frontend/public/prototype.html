@@ -6657,9 +6657,15 @@
     const colNames = ['传输机密性', '存储机密性', '传输完整性', '存储完整性'];
     const items = evaluationIndicatorLevels[t].items;
     const unitIdxs = unitNames.map(n => items.findIndex(it => it.name === n));
-    // 行 = 4个单元对象并集
+    // 行 = 勾选了四项安全需求之一的重要数据；顺序严格跟随第二步「系统资产 → 重要数据」的行序
+    // （旧实现按「四个测评单元依次遍历取并集」，行只勾存储类需求时会被排到只勾传输类的行之后，与页面行序不一致）
+    const dataReqValues = unitNames.map(n => ONSITE_UNIT_DATA_REQ[n]);
     const rows = [];
-    unitNames.forEach(n => getOnsiteUnitObjects(t, n).forEach(o => { if (rows.indexOf(o) < 0) rows.push(o); }));
+    getImportantDataAssets().forEach(function (asset) {
+      if (!dataReqValues.some(function (req) { return asset.reqs.indexOf(req) >= 0; })) return;
+      const name = asset.app ? asset.name + '-' + asset.app : asset.name;
+      if (rows.indexOf(name) < 0) rows.push(name);
+    });
     let html = '<div class="ua-caption">表4-6 ' + onsiteEsc(ONSITE_LAYERS[t].name) + '重要数据测评结果汇总</div>';
     if (!rows.length) {
       return html + '<div class="alert-box"><span class="icon">ℹ️</span><div>暂无重要数据，请先在第二步「系统资产 → 重要数据」中维护数据及其安全需求（传输/存储机密性、完整性）。</div></div>';
@@ -11390,7 +11396,12 @@
     const dataUnits = ['重要数据传输机密性', '重要数据存储机密性', '重要数据传输完整性', '重要数据存储完整性'];
     const dataItems = dataUnits.map(name => evaluationIndicatorLevels[3].items.findIndex(item => item.name === name));
     const dataObjects = [];
-    dataUnits.forEach(name => getOnsiteUnitObjects(3, name).forEach(obj => { if (!dataObjects.includes(obj)) dataObjects.push(obj); }));
+    const dataReqKeys = dataUnits.map(name => ONSITE_UNIT_DATA_REQ[name]);
+    getImportantDataAssets().forEach(function (asset) {
+      if (!dataReqKeys.some(function (req) { return asset.reqs.indexOf(req) >= 0; })) return;
+      const name = asset.app ? asset.name + '-' + asset.app : asset.name;
+      if (!dataObjects.includes(name)) dataObjects.push(name);
+    });
     const dataResults = dataItems.map(() => []);
     const dataRows = dataObjects.map(function (name, index) {
       const values = [String(index + 1), name];
