@@ -6826,7 +6826,11 @@
       owners = [...new Set(owners.map(norm))];
       if (owners.length === 1 && belongs(owners)) positions.push(pos);
     });
-    if (!positions.length) return req ? getUaDataFinalResult(3, itemIdx) : '—';
+    if (!positions.length) {
+      // 该单元的测评对象无法归属到具体应用（对象为“应用系统/应用数据”等通用对象、对象名与应用名不一致，
+      // 或该单元暂无对象）时，回退显示该单元的单元测评结果；此前一律显示“—”，导致已测评单元在表4-4 中看似未测。
+      return getUaDataFinalResult(3, itemIdx);
+    }
     const results = positions.map(pos => req
       ? (dataRequirementApplies(objects[pos], item.name) === false ? '不适用' : getObjectCls(3, itemIdx, pos))
       : getObjectCls(3, itemIdx, pos));
