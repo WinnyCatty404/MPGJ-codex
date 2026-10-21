@@ -6828,12 +6828,21 @@
   function getUaAppResult(appName, item, itemIdx) {
     const apps = [...new Set(getAssetAppNames())];
     const norm = value => impNormName(value);
+    // 归属推断：现场测评里该单元的测评对象 → 表4-4 的应用行。
+    // 双向包含：对象名包含应用名（如“浙江文旅大脑应用系统”）或应用名包含对象名（对象简写“浙江文旅大脑”）；
+    // 命中多个时取最具体（最长）的那一个，避免把通用对象错挂到短名应用。
     const inferOwner = name => {
       const key = norm(name);
+      if (!key) return [];
       const exact = apps.filter(app => norm(app) === key);
       if (exact.length === 1) return exact;
-      const matches = apps.filter(app => key.includes(norm(app)));
-      return matches.length === 1 ? matches : [];
+      const matches = apps.filter(app => {
+        const appKey = norm(app);
+        return appKey && (key.includes(appKey) || appKey.includes(key));
+      });
+      if (!matches.length) return [];
+      if (matches.length === 1) return matches;
+      return [matches.reduce((a, b) => norm(b).length > norm(a).length ? b : a)];
     };
     const belongs = owners => owners.some(owner => norm(owner) === norm(appName));
     const objects = getOnsiteUnitObjects(3, item.name);

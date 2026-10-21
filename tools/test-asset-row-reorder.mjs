@@ -58,6 +58,29 @@ for (const relative of ['frontend/src/report-generator.html', 'frontend/public/p
     `${relative} 上移重要数据行后表4-6 行序未同步`);
 }
 
+// ---------- 4. 表4-4 应用归属推断（现场测评对象 → 应用行）----------
+for (const relative of ['frontend/src/report-generator.html', 'frontend/public/prototype.html']) {
+  const src = await fs.readFile(relative, 'utf8');
+  const fnStart = src.indexOf('    const inferOwner = name => {');
+  const fnEnd = src.indexOf('    };', fnStart) + 5;
+  assert.ok(fnStart > 0 && fnEnd > fnStart, `${relative} 未找到归属推断 inferOwner`);
+  // 名称归一化直接复用源码实现，保证与页面一致
+  const normStart = src.indexOf('  function impNormName(s) {');
+  const normEnd = src.indexOf('  }', normStart) + 3;
+  assert.ok(normStart > 0, `${relative} 未找到 impNormName`);
+  const build = new Function('apps',
+    src.slice(normStart, normEnd) + '    const norm = value => impNormName(value);\n' +
+    src.slice(fnStart, fnEnd) + '\n    return inferOwner;');
+
+  const apps = ['浙江文旅大脑应用', '浙江文旅数据仓'];
+  const infer = build(apps);
+  assert.deepEqual(infer('浙江文旅大脑'), ['浙江文旅大脑应用'], `${relative} 对象简写未归属到完整应用名`);
+  assert.deepEqual(infer('浙江文旅大脑应用系统'), ['浙江文旅大脑应用'], `${relative} 对象带后缀未归属到应用`);
+  assert.deepEqual(infer('浙江文旅数据仓'), ['浙江文旅数据仓'], `${relative} 精确同名未归属`);
+  assert.deepEqual(infer('访问控制信息'), [], `${relative} 与应用无关的通用对象不应被归属`);
+  assert.deepEqual(infer('文旅'), ['浙江文旅大脑应用'], `${relative} 多候选取最具体（最长）应用名`);
+}
+
 // ---------- 2. 抽出 moveAssetRow / renumberAssetRows 做行序单测 ----------
 function extractFn(name) {
   const start = html.indexOf('  function ' + name + '(');
