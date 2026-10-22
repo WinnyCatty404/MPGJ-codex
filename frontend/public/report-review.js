@@ -3,7 +3,79 @@ let reportReviewState = { findings: [], accepted: [], ranAt: '', scope: null, si
 (function() {
   const labels = ['单元测评结果分析', '整体测评分析', '风险分析', '评估结论', '总体评价', '安全问题及改进建议'];
   labels[8] = '密码应用概况';
+
+  // ===== 图件传入检查（规则 C40）=====
+  // 报告要求插入的图片：图2-1/图2-2 为「网络拓扑图及描述」中的图片块（第1、2个图片块），
+  // 图3-1 为「测评方法及工具—测评接入点」中的工具接入示意图。只核对是否已传入，不判断图片内容。
+  const AREA_IMAGE_IDS = new Set(['access-image']);
+  const AREA_SCOPE_IDS = new Set(['access-placeholder', 'access-filename', 'access-file', 'access-upload-area',
+    'method-sub-panel-2', 'access-point-list']);
+  function onsitePictureText(value) {
+    const str = String(value || '');
+    return /^(data:image\/|blob:)/.test(str) || /^https?:/i.test(str);
+  }
+  function onsitePictureArea(img) {
+    const area = img.closest?.('.topology-upload, .crypto-upload');
+    return Boolean(area && AREA_IMAGE_IDS.has(img.id || ''));
+  }
+  // 图片区快照：当前 DOM；第二步未渲染时回退到末次保存的 images 快照。
+  function onsitePictureStates() {
+    const states = new Map();
+    if (typeof document.querySelectorAll === 'function') document.querySelectorAll('img').forEach(img => { if (img.id) states.set(img.id, onsitePictureText(img.getAttribute('src'))); });
+    const stored = typeof savedPlan === 'object' && savedPlan && Array.isArray(savedPlan.images) ? savedPlan.images : [];
+    stored.forEach(saved => {
+      if (!saved || !saved.id || states.get(saved.id)) return;
+      states.set(saved.id, onsitePictureText(saved.src));
+    });
+    return states;
+  }
+  function onsitePicturePresent(states, id) {
+    const value = states.get(id);
+    if (value === true) return true;
+    const el = document.getElementById(id);
+    if (!el || !AREA_SCOPE_IDS.has(id)) return false;
+    const area = el.closest?.('.topology-upload, .crypto-upload');
+    return Boolean(area);
+  }
+  function onsiteFigureFindings() {
+    const states = onsitePictureStates();
+    // 拓扑图片块来自第二步数据；页面尚未初始化该数组时按“未传入”处理。
+    const blocks = Array.isArray(typeof topologyBlocks === 'object' ? topologyBlocks : null) ? topologyBlocks : [];
+    const topologyImages = blocks.filter(block => block && block.type === 'image' && block.dataUrl);
+    const prepared = topologyImages[0];
+    const deployed = topologyImages[1];
+    const access = document.getElementById('access-image');
+    // 图片已设置 src 或明确隐藏（display:none）时，按已传入处理；
+    // 否则 DOM 缺失（第二步未渲染）时回退到末次保存的快照。
+    const accessSrc = onsitePictureText(access && access.getAttribute('src'));
+    const accessHidden = Boolean(access && String(access.style.display || '').toLowerCase() === 'none');
+    const accessPresent = accessSrc || accessHidden || (!access && onsitePicturePresent(states, 'access-image'));
+    return [
+      { key: 'plan-figure-topology-prepared', name: '图2-1', section: 2, layer: -1, path: '被测系统情况—网络拓扑图及描述',
+        hint: '网络拓扑图及描述（第1个图片块）', present: Boolean(prepared),
+        text: prepared ? '第1个拓扑图片块：' + (prepared.caption || '图 2-1') : '',
+        targetId: 'plan-topology-blocks' },
+      { key: 'plan-figure-topology-deployed', name: '图2-2', section: 2, layer: -1, path: '被测系统情况—网络拓扑图及描述',
+        hint: '网络拓扑图及描述（第2个图片块）', present: Boolean(deployed),
+        text: deployed ? '第2个拓扑图片块：' + (deployed.caption || '图 2-2') : '',
+        targetId: 'plan-topology-blocks' },
+      { key: 'plan-figure-access-tool', name: '图3-1', section: 2, layer: -1, path: '测评方法及工具—测评接入点',
+        unit: '测评接入点', hint: '工具接入示意图（图片名称：' + ((document.getElementById('access-filename')?.textContent || '').trim() || '--') + '）',
+        present: Boolean(accessPresent), text: accessPresent ? '已传入工具接入示意图' : '',
+        targetId: 'access-upload-area' }
+    ];
+  }
+  function onsiteFigureOutline(figures) {
+    // 图片齐全时不显示；缺少时提示应到哪一步哪一页补充，避免用户找不到位置。
+    const missing = (figures || []).filter(figure => !figure.present);
+    if (!missing.length) return '';
+    return '<p class="review-hint">图片检查：需提供 图2-1、图2-2（网络拓扑图及描述）和 图3-1（测评方法及工具—测评接入点）；' +
+      '当前缺少 ' + missing.map(figure => figure.name).join('、') + '，请到第二步对应页面补充图片后重新审核。</p>';
+  }
+
   let selected = '';
+  // 当前快照：渲染时复用，避免重复扫描全部测评对象。
+  let snapshotCache = null;
   const esc = value => onsiteEsc(String(value || ''));
   function assetNames(kind) {
     const tbody = document.getElementById('asset-tbody-' + kind);
@@ -82,8 +154,15 @@ let reportReviewState = { findings: [], accepted: [], ranAt: '', scope: null, si
       if (loc) targets.push({ id: 'fix|' + key, section: 1, layer: loc.t, unit: loc.unitName, text: String(fix.reason || ''), manual: true });
     });
     targets.push({ id: 'report-conclusion-text', section: 3, layer: -1, text: getReportTextVal('report-conclusion-text', buildConclusionSentence()), manual: Object.prototype.hasOwnProperty.call(reportTexts, 'report-conclusion-text') });
-    return { objects, units, targets, recordExpectations,
+    const figures = onsiteFigureFindings();
+    // 图片缺失时补一条零文本目标，保证只审该章节时仍能进入图片检查；图片齐全时此目标不产生问题。
+    if (figures.some(figure => !figure.present)) {
+      targets.push({ id: 'plan-figure-none', section: 2, layer: -1, text: '', manual: true, kind: 'figure' });
+    }
+    const input = { objects, units, targets, recordExpectations, figures,
       serverNames: assetNames('server'), databaseNames: assetNames('db'), dataCount: assetNames('data').length };
+    snapshotCache = input;
+    return input;
   }
   function signature(input) { return BBReportReviewEngine.hash(JSON.stringify(input)); }
   function findInputObject(input, key) {
@@ -105,12 +184,17 @@ let reportReviewState = { findings: [], accepted: [], ranAt: '', scope: null, si
     return match ? Number(match[1]) : null;
   }
   function validFinding(finding) {
-    if (!finding || excludedSections.has(finding.target?.section)) return false;
+    if (!finding) return false;
+    // 图件检查不属于任何章节文本，必须在章节过滤之前判定。
+    if (finding.rule === 'C40') return finding.object?.key !== 'plan-figure-none';
+    if (excludedSections.has(finding.target?.section)) return false;
     if (Number(finding.object?.layer) >= 4 && managementRulesReplaced.has(finding.rule)) return false;
     return finding.target?.section !== 5 || suggestionRules.has(finding.rule);
   }
   function validAccepted(item) {
-    if (!item || excludedSections.has(item.targetSection)) return false;
+    if (!item) return false;
+    if (item.rule === 'C40') return item.objectKey !== 'plan-figure-none';
+    if (excludedSections.has(item.targetSection)) return false;
     const layer = item.objectLayer ?? layerFromTargetId(item.targetId);
     if (Number(layer) >= 4 && managementRulesReplaced.has(item.rule)) return false;
     return item.targetSection !== 5 || suggestionRules.has(item.rule);
@@ -193,6 +277,7 @@ let reportReviewState = { findings: [], accepted: [], ranAt: '', scope: null, si
   }
   window.runReportReview = async function(scope) {
     normalizeState();
+    snapshotCache = null;
     const input = snapshot();
     const filtered = { ...input, targets: input.targets.filter(t => scope == null || t.section === scope) };
     reportReviewState.accepted = reportReviewState.accepted.filter(item => {
@@ -244,6 +329,7 @@ let reportReviewState = { findings: [], accepted: [], ranAt: '', scope: null, si
   };
   window.locateReviewSource = function(id) {
     const f = findingMembers(id)[0]; if (!f) return;
+    if (f.rule === 'C40') { locateReviewFigure(f.object.key, f.target.id); return; }
     if (f.rule === 'C32') { switchStep(4); activeSuggestionLayer = f.target.layer; switchReportTab(5); showToast('请核对本层面的“问题项”数量及编号条目。'); return; }
     if (f.rule === 'C37' && f.object.summaryCount) { switchStep(4); activeSuggestionLayer = f.target.layer; switchReportTab(5); showToast('请核对本层面的改进建议编号及问题单元。'); return; }
     if (Number(f.object.item) < 0 || Number(f.object.index) < 0) { switchStep(3); switchOnsiteTab(f.object.layer); showToast('请核对本测评单元的现场结果记录。'); return; }
@@ -252,8 +338,31 @@ let reportReviewState = { findings: [], accepted: [], ranAt: '', scope: null, si
     switchOnsiteTab(f.object.layer);
     expandOnsiteRecord(f.object.layer, f.object.item, f.object.index);
   };
+  async function locateReviewFigure(key, targetId) {
+    // 图片检查定位到第二步的对应页面，并高亮目标区域。
+    const isAccess = key === 'plan-figure-access-tool' || targetId === 'access-upload-area';
+    switchStep(2);
+    let field = null;
+    if (isAccess) {
+      switchPlanTab(4);
+      switchMethodSubTab(2);
+      field = document.getElementById('access-upload-area');
+    } else {
+      switchPlanTab(11);
+      field = document.getElementById('topology-block-list');
+    }
+    if (field) {
+      field.scrollIntoView({ block: 'center', behavior: 'smooth' });
+      field.style.outline = '3px solid #e7a12a';
+      setTimeout(() => { field.style.outline = ''; }, 3000);
+      showToast(isAccess ? '请在“工具接入示意图”中粘贴或导入图3-1，然后重新审核。' : '请在“网络拓扑图及描述”中添加图2-1、图2-2 对应的图片块，然后重新审核。');
+    } else {
+      showToast('请到第二步对应页面补充图片后重新审核。');
+    }
+  }
   window.locateReviewTarget = async function(id) {
     const f = findingMembers(id)[0]; if (!f) return;
+    if (f.rule === 'C40') { locateReviewFigure(f.object.key, f.target.id); return; }
     let panel;
     if (f.target.section === 8) {
       switchStep(2);
@@ -299,6 +408,7 @@ let reportReviewState = { findings: [], accepted: [], ranAt: '', scope: null, si
     return out;
   }
   function rvDescribe(finding) {
+    if (finding.rule === 'C40') return '<b>审核依据：</b>' + esc(finding.reason);
     if (finding.rule === 'C31' || finding.rule === 'C32' || /^C3[4-9]$/.test(finding.rule)) return '<b>审核依据：</b>' + esc(finding.reason);
     const left = rvBrief(finding.baseline || finding.object.name);
     const right = String(finding.target.text || '').trim();
@@ -311,7 +421,9 @@ let reportReviewState = { findings: [], accepted: [], ranAt: '', scope: null, si
     normalizeState();
     const state = reportReviewState, visible = groupedFindings(state.findings);
     const f = visible.find(x => x.id === selected || x.memberIds?.includes(selected)) || visible[0];
-    const stale = state.ranAt && (state.signature !== signature(snapshot()) || state.findings.some(x => x.stale));
+    const current = snapshotCache || snapshot();
+    const stale = state.ranAt && (state.signature !== signature(current) || state.findings.some(x => x.stale) ||
+      Boolean(onsiteFigureOutline(current.figures)) !== state.findings.some(x => x.rule === 'C40'));
     const counts = STATUSES.map(s => visible.filter(x => x.status === s).length);
     const list = reviewFilter === '全部' ? visible : visible.filter(x => x.status === reviewFilter);
     const scopeLabel = state.scope == null ? '整份报告' : labels[state.scope];
@@ -326,12 +438,25 @@ let reportReviewState = { findings: [], accepted: [], ranAt: '', scope: null, si
     const detail = f ? (function() {
       const hasObject = String(f.target.text || '').indexOf(f.object.name) >= 0;
       const recordRule = /^C3[4-9]$/.test(f.rule) || (f.rule === 'C28' && Number(f.object.layer) >= 4);
+      if (f.rule === 'C40') {
+        // 图件检查：左侧为应为的图号，右侧为当前是否已传入，不使用原文对照。
+        return '<h4>' + esc(f.title) + '</h4>' +
+          '<p class="review-desc">' + rvDescribe(f) + '</p>' +
+          '<div class="review-fields"><span>检查项 <b>' + esc(f.object.name) + '</b></span>' +
+            '<span>应为位置 <b>' + esc(f.object.record || '对应章节') + '</b></span></div>' +
+          '<div class="review-compare"><div><div class="review-compare-head"><span>图片传入状态</span></div>' +
+            '<div class="review-missing">' + esc(f.object.name) + ' 未传入图片</div></div>' +
+            '<div><div class="review-compare-head"><span>当前内容</span></div>' +
+            '<pre>' + esc(f.target.text || '（该位置未检测到图片）') + '</pre></div></div>' +
+          '<label>处理状态 <select onchange="setReviewStatus(\'' + f.id + '\',this.value)">' + STATUSES.map(s => '<option' + (s === f.status ? ' selected' : '') + '>' + s + '</option>').join('') + '</select></label>' +
+          '<label>处理说明<textarea class="text-area" onchange="setReviewNote(\'' + f.id + '\',this.value)">' + esc(f.note) + '</textarea></label>';
+      }
       return '<h4>' + esc(f.title) + '</h4>' +
         '<p class="review-desc">' + rvDescribe(f) + '</p>' +
         '<div class="review-fields">' +
           (f.object.unit ? '<span>测评指标 <b>' + esc(f.object.unit) + '</b></span>' : '') +
           (recordRule ? '<span>核对项目 <b>' + esc(f.target.kind === 'advice' ? '改进建议' : '结果记录') + '</b></span>' : '<span>测评对象 <b>' + esc(f.object.name) + '</b></span>') +
-          '<span>所属层面 <b>' + esc(ONSITE_LAYERS[f.object.layer].name) + '</b></span>' +
+          '<span>所属层面 <b>' + esc((ONSITE_LAYERS[f.object.layer] || { name: '第二步准备资料' }).name) + '</b></span>' +
         '</div>' +
         '<div class="review-compare">' +
           '<div><div class="review-compare-head"><span>现场结果记录 / 第二步对象</span>' +
@@ -345,15 +470,17 @@ let reportReviewState = { findings: [], accepted: [], ranAt: '', scope: null, si
         '<label>处理状态 <select onchange="setReviewStatus(\'' + f.id + '\',this.value)">' + STATUSES.map(s => '<option' + (s === f.status ? ' selected' : '') + '>' + s + '</option>').join('') + '</select></label>' +
         '<label>处理说明<textarea class="text-area" onchange="setReviewNote(\'' + f.id + '\',this.value)">' + esc(f.note) + '</textarea></label>';
     })() : '<p>选择左侧问题查看原文对照。</p>';
+    const missingNote = onsiteFigureOutline(current.figures);
     panel.innerHTML = '<h3>报告审核</h3><p>技术类层面依据测评对象及现场记录核对对象、参数和结论；管理类层面依据测评单元及结果记录核对单元分析、总体评价和问题描述，允许不改变核心事实与肯否方向的合理简写。</p>' +
       '<p class="review-hint">问题描述同时检查问题项编号；改进建议检查问题单元对应关系、整改方向、可执行性以及现状与未来措施是否混淆。复杂语义及截图代码仍需人工复核，审核结果不会自动修改报告原文。</p>' +
+      missingNote +
       statusbar +
       (state.accepted.length ? '<details class="review-accepted"><summary>已确认合理差异（' + groupedAccepted(state.accepted).length + '，不计入问题数）</summary>' +
         groupedAccepted(state.accepted).map(item => '<div class="review-accepted-item"><span>' + esc(item.rule + ' · ' + item.title + ' · ' + item.objectName + ' · ' + (labels[item.targetSection] || '报告内容')) +
           (item.note ? '<small>说明：' + esc(item.note) + '</small>' : '') + '</span><button type="button" class="btn" onclick="restoreAcceptedReview(\'' + item.id + '\')">撤销确认</button></div>').join('') +
         '</details>' : '') +
       filters +
-      '<div class="review-grid"><div>' + list.map(x => '<button class="review-item ' + (f?.id === x.id ? 'selected' : '') + '" onclick="selectReviewFinding(\'' + x.id + '\')"><strong>' + esc(x.title) + '</strong><small>' + esc(labels[x.target.section] + ' · ' + ONSITE_LAYERS[x.object.layer].name) + '<span class="review-badge st-' + esc(x.status) + '">' + esc(x.status) + '</span></small></button>').join('') +
+      '<div class="review-grid"><div>' + list.map(x => '<button class="review-item ' + (f?.id === x.id ? 'selected' : '') + '" onclick="selectReviewFinding(\'' + x.id + '\')"><strong>' + esc(x.title) + '</strong><small>' + esc((x.rule === 'C40' ? '第二步图片检查' : labels[x.target.section]) + ' · ' + (ONSITE_LAYERS[x.object.layer] || { name: '第二步准备资料' }).name) + '<span class="review-badge st-' + esc(x.status) + '">' + esc(x.status) + '</span></small></button>').join('') +
       (state.ranAt && !visible.length ? '<p>本次规则检查未发现问题；未覆盖的语义和证据项仍需人工审核。</p>' : '') +
       (visible.length && !list.length ? '<p>当前筛选下没有问题。</p>' : '') + '</div><div>' + detail + '</div></div>';
   }

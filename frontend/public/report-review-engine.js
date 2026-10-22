@@ -190,6 +190,7 @@
   }
   function analyze(input) {
     const findings = [];
+    analyzeFigures(input.figures);
     const allNames = [...new Set(input.objects.filter(o => !o.summaryCount).map(o => o.name))];
     function add(rule, target, object, title, reason, baseline, type, params) {
       const id = hash([rule, target.id, object.key, title].join('|'));
@@ -240,6 +241,21 @@
           '当前章节可能对结果记录进行了简写，但核心事实覆盖不足，请人工核对。', baseline, '无法核对', { score: scoreText });
         else if (coverage.status === 'conflict') add('C36', target, source, '结果记录肯否方向可能相反：' + item.unit,
           '现场结果记录与当前章节在肯定、否定方向上可能不一致，请核对是否改变了原意。', baseline, '一致性检查', { score: scoreText });
+      }
+    }
+    // 图件传入检查：拓扑图、工具接入示意图等报告必需图片，只核对“是否已传入”，不判断图片内容。
+    // 由报告审核页传入 figures（含编号、名称、是否有图、定位信息）。
+    function analyzeFigures(figures) {
+      for (const figure of figures || []) {
+        if (!figure || figure.present) continue;
+        const object = { key: figure.key, layer: figure.layer, item: -1, index: -1, name: figure.name,
+          unit: figure.unit || '', record: figure.hint || '', result: '' };
+        const target = { id: figure.targetId, section: figure.section, layer: figure.layer,
+          text: figure.text == null ? '' : String(figure.text), kind: 'figure' };
+        const where = figure.path || '对应章节';
+        add('C40', target, object, '图片未传入：' + figure.name,
+          '报告要求在“' + where + '”中插入' + figure.name + '，当前未检测到已传入的图片。',
+          figure.hint || '（未上传图片）', '证据不足');
       }
     }
     function analyzeAdvice(target) {

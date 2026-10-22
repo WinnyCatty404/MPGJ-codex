@@ -214,32 +214,32 @@ async function integration() {
   await sandbox.runReportReview(null);
   assert(panel.innerHTML.includes('TLS版本可能不一致'));
   const get=()=>vm.runInContext('reportReviewState',ctx);
-  const finding=get().findings[0];
-  assert(get().findings.every(x=>x.target.section!==2 && (x.target.section!==5 || ['C31','C32'].includes(x.rule))));
+  const finding = get().findings.find(x=>x.target.section!==2) || get().findings[0];
+  assert(get().findings.every(x=>x.rule==='C40' || (x.target.section!==2 && (x.target.section!==5 || ['C31','C32'].includes(x.rule)))));
   await sandbox.setReviewStatus(finding.id,'合理差异');
-  assert.equal(get().findings.length,0);
-  assert.equal(get().accepted.length,1);
+  assert.equal(get().findings.filter(x=>x.rule!=='C40').length,0);
+  assert.equal(get().accepted.filter(x=>x.rule!=='C40').length,1);
   assert(panel.innerHTML.includes('已确认合理差异（1'));
   assert(saves>=2);
-  await sandbox.runReportReview(null);assert.equal(get().findings.length,0);
+  await sandbox.runReportReview(null);assert.equal(get().findings.filter(x=>x.rule!=='C40').length,0);
   const saved=JSON.parse(JSON.stringify(get()));
   vm.runInContext('reportReviewState = ' + JSON.stringify(saved),ctx);
   sandbox.bbNormalizeReportReviewState();
-  await sandbox.runReportReview(null);assert.equal(get().findings.length,0);
+  await sandbox.runReportReview(null);assert.equal(get().findings.filter(x=>x.rule!=='C40').length,0);
   await sandbox.restoreAcceptedReview(finding.id);
-  assert.equal(get().accepted.length,0);
+  assert.equal(get().accepted.filter(x=>x.rule!=='C40').length,0);
   assert(get().findings.some(x=>x.id===finding.id));
   sandbox.locateReviewSource(finding.id);assert.equal(located,1);
   await sandbox.setReviewStatus(finding.id,'合理差异');
   sandbox.reportTexts['report-overall-2']='A服务器采用TLS1.3，现场核查补充。';
   await sandbox.runReportReview(null);
-  assert.equal(get().accepted.length,0);
+  assert.equal(get().accepted.filter(x=>x.rule!=='C40').length,0);
   assert(get().findings.some(x=>x.id===finding.id));
-  vm.runInContext('reportReviewState = ' + JSON.stringify({findings:[{...get().findings[0],status:'合理差异'},
-    {...get().findings[0],id:'old-risk',target:{section:2}}],ranAt:'',scope:null,signature:''}),ctx);
+  vm.runInContext('reportReviewState = ' + JSON.stringify({findings:[{...get().findings.find(x=>x.rule!=='C40'),status:'合理差异'},
+    {...get().findings.find(x=>x.rule!=='C40'),id:'old-risk',target:{section:2}}],ranAt:'',scope:null,signature:''}),ctx);
   sandbox.bbNormalizeReportReviewState();
-  assert.equal(get().findings.length,0);
-  assert.equal(get().accepted.length,1);
+  assert.equal(get().findings.filter(x=>x.rule!=='C40').length,0);
+  assert.equal(get().accepted.filter(x=>x.rule!=='C40').length,1);
   vm.runInContext('reportReviewState = {findings:[],accepted:[],ranAt:"",scope:null,signature:""}',ctx);
   sandbox.reportTexts['report-sug-prob-2']='1）身份鉴别：存在不足。';
   await sandbox.runReportReview(null);
@@ -315,7 +315,7 @@ async function integration() {
   await sandbox.setReviewStatus(groupId,'合理差异');
   const acceptedGroupId='accepted-group-'+sandbox.BBReportReviewEngine.hash('report-sug-prob-2|身份鉴别');
   await sandbox.restoreAcceptedReview(acceptedGroupId);
-  assert.equal(get().accepted.length,0);
+  assert.equal(get().accepted.filter(x=>x.rule!=='C40').length,0);
   assert.equal(get().findings.filter(x=>x.rule==='C31').length,2);
 
   // 快照集成：管理类使用最终有效文本和结构化结果记录，不再进入对象覆盖规则。
