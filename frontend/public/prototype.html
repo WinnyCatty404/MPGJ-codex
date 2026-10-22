@@ -2832,15 +2832,24 @@
   let nextProjectId = 7;
 
   // textarea 的 CSS text-indent 只处理整个控件首行；按实际换行分段才可逐段缩进。
-  const paragraphTextareaSelector = [
-    'textarea.indent-text',
+  // 系统资产中以下说明性单元格不参与首行缩进（页面不写入缩进空格，Word 导出同样不缩进）：
+  // 重要数据·数据描述、密码产品·用途、服务器/存储设备·用途、网络及安全设备·用途、人员·职责说明。
+  const assetNoIndentSelector = [
     '#asset-tbody-data td:nth-child(3) textarea',
-    '#asset-tbody-doc td:nth-child(3) textarea',
     '#asset-tbody-crypto td:nth-child(7) textarea',
     '#asset-tbody-server td:nth-child(7) textarea',
     '#asset-tbody-network td:nth-child(5) textarea',
+    '#asset-tbody-person td:nth-child(4) textarea'
+  ].join(',');
+  function stripParagraphIndent(value) {
+    return String(value || '').replace(/\r\n?/g, '\n').split('\n').map(function (line) {
+      return line.replace(/^[ \t\u00a0\u3000]+/, '');
+    }).join('\n');
+  }
+  const paragraphTextareaSelector = [
+    'textarea.indent-text',
+    '#asset-tbody-doc td:nth-child(3) textarea',
     '#asset-tbody-app td:nth-child(5) textarea',
-    '#asset-tbody-person td:nth-child(4) textarea',
     '[id^="obj-tbody-"] td.col-desc textarea',
     '#tool-tbody textarea.long-text-input',
     '#access-point-list textarea',
@@ -2865,21 +2874,43 @@
       el.dispatchEvent(new Event('input', { bubbles: true }));
     }
   }
+  // 不缩进的说明列：仅清理首尾空白，绝不补缩进；并剥离历史数据里已写入的缩进空格。
+  function normalizeNoIndentTextarea(el) {
+    if (!el || !el.matches(assetNoIndentSelector) || document.activeElement === el) return;
+    const next = stripParagraphIndent(el.value);
+    if (next !== el.value) {
+      el.value = next;
+      el.dispatchEvent(new Event('input', { bubbles: true }));
+    }
+  }
   function normalizeParagraphTextareas(root) {
     if (!root || !root.querySelectorAll) return;
     if (root.matches && root.matches(paragraphTextareaSelector)) normalizeParagraphTextarea(root);
     root.querySelectorAll(paragraphTextareaSelector).forEach(normalizeParagraphTextarea);
+    if (root.matches && root.matches(assetNoIndentSelector)) normalizeNoIndentTextarea(root);
+    root.querySelectorAll(assetNoIndentSelector).forEach(normalizeNoIndentTextarea);
   }
   document.addEventListener('keydown', function (event) {
     const el = event.target;
     if (event.key !== 'Enter' || event.isComposing || !el || !el.matches || !el.matches(paragraphTextareaSelector)) return;
+    if (el.matches(assetNoIndentSelector)) return;
     event.preventDefault();
     el.setRangeText('\n\u3000\u3000', el.selectionStart, el.selectionEnd, 'end');
     el.dispatchEvent(new Event('input', { bubbles: true }));
   });
   document.addEventListener('focusout', function (event) {
     const el = event.target;
-    if (!el || !el.matches || !el.matches(paragraphTextareaSelector)) return;
+    if (!el || !el.matches) return;
+    if (el.matches(assetNoIndentSelector)) {
+      // focusout 时 activeElement 可能尚未切换，因此直接归一化该输入框。
+      const stripped = stripParagraphIndent(el.value);
+      if (stripped !== el.value) {
+        el.value = stripped;
+        el.dispatchEvent(new Event('input', { bubbles: true }));
+      }
+      return;
+    }
+    if (!el.matches(paragraphTextareaSelector)) return;
     // focusout 时 activeElement 可能尚未切换，因此直接归一化该输入框。
     const next = indentEveryParagraph(el.value);
     if (next !== el.value) {
@@ -11371,11 +11402,28 @@
     Object.keys(names).forEach(function (type) {
       const body = document.getElementById('asset-tbody-' + type);
       if (!body) return;
+      // 以下说明性列在页面与 Word 导出中均不使用首行缩进（按表头列号定位，避免依赖单元格索引）。
+      const noIndentHeaders = {
+        data: ['数据描述'],
+        crypto: ['用途'],
+        server: ['用途'],
+        network: ['用途（包括涉及的密码技术）'],
+        person: ['职责说明']
+      }[type] || [];
+      const headerCells = Array.from(body.closest('table')?.tHead?.rows?.[0]?.cells || []);
+      const noIndentCols = headerCells.reduce(function (list, cell, colIndex) {
+        const label = String(cell.textContent || '').replace(/[\s\u3000]/g, '');
+        if (noIndentHeaders.some(name => label === name.replace(/[\s\u3000]/g, ''))) list.push(colIndex);
+        return list;
+      }, []);
       const rows = Array.from(body.rows).map(function (row, index) {
         return [String(index + 1)].concat(Array.from(row.cells).slice(1).filter(cell => !cell.classList.contains('check-cell')).map(function (cell) {
+          // 用单元格在行内的真实列号（而非过滤后数组下标）判断是否需要去缩进。
+          const originalCol = Array.from(row.cells).indexOf(cell);
           if (cell.classList.contains('req-cell')) return Array.from(cell.querySelectorAll('.req-chip')).map(chip => chip.getAttribute('data-req')).join('\n');
           const field = cell.querySelector('input:not([type="checkbox"]), textarea, select');
-          return field ? field.value : cell.textContent.trim();
+          const raw = field ? field.value : cell.textContent.trim();
+          return noIndentCols.indexOf(originalCol) >= 0 ? stripParagraphIndent(raw) : raw;
         }));
       });
       tables.push({ caption: names[type], rows: rows, skip: 1 });
