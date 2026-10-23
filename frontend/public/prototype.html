@@ -9814,21 +9814,31 @@
       const roleColumn = column('角色'), nameColumn = column('姓名'), taskColumn = column('任务分工'), examColumn = column('是否通过密评人员考核');
       if (roleColumn < 0 || nameColumn < 0 || taskColumn < 0 || examColumn < 0) { add(s2, '表1-1测评项目组成员：表头不完整', true); return; }
       const userNames = getEvalUserNameList();
-      const imported = [];
+      const imported = [], skipped = [];
       team.rows.slice(headerIndex + 1).forEach(function(row) {
         const sourceName = String(row[nameColumn] || '').trim();
         if (!sourceName) return;
-        const exists = userNames.includes(sourceName);
+        // 只导入系统用户表中已存在的人员：未匹配的人不生成成员行，避免留下姓名为空且无法删除的行。
+        if (!userNames.includes(sourceName)) {
+          skipped.push(sourceName);
+          add(s2, sourceName + '：系统用户表中不存在此数据，未导入该成员，请补充后再导入。', true);
+          return;
+        }
         imported.push(newPlanMember({
-          role: String(row[roleColumn] || '').trim(), name: exists ? sourceName : '', importedName: exists ? '' : sourceName,
+          role: String(row[roleColumn] || '').trim(), name: sourceName,
           task: String(row[taskColumn] || '').trim(), passed: compact(row[examColumn]) === '否' ? '否' : '是'
         }));
-        if (!exists) add(s2, sourceName + '：系统用户表中不存在此数据，请补充。', true);
       });
-      if (!imported.length) { add(s2, '表1-1测评项目组成员：没有可导入的数据行', true); return; }
+      if (!imported.length) {
+        add(s2, '表1-1测评项目组成员：' + (skipped.length
+          ? '共 ' + skipped.length + ' 人均不在系统用户表中，未导入，保留现有人员'
+          : '没有可导入的数据行'), true);
+        return;
+      }
       planMembers = imported;
       renderPlanMembers();
-      add(s2, '表1-1测评项目组成员：导入 ' + imported.length + ' 人，已匹配系统用户 ' + imported.filter(member => member.name).length + ' 人');
+      add(s2, '表1-1测评项目组成员：导入 ' + imported.length + ' 人' +
+        (skipped.length ? '，跳过 ' + skipped.length + ' 人（系统用户表中不存在：' + skipped.join('、') + '）' : ''));
     })(); else add(s2, '表1-1测评项目组成员：本次未选择导入测评准备与方案，保留原值');
     // 前次测评情况（"本次测评是被测信息系统进行的第 N 次商用密码应用安全性评估，上次评估时间为…，密评机构为：…，评估结论为：…，综合得分为：…"）
     (function () {
